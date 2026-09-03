@@ -211,7 +211,10 @@ without talking to Jarrod first.
   you — 3 easy, 5 normal, 8 hard — and how many each sends on the first night.
   The wave is the sum of what the living nests send, so pulling one down is a
   permanent cut to every night after. There is no global wave counter to grow;
-  `waveSize()` recomputes it from what is still standing.
+  `waveSize()` recomputes it from what is still standing. It is chosen on the
+  setup screen before a round, not in Settings — it decides the shape of the map
+  you are about to get, so it belongs with the seed, and changing it mid-round
+  would mean nothing anyway.
 - **The nests are the objective and the bank.** They are tough, they knit back
   together each dawn, they keep a standing garrison by day, and they wake
   defenders when hit. Their cache is the only income after the map is stripped,
@@ -233,11 +236,11 @@ without talking to Jarrod first.
   them in — that is the whole tactical language of the wall system. Your own
   units steer directly and follow walls around obstacles, deliberately: a
   player's order should be obeyed literally rather than re-planned.
-- **The HUD has fixed homes.** Supply bottom-left, worker/army counts
-  bottom-right, minimap and clock top-right, selection verbs top-left, build
-  cards in the bottom dock. The dock is where the player's hand lives during a
-  round and must not change contents under it — selection panels appear in the
-  corner instead.
+- **The HUD has fixed homes.** Supply top-left, selection panels bottom-left,
+  worker/army counts bottom-right, minimap and clock top-right, build cards in
+  the bottom dock. The dock is where the player's hand lives during a round and
+  must not change contents under it — selection panels appear in the corner
+  instead.
 
 ---
 
