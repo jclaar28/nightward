@@ -282,6 +282,42 @@
     font-family:"IBM Plex Mono",monospace;font-size:10.5px;letter-spacing:.10em;
     color:var(--faint);pointer-events:none}
 
+  /* ---------------- pre-game setup ---------------- */
+  #screen-setup{display:flex;align-items:center;justify-content:center}
+  #newScrim{position:absolute;inset:0;background:rgba(9,11,14,.80)}
+  #newCard{position:relative;width:min(560px,calc(100vw - 32px));padding:26px 28px 24px}
+  #newCard h2{font-size:24px;font-weight:700;letter-spacing:-.025em;margin:5px 0 4px}
+  #newCard .lead{font-size:12.5px;color:var(--muted);line-height:1.5;margin:0 0 18px}
+  #diffPick{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+  .diffCard{background:transparent;border:1px solid var(--line);border-radius:3px;
+    padding:12px 12px 13px;cursor:pointer;text-align:left;color:var(--muted);
+    transition:border-color .12s ease,background .12s ease,color .12s ease}
+  .diffCard:hover{border-color:var(--line-hi);color:var(--ink)}
+  .diffCard[aria-pressed="true"]{border-color:var(--accent);
+    background:rgba(217,113,74,.13);color:var(--ink)}
+  .diffCard .dn{display:block;font-size:15px;font-weight:700;letter-spacing:-.01em}
+  .diffCard .dm{display:block;margin-top:6px;font-family:"IBM Plex Mono",monospace;
+    font-size:10px;letter-spacing:.06em;color:var(--faint);line-height:1.65;
+    font-variant-numeric:tabular-nums}
+  .diffCard[aria-pressed="true"] .dm{color:var(--muted)}
+  #diffBlurb{margin-top:14px;font-size:12.5px;color:var(--muted);line-height:1.55;
+    border-top:1px solid var(--line);padding-top:13px}
+  #newMapRow{display:flex;align-items:baseline;justify-content:space-between;gap:12px;
+    margin-top:14px;border-top:1px solid var(--line);padding-top:13px}
+  #newMapRow .lbl{font-size:13.5px;font-weight:600;color:var(--ink)}
+  #newMapRow .desc{font-size:11.5px;color:var(--faint);margin-top:2px}
+  #newMapPick{background:transparent;border:1px solid var(--line);border-radius:2px;
+    padding:6px 12px;font-size:12px;font-weight:600;color:var(--muted);white-space:nowrap}
+  #newMapPick:hover{border-color:var(--line-hi);color:var(--ink)}
+  #newGo{width:100%;margin-top:18px;padding:13px;border:0;border-radius:3px;
+    background:var(--accent);color:#12161A;font-family:Archivo,sans-serif;
+    font-size:15px;font-weight:700;cursor:pointer}
+  #newGo:hover{filter:brightness(1.08)}
+  #newBack{margin-top:9px;width:100%;background:transparent;border:1px solid var(--line);
+    border-radius:2px;padding:9px;font-size:12.5px;font-weight:600;color:var(--muted)}
+  #newBack:hover{border-color:var(--line-hi);color:var(--ink)}
+  @media (max-width:520px){ #diffPick{grid-template-columns:1fr} }
+
   /* ---------------- settings ---------------- */
   #screen-settings{display:flex;align-items:center;justify-content:center}
   #setScrim{position:absolute;inset:0;background:rgba(9,11,14,.80)}
@@ -600,7 +636,7 @@
         Maps <span class="sub" id="mMapCount">— maps</span>
       </button>
       <button class="navBtn" id="btnSettings" type="button">
-        Settings <span class="sub">difficulty · render</span>
+        Settings <span class="sub">render · audio</span>
       </button>
       <button class="navBtn" id="btnNet" type="button">
         Two players <span class="sub">one map · two towns</span>
@@ -761,25 +797,36 @@
 </div>
 
 <!-- ============================ SETTINGS ============================ -->
+<!-- ============================ NEW ROUND ============================ -->
+<div class="screen" id="screen-setup" hidden>
+  <div id="newScrim"></div>
+  <div class="panel" id="newCard">
+    <div class="eyebrow">New round</div>
+    <h2>Before the first night</h2>
+    <p class="lead">Difficulty decides how many nests ring your settlement and how
+      many each one sends. It is fixed for the round.</p>
+
+    <div id="diffPick" role="group" aria-label="Difficulty"></div>
+    <div id="diffBlurb"></div>
+
+    <div id="newMapRow">
+      <div>
+        <div class="lbl" id="newMapName">A fresh random map</div>
+        <div class="desc" id="newMapNote">A new seed every round.</div>
+      </div>
+      <button id="newMapPick" type="button">Choose…</button>
+    </div>
+
+    <button id="newGo" type="button">Start the round</button>
+    <button id="newBack" type="button">← Menu</button>
+  </div>
+</div>
+
 <div class="screen" id="screen-settings" hidden>
   <div id="setScrim"></div>
   <div class="panel" id="setCard">
     <div class="eyebrow">Settings</div>
     <h2>Options</h2>
-
-    <div class="sRow">
-      <div>
-        <div class="lbl">Difficulty</div>
-        <div class="desc" id="setDiffNote">180 supply · 48 attackers · 34 HP each</div>
-      </div>
-      <div class="ctl">
-        <select id="setDiff">
-          <option value="easy">Easy</option>
-          <option value="normal">Normal</option>
-          <option value="hard">Hard</option>
-        </select>
-      </div>
-    </div>
 
     <div class="sRow">
       <div>
@@ -984,7 +1031,7 @@
     <div class="pauseNav">
       <button class="pauseBtn" id="pResume" type="button">Resume<span class="sub">esc</span></button>
       <button class="pauseBtn" id="pControls" type="button">Controls<span class="sub">keys · mouse</span></button>
-      <button class="pauseBtn" id="pSettings" type="button">Settings<span class="sub">difficulty · render</span></button>
+      <button class="pauseBtn" id="pSettings" type="button">Settings<span class="sub">render · audio</span></button>
       <button class="pauseBtn" id="pQuit" type="button">Abandon round<span class="sub">back to the menu</span></button>
     </div>
     <div id="pauseKeys" hidden>

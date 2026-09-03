@@ -95,7 +95,7 @@ function backdropCam(){
 
 // ---- screens --------------------------------------------------------------
 var screen="menu";
-var SCREENS=["menu","play","library","maps","settings","net"];
+var SCREENS=["menu","play","setup","library","maps","settings","net"];
 function show(name){
   if(screen==="library"&&name!=="library") HFLIB.exit();
   if(screen==="maps"&&name!=="maps") HFMAP.exit();
@@ -108,7 +108,8 @@ function show(name){
   el("hud").hidden=(name!=="play");
   if(name!=="play") el("overlay").hidden=true;
   if(name!=="play") R.setLamps([]);
-  if(name==="menu"||name==="settings"||name==="net"){ R.setStatic(ensureBackdrop()); }
+  if(name==="menu"||name==="settings"||name==="net"||name==="setup"){ R.setStatic(ensureBackdrop()); }
+  if(name==="setup") drawSetup();
   if(name==="library"){ R.setTime(0.08); HFLIB.enter(); }
   if(name==="maps"){ R.setTime(0.06); HFMAP.enter(); }
   if(name==="menu") refreshMenu();
@@ -796,9 +797,14 @@ function netHud(){
     }
   }
   function mapNote(){
-    el("netMapNote").textContent = playMap
-      ? "This round will use your map \u201c"+playMap.name+"\u201d."
-      : "This round will use a fresh random map. Pick one in Maps first if you want a set one.";
+    // The host's difficulty is the round's, so the host should be able to see
+    // it here rather than having to remember what they last picked.
+    var d=HFGAME.DIFF[SET.difficulty];
+    el("netMapNote").textContent = (playMap
+      ? "This round will use your map \u201c"+playMap.name+"\u201d"
+      : "This round will use a fresh random map")
+      + " on "+d.label.toLowerCase()+" \u2014 "+d.nests+" nests. "
+      + "Change it on the Play screen.";
   }
 
   HFNET.init({
@@ -919,7 +925,10 @@ function playAgain(){
   if(HFNET.active()) return;
   startRun(playMap);
 }
-el("btnPlay").addEventListener("click",function(){ startRun(null); });
+// Play opens the setup screen. Difficulty is a decision about the round you
+// are about to start, not a preference that lives in a menu with the render
+// options — it cannot be changed once the first night is coming.
+el("btnPlay").addEventListener("click",function(){ show("setup"); });
 el("btnLibrary").addEventListener("click",function(){ show("library"); });
 el("btnMaps").addEventListener("click",function(){ show("maps"); });
 el("btnNet").addEventListener("click",function(){ show("net"); });
@@ -982,11 +991,8 @@ el("troopStance").addEventListener("click",function(){
 
 // settings controls
 function wireSettings(){
-  var d=el("setDiff");
-  d.value=SET.difficulty;
-  d.addEventListener("change",function(){
-    SET.difficulty=d.value; applySettings(); refreshMenu(); updateDiffNote();
-  });
+  // Difficulty used to live here. It belongs to a round, not to a profile, so
+  // it moved to the setup screen you pass through on the way into one.
   var o=el("setOutline");
   o.checked=SET.outline;
   o.addEventListener("change",function(){ SET.outline=o.checked; applySettings(); });
@@ -1034,13 +1040,46 @@ function wireSettings(){
     el("setWipeAssets").textContent="Edits cleared";
     setTimeout(function(){ el("setWipeAssets").textContent="Clear asset & balance edits"; },1600);
   });
-  updateDiffNote();
 }
-function updateDiffNote(){
-  var C=HFGAME.DIFF[SET.difficulty];
-  el("setDiffNote").textContent=C.supply+" supply · "+C.wave+" attackers · "+C.hp+" HP base · "
-    +Math.round(C.wave*C.mix.runner)+" runners, "+Math.round(C.wave*C.mix.brute)+" brutes";
+// ---- the pre-game setup screen -------------------------------------------
+// Everything here is read from the balance table, so a difficulty edited in the
+// Library describes itself correctly without a second copy of its numbers.
+var DIFF_BLURB={
+  easy:  "Three nests, further apart, and the smallest nights. Room to learn what "+
+         "a wall is for before anything tests it.",
+  normal:"Five nests. Holding the line is affordable; clearing them is the game.",
+  hard:  "Eight nests ringing you, and less to start with. Every night you leave "+
+         "one standing, the next comes harder \u2014 and there are eight to pull down."
+};
+function drawSetup(){
+  var box=el("diffPick");
+  if(!box) return;
+  box.innerHTML="";
+  Object.keys(HFGAME.DIFF).forEach(function(k){
+    var C=HFGAME.DIFF[k];
+    var first=(C.nests|0)*(C.send|0);
+    var b=document.createElement("button");
+    b.type="button"; b.className="diffCard"; b.dataset.diff=k;
+    b.setAttribute("aria-pressed",k===SET.difficulty?"true":"false");
+    b.innerHTML='<span class="dn">'+C.label+'</span><span class="dm">'+
+      C.nests+' nests<br>'+first+' the first night<br>'+
+      C.supply+' supply to start</span>';
+    b.addEventListener("click",function(){
+      SET.difficulty=k; applySettings(); refreshMenu(); drawSetup();
+    });
+    box.appendChild(b);
+  });
+  var C2=HFGAME.DIFF[SET.difficulty];
+  el("diffBlurb").textContent=DIFF_BLURB[SET.difficulty]||C2.label;
+  el("newMapName").textContent=playMap?playMap.name:"A fresh random map";
+  el("newMapNote").textContent=playMap
+    ? "One of yours, from the Maps screen."
+    : "A new seed every round.";
+  el("newMapPick").textContent=playMap?"Change\u2026":"Choose\u2026";
 }
+el("newGo").addEventListener("click",function(){ startRun(playMap); });
+el("newBack").addEventListener("click",function(){ show("menu"); });
+el("newMapPick").addEventListener("click",function(){ show("maps"); });
 
 window.addEventListener("keydown",function(ev){
   if(screen==="library" && HFLIB.keydown(ev)) return;
@@ -1053,7 +1092,7 @@ window.addEventListener("keydown",function(ev){
       setPause(true);
       return;
     }
-    if(screen==="library"||screen==="settings") show("menu");
+    if(screen==="library"||screen==="settings"||screen==="setup") show("menu");
     else if(screen==="play"&&el("overlay").hidden){
       if(paused) resumePlay(); else setPause(true);
     }

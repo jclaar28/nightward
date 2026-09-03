@@ -133,9 +133,17 @@ check('nothing is cut off by its own window', rows.every(r => r.m && r.m.seconds
 
 // The mix has to have a shape: chatter under events under moments.
 const lvl = n => rows.find(r => r.name === n).m.peak;
+// By category, not by pairs. Every sound here is randomised, so two individual
+// renders of similarly-sized events can land either way round — an ordering
+// between a tower shot and a light impact is a coin toss, and asserting it made
+// this check fail on a run where nothing had changed.
+const CHATTER = ['shot:tower','loose','impact:light','swing','chew','gather','deposit','order'];
+const BIG     = ['impact:heavy','hallHit','waveStart','lose'];
+const loudestChatter = Math.max(...CHATTER.map(lvl));
+const quietestBig    = Math.min(...BIG.map(lvl));
 check('combat chatter sits under the big moments',
-      lvl('shot:tower') < lvl('impact:light') * 1.2 && lvl('impact:light') < lvl('impact:heavy') * 0.6,
-      `shot ${lvl('shot:tower')}, light impact ${lvl('impact:light')}, heavy ${lvl('impact:heavy')}`);
+      loudestChatter < quietestBig * 0.75,
+      `loudest chatter ${loudestChatter.toFixed(3)}, quietest big moment ${quietestBig.toFixed(3)}`);
 check('nothing is so quiet it may as well not fire',
       rows.every(r => r.m.peak > 0.05),
       'quietest ' + Math.min(...rows.map(r => r.m.peak)).toFixed(3));
@@ -144,8 +152,11 @@ check('nothing is so quiet it may as well not fire',
 // Heavy things are dark, small things are bright. A synth pass that got this
 // backwards would still "play a sound" for every event.
 const heavy = rows[7].m, light = rows[6].m;      // impact(true) vs impact(false)
+// An absolute margin, not a ratio: the light impact's body is randomised
+// either side of the 180 Hz measurement line, so its weight swings 0.33-0.43
+// and a x2 test sat right on the edge of that swing.
 check('a heavy impact carries more weight than a light one',
-      heavy.weight > light.weight * 2,
+      heavy.weight > 0.7 && heavy.weight - light.weight > 0.25,
       `${heavy.weight} vs ${light.weight} of the energy under 180 Hz`);
 const brute = rows[12].m, sham = rows[11].m;
 check('a brute dies heavier and longer than a shambler',

@@ -282,6 +282,42 @@
     font-family:"IBM Plex Mono",monospace;font-size:10.5px;letter-spacing:.10em;
     color:var(--faint);pointer-events:none}
 
+  /* ---------------- pre-game setup ---------------- */
+  #screen-setup{display:flex;align-items:center;justify-content:center}
+  #newScrim{position:absolute;inset:0;background:rgba(9,11,14,.80)}
+  #newCard{position:relative;width:min(560px,calc(100vw - 32px));padding:26px 28px 24px}
+  #newCard h2{font-size:24px;font-weight:700;letter-spacing:-.025em;margin:5px 0 4px}
+  #newCard .lead{font-size:12.5px;color:var(--muted);line-height:1.5;margin:0 0 18px}
+  #diffPick{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+  .diffCard{background:transparent;border:1px solid var(--line);border-radius:3px;
+    padding:12px 12px 13px;cursor:pointer;text-align:left;color:var(--muted);
+    transition:border-color .12s ease,background .12s ease,color .12s ease}
+  .diffCard:hover{border-color:var(--line-hi);color:var(--ink)}
+  .diffCard[aria-pressed="true"]{border-color:var(--accent);
+    background:rgba(217,113,74,.13);color:var(--ink)}
+  .diffCard .dn{display:block;font-size:15px;font-weight:700;letter-spacing:-.01em}
+  .diffCard .dm{display:block;margin-top:6px;font-family:"IBM Plex Mono",monospace;
+    font-size:10px;letter-spacing:.06em;color:var(--faint);line-height:1.65;
+    font-variant-numeric:tabular-nums}
+  .diffCard[aria-pressed="true"] .dm{color:var(--muted)}
+  #diffBlurb{margin-top:14px;font-size:12.5px;color:var(--muted);line-height:1.55;
+    border-top:1px solid var(--line);padding-top:13px}
+  #newMapRow{display:flex;align-items:baseline;justify-content:space-between;gap:12px;
+    margin-top:14px;border-top:1px solid var(--line);padding-top:13px}
+  #newMapRow .lbl{font-size:13.5px;font-weight:600;color:var(--ink)}
+  #newMapRow .desc{font-size:11.5px;color:var(--faint);margin-top:2px}
+  #newMapPick{background:transparent;border:1px solid var(--line);border-radius:2px;
+    padding:6px 12px;font-size:12px;font-weight:600;color:var(--muted);white-space:nowrap}
+  #newMapPick:hover{border-color:var(--line-hi);color:var(--ink)}
+  #newGo{width:100%;margin-top:18px;padding:13px;border:0;border-radius:3px;
+    background:var(--accent);color:#12161A;font-family:Archivo,sans-serif;
+    font-size:15px;font-weight:700;cursor:pointer}
+  #newGo:hover{filter:brightness(1.08)}
+  #newBack{margin-top:9px;width:100%;background:transparent;border:1px solid var(--line);
+    border-radius:2px;padding:9px;font-size:12.5px;font-weight:600;color:var(--muted)}
+  #newBack:hover{border-color:var(--line-hi);color:var(--ink)}
+  @media (max-width:520px){ #diffPick{grid-template-columns:1fr} }
+
   /* ---------------- settings ---------------- */
   #screen-settings{display:flex;align-items:center;justify-content:center}
   #setScrim{position:absolute;inset:0;background:rgba(9,11,14,.80)}
@@ -600,7 +636,7 @@
         Maps <span class="sub" id="mMapCount">— maps</span>
       </button>
       <button class="navBtn" id="btnSettings" type="button">
-        Settings <span class="sub">difficulty · render</span>
+        Settings <span class="sub">render · audio</span>
       </button>
       <button class="navBtn" id="btnNet" type="button">
         Two players <span class="sub">one map · two towns</span>
@@ -761,25 +797,36 @@
 </div>
 
 <!-- ============================ SETTINGS ============================ -->
+<!-- ============================ NEW ROUND ============================ -->
+<div class="screen" id="screen-setup" hidden>
+  <div id="newScrim"></div>
+  <div class="panel" id="newCard">
+    <div class="eyebrow">New round</div>
+    <h2>Before the first night</h2>
+    <p class="lead">Difficulty decides how many nests ring your settlement and how
+      many each one sends. It is fixed for the round.</p>
+
+    <div id="diffPick" role="group" aria-label="Difficulty"></div>
+    <div id="diffBlurb"></div>
+
+    <div id="newMapRow">
+      <div>
+        <div class="lbl" id="newMapName">A fresh random map</div>
+        <div class="desc" id="newMapNote">A new seed every round.</div>
+      </div>
+      <button id="newMapPick" type="button">Choose…</button>
+    </div>
+
+    <button id="newGo" type="button">Start the round</button>
+    <button id="newBack" type="button">← Menu</button>
+  </div>
+</div>
+
 <div class="screen" id="screen-settings" hidden>
   <div id="setScrim"></div>
   <div class="panel" id="setCard">
     <div class="eyebrow">Settings</div>
     <h2>Options</h2>
-
-    <div class="sRow">
-      <div>
-        <div class="lbl">Difficulty</div>
-        <div class="desc" id="setDiffNote">180 supply · 48 attackers · 34 HP each</div>
-      </div>
-      <div class="ctl">
-        <select id="setDiff">
-          <option value="easy">Easy</option>
-          <option value="normal">Normal</option>
-          <option value="hard">Hard</option>
-        </select>
-      </div>
-    </div>
 
     <div class="sRow">
       <div>
@@ -984,7 +1031,7 @@
     <div class="pauseNav">
       <button class="pauseBtn" id="pResume" type="button">Resume<span class="sub">esc</span></button>
       <button class="pauseBtn" id="pControls" type="button">Controls<span class="sub">keys · mouse</span></button>
-      <button class="pauseBtn" id="pSettings" type="button">Settings<span class="sub">difficulty · render</span></button>
+      <button class="pauseBtn" id="pSettings" type="button">Settings<span class="sub">render · audio</span></button>
       <button class="pauseBtn" id="pQuit" type="button">Abandon round<span class="sub">back to the menu</span></button>
     </div>
     <div id="pauseKeys" hidden>
@@ -9084,7 +9131,7 @@ function backdropCam(){
 
 // ---- screens --------------------------------------------------------------
 var screen="menu";
-var SCREENS=["menu","play","library","maps","settings","net"];
+var SCREENS=["menu","play","setup","library","maps","settings","net"];
 function show(name){
   if(screen==="library"&&name!=="library") HFLIB.exit();
   if(screen==="maps"&&name!=="maps") HFMAP.exit();
@@ -9097,7 +9144,8 @@ function show(name){
   el("hud").hidden=(name!=="play");
   if(name!=="play") el("overlay").hidden=true;
   if(name!=="play") R.setLamps([]);
-  if(name==="menu"||name==="settings"||name==="net"){ R.setStatic(ensureBackdrop()); }
+  if(name==="menu"||name==="settings"||name==="net"||name==="setup"){ R.setStatic(ensureBackdrop()); }
+  if(name==="setup") drawSetup();
   if(name==="library"){ R.setTime(0.08); HFLIB.enter(); }
   if(name==="maps"){ R.setTime(0.06); HFMAP.enter(); }
   if(name==="menu") refreshMenu();
@@ -9785,9 +9833,14 @@ function netHud(){
     }
   }
   function mapNote(){
-    el("netMapNote").textContent = playMap
-      ? "This round will use your map \u201c"+playMap.name+"\u201d."
-      : "This round will use a fresh random map. Pick one in Maps first if you want a set one.";
+    // The host's difficulty is the round's, so the host should be able to see
+    // it here rather than having to remember what they last picked.
+    var d=HFGAME.DIFF[SET.difficulty];
+    el("netMapNote").textContent = (playMap
+      ? "This round will use your map \u201c"+playMap.name+"\u201d"
+      : "This round will use a fresh random map")
+      + " on "+d.label.toLowerCase()+" \u2014 "+d.nests+" nests. "
+      + "Change it on the Play screen.";
   }
 
   HFNET.init({
@@ -9908,7 +9961,10 @@ function playAgain(){
   if(HFNET.active()) return;
   startRun(playMap);
 }
-el("btnPlay").addEventListener("click",function(){ startRun(null); });
+// Play opens the setup screen. Difficulty is a decision about the round you
+// are about to start, not a preference that lives in a menu with the render
+// options — it cannot be changed once the first night is coming.
+el("btnPlay").addEventListener("click",function(){ show("setup"); });
 el("btnLibrary").addEventListener("click",function(){ show("library"); });
 el("btnMaps").addEventListener("click",function(){ show("maps"); });
 el("btnNet").addEventListener("click",function(){ show("net"); });
@@ -9971,11 +10027,8 @@ el("troopStance").addEventListener("click",function(){
 
 // settings controls
 function wireSettings(){
-  var d=el("setDiff");
-  d.value=SET.difficulty;
-  d.addEventListener("change",function(){
-    SET.difficulty=d.value; applySettings(); refreshMenu(); updateDiffNote();
-  });
+  // Difficulty used to live here. It belongs to a round, not to a profile, so
+  // it moved to the setup screen you pass through on the way into one.
   var o=el("setOutline");
   o.checked=SET.outline;
   o.addEventListener("change",function(){ SET.outline=o.checked; applySettings(); });
@@ -10023,13 +10076,46 @@ function wireSettings(){
     el("setWipeAssets").textContent="Edits cleared";
     setTimeout(function(){ el("setWipeAssets").textContent="Clear asset & balance edits"; },1600);
   });
-  updateDiffNote();
 }
-function updateDiffNote(){
-  var C=HFGAME.DIFF[SET.difficulty];
-  el("setDiffNote").textContent=C.supply+" supply · "+C.wave+" attackers · "+C.hp+" HP base · "
-    +Math.round(C.wave*C.mix.runner)+" runners, "+Math.round(C.wave*C.mix.brute)+" brutes";
+// ---- the pre-game setup screen -------------------------------------------
+// Everything here is read from the balance table, so a difficulty edited in the
+// Library describes itself correctly without a second copy of its numbers.
+var DIFF_BLURB={
+  easy:  "Three nests, further apart, and the smallest nights. Room to learn what "+
+         "a wall is for before anything tests it.",
+  normal:"Five nests. Holding the line is affordable; clearing them is the game.",
+  hard:  "Eight nests ringing you, and less to start with. Every night you leave "+
+         "one standing, the next comes harder \u2014 and there are eight to pull down."
+};
+function drawSetup(){
+  var box=el("diffPick");
+  if(!box) return;
+  box.innerHTML="";
+  Object.keys(HFGAME.DIFF).forEach(function(k){
+    var C=HFGAME.DIFF[k];
+    var first=(C.nests|0)*(C.send|0);
+    var b=document.createElement("button");
+    b.type="button"; b.className="diffCard"; b.dataset.diff=k;
+    b.setAttribute("aria-pressed",k===SET.difficulty?"true":"false");
+    b.innerHTML='<span class="dn">'+C.label+'</span><span class="dm">'+
+      C.nests+' nests<br>'+first+' the first night<br>'+
+      C.supply+' supply to start</span>';
+    b.addEventListener("click",function(){
+      SET.difficulty=k; applySettings(); refreshMenu(); drawSetup();
+    });
+    box.appendChild(b);
+  });
+  var C2=HFGAME.DIFF[SET.difficulty];
+  el("diffBlurb").textContent=DIFF_BLURB[SET.difficulty]||C2.label;
+  el("newMapName").textContent=playMap?playMap.name:"A fresh random map";
+  el("newMapNote").textContent=playMap
+    ? "One of yours, from the Maps screen."
+    : "A new seed every round.";
+  el("newMapPick").textContent=playMap?"Change\u2026":"Choose\u2026";
 }
+el("newGo").addEventListener("click",function(){ startRun(playMap); });
+el("newBack").addEventListener("click",function(){ show("menu"); });
+el("newMapPick").addEventListener("click",function(){ show("maps"); });
 
 window.addEventListener("keydown",function(ev){
   if(screen==="library" && HFLIB.keydown(ev)) return;
@@ -10042,7 +10128,7 @@ window.addEventListener("keydown",function(ev){
       setPause(true);
       return;
     }
-    if(screen==="library"||screen==="settings") show("menu");
+    if(screen==="library"||screen==="settings"||screen==="setup") show("menu");
     else if(screen==="play"&&el("overlay").hidden){
       if(paused) resumePlay(); else setPause(true);
     }
