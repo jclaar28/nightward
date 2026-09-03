@@ -27,14 +27,19 @@ const BUILDS = arg('build', 'mid').split(',');
 const NSEEDS = +arg('seeds', 5);
 const AB     = arg('ab', null);   // e.g. "tower.dmg=20" or "wall.hp=200"
 const NIGHTS = +arg('nights', 1); // how many nights to play out per run
+// Stand-in for a player who actually mounts assaults: pull this many nests down
+// after the second night. The harness cannot micro an army across the map, but
+// the thing that matters downstream is the wave being smaller, and that it can
+// model honestly.
+const KILL   = +arg('kill', 0);
 
 const SEEDS = [31337, 5150, 90210, 4242, 8888, 1234, 777, 2468, 13579, 60606, 42, 999]
   .slice(0, Math.max(1, Math.min(12, NSEEDS)));
 
 // The whole run, inside the page. It plays a full day — gather, cottages,
 // defence — then holds a night, and reports what happened.
-function playRound({ seed, wave, build, stat, nights }) {
-  nights = nights || 1;
+function playRound({ seed, wave, build, stat, nights, kill }) {
+  nights = nights || 1; kill = kill || 0;
   const G = window.__hf.game;
   // A/B switch: apply an override, or explicitly restore the shipped default,
   // so both columns of a comparison run through identical code.
@@ -124,21 +129,44 @@ function playRound({ seed, wave, build, stat, nights }) {
   const unfinished = __nw.roots().filter(b => b.site).length;
 
   // Holding a night no longer ends the round, so the measure is how many of
-  // them a build survives before the accelerating waves take it.
-  let peak = 0, held = 0, firstWave = S.wave;
+  // them a build survives. A frozen defence answers the wrong question — the
+  // real player spends every morning's income — so the days between nights are
+  // played: workers keep gathering and the purse keeps buying guns.
+  let peak = 0, held = 0, firstWave = G.waveSize();
+  let ring2 = 0;
+  const spendDay = () => {
+    for (let t = 0; t < S.dayLen - 14; t += 12) {
+      assign(); __nw.run(12);
+      // widen the gun line outward, a ring at a time
+      while (S.players[0].supply >= 60) {
+        const a = ring2 * 0.618 * 6.283, r = 6.2 + (ring2 % 5) * 1.5;
+        const want = (ring2 % 7 === 6) ? 'ballista' : 'tower';
+        if (!__nw.place(want, Math.cos(a) * r, Math.sin(a) * r)) { ring2++; continue; }
+        spent[want]++; ring2++;
+        if (ring2 > 400) break;
+      }
+    }
+    __nw.run(12);
+  };
   for (let night = 0; night < nights; night++) {
+    if (night === 2 && kill > 0) {
+      S.nests.filter(n => !n.dead).slice(0, kill)
+        .forEach(n => { G.hurtNest(n, n.hp + 1, 0); });
+      __nw.run(1);
+    }
     G.startWave();
-    for (let n = 0; n < 200 && S.phase === 'attack'; n++) {
+    for (let n = 0; n < 240 && S.phase === 'attack'; n++) {
       __nw.run(1);
       peak = Math.max(peak, S.enemies.length);
     }
     if (S.phase !== 'build') break;      // lost, or the nests are gone
     held++;
-    __nw.run(Math.max(1, S.dayLen - 2)); // spend the day doing nothing but repair
+    spendDay();
   }
   return {
     seed, wave: firstWave, build, gathered, purse, cottages, unfinished,
-    result: S.phase, held, lastWave: S.wave, kills: S.kills, peak,
+    result: S.phase, held, lastWave: G.waveSize(), kills: S.kills, peak,
+    guns: spent.tower + spent.ballista,
     hall: S.players[0].hall ? Math.round(100 * S.players[0].hall.hp / G.TYPES.hall.hp) : 0,
     spent,
   };
@@ -163,7 +191,8 @@ for (const wave of WAVES) {
       const out = [];
       for (const on of runs) {
         const r = await page.evaluate(a => window.__play(a),
-          { seed, wave, build, nights: NIGHTS, stat: stat ? { ...stat, on } : null });
+          { seed, wave, build, nights: NIGHTS, kill: KILL,
+            stat: stat ? { ...stat, on } : null });
         if (r.error) { console.log(`wave ${wave} ${build} seed ${seed}: ${r.error}`); continue; }
         const key = `${wave}|${build}|${on === true ? 'B' : 'A'}`;
         tally[key] = tally[key] || { held: 0, nights: 0, n: 0 };
@@ -174,7 +203,8 @@ for (const wave of WAVES) {
       }
       const line = out.map(r =>
         `${r.held}/${NIGHTS} nights  ${r.result === 'lost' ? 'FELL' : 'held'}` +
-        ` hall ${String(r.hall).padStart(3)}`).join('  |  ');
+        ` hall ${String(r.hall).padStart(3)}  guns ${String(r.guns).padStart(3)}` +
+        `  last wave ${String(r.lastWave).padStart(5)}`).join('  |  ');
       const first = out[0] || {};
       console.log(`wave ${String(wave).padStart(4)}  ${build.padEnd(6)} seed ${String(seed).padEnd(6)}` +
                   `  ${line}   kills ${String(first.kills || 0).padStart(4)}` +

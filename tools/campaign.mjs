@@ -42,7 +42,9 @@ const cycles = await page.evaluate(seed => {
       __nw.place('tower', Math.cos(a) * 6.5, Math.sin(a) * 6.5);
     }
     __nw.run(12);
-    const before = { night: S.night, wave: S.wave, ehp: +S.ehp.toFixed(1) };
+    // S.wave is only set at nightfall now, so ask what tonight will be rather
+    // than reading last night's number (which is 0 before the first one).
+    const before = { night: S.night, wave: HFGAME.waveSize(), ehp: +S.ehp.toFixed(1) };
     __until('attack', 600);                // ride the day out to nightfall
     const inWave = S.phase === 'attack';
     // This checks the loop, not the difficulty. Pin the hall through the night

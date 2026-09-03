@@ -180,22 +180,25 @@ function syncStats(){
   }
 }
 syncStats();
-// Six minutes of daylight is long enough to strip the map of scrap, so the
-// night is sized against a full purse rather than a starting one: the question
-// stopped being "can I afford a defence" and became "is the one I bought good
-// enough". Starting supply only decides how fast the first cottage goes up.
+// Difficulty sets the shape of the game, not just its numbers: how many nests
+// ring you, and how many each one sends on the first night. The wave is the sum
+// of what the living nests send, so pulling one down is a permanent cut to
+// every night after — which is the whole reason to leave the walls.
+// `send` is per nest per night one; `nests` is how many the map seeds.
 var DIFF={
-  easy  :{supply:60, wave:400, hp:36, label:"Easy",
+  easy  :{supply:60, nests:3, send:112, hp:36, label:"Easy",
           mix:{shambler:0.76, runner:0.20, brute:0.04}},
-  normal:{supply:45, wave:600, hp:42, label:"Normal",
+  normal:{supply:45, nests:5, send:104, hp:42, label:"Normal",
           mix:{shambler:0.66, runner:0.25, brute:0.09}},
-  hard  :{supply:30, wave:850, hp:46, label:"Hard",
+  hard  :{supply:30, nests:8, send:98,  hp:46, label:"Hard",
           mix:{shambler:0.58, runner:0.28, brute:0.14}}
 };
 var BOLT_SPEED=30;
 // Two settlements sit this far either side of the middle, far enough apart that
 // their build rings never touch but close enough to see each other fight.
-var SEAT=[[[0,0]], [[-16,0],[16,0]]];
+// Two towns on a 120-unit map want real distance between them; 32 apart was
+// sized for a grid a third this wide.
+var SEAT=[[[0,0]], [[-34,0],[34,0]]];
 var SEAT_COL=[[0.62,0.72,0.86],[0.86,0.72,0.50]];   // player tints on the map
 var MAX_PARTS=640, MAX_CORPSES=200;
 
@@ -244,7 +247,9 @@ function init(renderer, cv, settings, endCb){
   // found the seam rather than counting it — the list has grown twice already
   var cut=BATCHES.indexOf(B.nest);
   BATCHES=BATCHES.slice(0,cut).concat(rigB,BATCHES.slice(cut));
-  var CAP={swarm:1200,runner:900,brute:420,corpse:MAX_CORPSES,spark:MAX_PARTS,
+  // Late nights are an order of magnitude bigger than the old single wave, and
+  // a batch that overflows its buffer truncates silently.
+  var CAP={swarm:2600,runner:1900,brute:900,corpse:MAX_CORPSES,spark:MAX_PARTS,
            debris:MAX_PARTS,
            bolt:400,arrow:300,wall:1400,soldier:120,archer:120,worker:120,
            commander:8,
@@ -275,7 +280,17 @@ function newGame(seed,map,opt){
   var pn=Math.max(1,Math.min(2,(opt&&opt.players)|0||1));
   var seats=SEAT[pn-1];
   var mapNests=(map&&map.nests&&map.nests.length)?map.nests:null;
-  var T=M.makeTerrain(seed,map?map.gen:null,mapNests,seats), C=conf();
+  var C=conf();
+  // A hand-built map places its own nests; otherwise the difficulty says how
+  // many to ring the settlement with, which is what makes easy and hard
+  // different games rather than the same game with bigger numbers.
+  var gen=map?map.gen:null;
+  if(!mapNests){
+    var g2={}; for(var gk in (gen||{})) g2[gk]=gen[gk];
+    if(g2.nestN===undefined||g2.nestN===null) g2.nestN=RD.nests||C.nests||5;
+    gen=g2;
+  }
+  var T=M.makeTerrain(seed,gen,mapNests,seats);
   var mesh=M.buildStatic(T,map?map.props:null);
   R.setStatic(mesh);
   // live copies: a nest is a target, so it carries hp and takes hits
@@ -301,7 +316,8 @@ function newGame(seed,map,opt){
     }),
     me:Math.max(0,Math.min(pn-1,(opt.me|0)||0)),
     multi:pn>1,
-    phase:"build", supply:RD.supply||C.supply, ehp:RD.hp||C.hp, wave:RD.wave||C.wave,
+    phase:"build", supply:RD.supply||C.supply, ehp:RD.hp||C.hp, wave:0,
+    send:RD.send||C.send||104,     // what one nest sends on the first night
     cells:{}, hall:null, enemies:[], bolts:[], parts:[], corpses:[], queue:[],
     units:[], markers:[], stance:"hold", marquee:null,
     nodes:makeNodes(seed,map), gathered:0,
@@ -498,14 +514,17 @@ function makeNodes(seed,map){
     out.push({x:Math.cos(a)*r, z:Math.sin(a)*r, amt:amt, max:amt,
               rot:rng()*Math.PI*2});
   }
+  // Inside piles sit just past the plateau, where a worker is safe and the walk
+  // is short. Outside piles are spread across the open ground between the town
+  // and the nests: worth more, and worth an escort.
   for(i=0;i<(st.nearN|0);i++){
     a=(i+rng())*(Math.PI*2/Math.max(1,st.nearN|0));
-    r=6.2+rng()*3.2;
+    r=6.4+rng()*4.0;
     push(a,r,Math.round(st.amt*(0.85+rng()*0.3)));
   }
   for(i=0;i<(st.farN|0);i++){
     a=(i+rng())*(Math.PI*2/Math.max(1,st.farN|0));
-    r=13.8+rng()*4.6;
+    r=16.0+Math.pow(rng(),0.8)*22.0;
     push(a,r,Math.round(st.amt*st.farK*(0.85+rng()*0.3)));
   }
   return out;
@@ -1293,6 +1312,7 @@ function nightfall(){
 // the day is the day, and what you have built when it ends is what you have.
 function startWave(){
   if(!livePlayers().some(function(p){ return !!p.hall; })||S.phase!=="build") return;
+  S.wave=waveSize();
   S.phase="attack"; S.spawnLeft=S.wave; S.spawnTimer=1.2; S.waveClock=0;
   // The nests empty out. A guard is only a guard by daylight; once the horde is
   // moving it goes with them, which is why clearing a garrison in the afternoon
@@ -1413,8 +1433,25 @@ function spawnGuard(nest){
   nest.guards++;
   return m;
 }
+// What the nests will send tonight: each living one contributes its share,
+// ramping with the night. Kill a nest and its share is gone for good — that is
+// the payoff for marching out, and the reason the total accelerates only while
+// you leave them alone.
+function nestSend(night){
+  var ramp=(NEST.ramp===undefined?1.28:NEST.ramp);
+  return Math.max(1,Math.round((S.send||104)*Math.pow(ramp,Math.max(0,(night||1)-1))));
+}
+function waveSize(){ return liveNests().length*nestSend(S.night); }
+// A nest starts with a few of them loitering and fills up as the nights go on,
+// so an early assault is a raid and a late one is a siege.
+function guardWant(){
+  var base=(NEST.guard===undefined?3:NEST.guard);
+  var step=(NEST.guardStep===undefined?2:NEST.guardStep);
+  var cap=(NEST.guardMax===undefined?16:NEST.guardMax);
+  return Math.max(0,Math.min(cap,Math.round(base+step*Math.max(0,S.night-1))));
+}
 function garrisonNests(){
-  var want=NEST.guard===undefined?6:NEST.guard;
+  var want=guardWant();
   liveNests().forEach(function(n){
     n.guards=0;
     for(var i=0;i<S.enemies.length;i++) if(S.enemies[i].home===n) n.guards++;
@@ -1890,11 +1927,9 @@ function dawn(){
 
   S.lastBurn=S.dawnBurn; S.lastHeld=S.night;
   S.night++;
-  // Accelerating growth: the gap between nights widens, so a long game is not a
-  // safe one. Attacker health creeps up with it.
-  var grow=(NEST.grow===undefined?0.20:NEST.grow);
-  var accel=(NEST.accel===undefined?0.06:NEST.accel);
-  S.wave=Math.max(1,Math.round(S.wave*(1+grow+accel*(S.night-2))));
+  // The wave is not carried forward and grown — it is recomputed from what is
+  // still out there. Attacker health creeps up alongside it.
+  S.wave=waveSize();
   S.ehp=S.ehp*(NEST.ehpK||1.05);
   // A nest you only wounded is a nest you did not kill.
   var regen=(NEST.regen===undefined?0.5:NEST.regen);
@@ -3054,6 +3089,9 @@ return {
   deselectAll:deselectAll,
   startWave:startWave, clearSel:clearSel, RIG:RIG, RIGDEF:RIGDEF,
   liveNests:liveNests, cam:function(){ return cam; }, camera:camera,
+  // how big tonight will be, from what is still standing out there
+  waveSize:function(){ return S?waveSize():0; },
+  nestSend:function(n){ return S?nestSend(n||(S?S.night:1)):0; },
   // exposed so a test can land credited damage on a nest without pretending to
   // be a soldier; the game itself only ever reaches it through hurtTarget
   hurtNest:function(n,amt,pid){ hurtTarget(n,amt,pid); },

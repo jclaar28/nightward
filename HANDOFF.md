@@ -35,7 +35,8 @@ python3 -m http.server 8899   # then http://127.0.0.1:8899/nightward.html
 
 ## The five-minute tour
 
-The map is a grid. You start with a commander and a small purse. You place the
+The map is a 120-unit grid — 80 cells of 1.5. You start with a commander and a
+small purse. You place the
 town hall, he walks to it and raises it, and it musters two workers. Six minutes
 of daylight: workers strip salvage piles, cottages compound the workforce, and
 you spend the proceeds on walls, towers and troops. Two minutes of night: the
@@ -137,12 +138,16 @@ over WebRTC with the host and guest in exact agreement — measured drift of zer
 
 **Rough or unfinished.**
 
-- *Wave sizes want re-tuning.* The ladder sets the **first** night at easy 400 /
-  normal 600 / hard 850, and every night after grows. A defence that never grows
-  gets roughly one night from the `mid` build and two to four from `strong` —
-  measured, and about right for a build that never spends a nest cache, but the
-  curve has not been tuned against a player who does. `tools/balance.mjs
-  --nights N` is the harness for it.
+- *The difficulty curve is tuned but thinly sampled.* Measured on three seeds
+  with a defence that spends every morning's income: a player who never leaves
+  the walls dies around **night 5**; clearing one of five nests reaches **8.7**;
+  clearing two holds all **12**. That is the shape the design wants — holding is
+  not a strategy — but the harness kills nests for free, so the real curve sits
+  between the one-nest and two-nest lines. Worth re-running with more seeds, and
+  worth checking that an assault is actually affordable in troops.
+- *Nest count scales with difficulty, and so do the caches.* Hard rings you with
+  8 nests, which is both far more danger and 8 x 320 supply of reward. That may
+  want a per-difficulty cache; nobody has measured it.
 - *The multiplayer invite code is ~855 characters.* It is the WebRTC session
   description itself, so a short code would need a rendezvous server. Jarrod
   decided to leave it alone rather than take on infrastructure — worth knowing

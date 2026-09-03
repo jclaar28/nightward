@@ -505,9 +505,12 @@ function refreshDay(){
   el("dayBar").classList.toggle("crit",f<0.22);
   // A round runs until every hall or every nest is gone, so both readouts have
   // to say where in that it is — the clock alone stopped being the whole story.
+  // What is coming matters more than the clock once a round runs for days: the
+  // nests you have not pulled down are the number that keeps climbing.
   var live=HFGAME.liveNests().length;
-  el("nightNo").textContent="Night "+S.night+" coming";
+  el("nightNo").textContent="Night "+S.night;
   el("nestsLeft").textContent=live+(live===1?" nest":" nests");
+  el("nightSend").textContent=(HFGAME.waveSize?HFGAME.waveSize():S.wave);
   el("supply").textContent=S.players[S.me].supply;
 }
 function refreshWave(){
@@ -520,7 +523,7 @@ function refreshWave(){
   el("wLeft").textContent=S.enemies.length+S.spawnLeft;
   var lv2=HFGAME.liveNests().length;
   el("nightNo2").textContent="Night "+S.night;
-  el("nestsLeft2").textContent=lv2+(lv2===1?" nest":" nests");
+  el("nestsLeft2").textContent=lv2+(lv2===1?" nest left":" nests left");
   el("supply").textContent=S.players[S.me].supply;
   var H=S.players[S.me].hall;
   var f=H?Math.max(0,H.hp/HFGAME.TYPES.hall.hp):0;

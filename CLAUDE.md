@@ -132,7 +132,8 @@ judging how something looks; they are not evidence that it works. Nearly every
 bug found here was found by reading numbers out of the running game.
 
 **Run `node tools/smoke.mjs`, `node tools/instances.mjs` and
-`node tools/campaign.mjs` after any change**,
+`node tools/campaign.mjs` after any change**, plus `node tools/economy.mjs` for
+anything touching salvage, workers or the map,
 and `node tools/balance.mjs --ab id.key=value` for anything touching difficulty.
 `tools/README.md` explains them; read it before writing a new one.
 
@@ -199,6 +200,11 @@ without talking to Jarrod first.
   ends only when every hall is gone or every nest is, and each night you leave
   the nests standing the next one is bigger by a widening margin. Holding
   forever is not a strategy the game will let you have.
+- **Difficulty changes the shape, not the numbers.** It sets how many nests ring
+  you — 3 easy, 5 normal, 8 hard — and how many each sends on the first night.
+  The wave is the sum of what the living nests send, so pulling one down is a
+  permanent cut to every night after. There is no global wave counter to grow;
+  `waveSize()` recomputes it from what is still standing.
 - **The nests are the objective and the bank.** They are tough, they knit back
   together each dawn, they keep a standing garrison by day, and they wake
   defenders when hit. Their cache is the only income after the map is stripped,

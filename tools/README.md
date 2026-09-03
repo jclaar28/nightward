@@ -45,6 +45,16 @@ losing every hall ends it, clearing every nest wins it and pays its cache, and
 the nest garrisons chase what comes close without leaving home or eating your
 workers during the day.
 
+**`economy.mjs`** — how much a day pays and how long the map lasts. Plays a
+settlement out day by day with workers on the nearest live pile and cottages
+bought as they become affordable, then reports income per day, when the piles
+run dry, and what the nest caches add. Use it whenever you touch salvage,
+gather rate, carry, or the map size.
+
+```sh
+node tools/economy.mjs --days 10 --seeds 3 --diff normal,hard
+```
+
 **`balance.mjs`** — plays a full day and holds a night, across seeds and
 difficulty sizes. `--nights N` plays out that many, which is the meaningful
 measure now that surviving one only buys you the next.
@@ -53,13 +63,23 @@ measure now that surviving one only buys you the next.
 node tools/balance.mjs                          # the current ladder, mid build
 node tools/balance.mjs --waves 400,600,850
 node tools/balance.mjs --build strong,gated,mid,thin --seeds 12
-node tools/balance.mjs --nights 5                # how deep a build gets
+node tools/balance.mjs --nights 12               # how deep a build gets
+node tools/balance.mjs --nights 12 --kill 2      # ...if it also clears 2 nests
 node tools/balance.mjs --ab tower.dmg=20         # that stat vs stock, same seeds
 ```
 
 `--ab id.key=value` runs each seed twice, once with the shipped default and once
 with the override, through identical code. Use it for anything that touches
 difficulty.
+
+`--kill N` pulls N nests down after the second night. The harness cannot micro
+an army across the map, but the thing that matters downstream is the wave being
+smaller, and that it can model honestly. It is the only way to measure the
+intended winning line rather than the turtle.
+
+The harness also spends every morning's income on more guns. A frozen defence
+answers the wrong question — it measured 3 nights where a growing one measures
+5, and the whole design depends on the difference.
 
 ## Writing a new one
 

@@ -265,9 +265,16 @@ var GLOW_COLD=[0.50,1.30,1.55];
 var GLOW_SIG=[0.42,1.62,1.70];   // friendly signal lamp — reads against the horde's red               // machinery, boilers
 
 // ---- world constants ------------------------------------------------------
-var CELL=1.5, GN=34, PLAT=0.30;
+// The playable grid is GN x GN cells of CELL units: 80 x 1.5 = 120 units across,
+// centred on the origin, so anything past +/-60 is off the map. It was 34 cells
+// (51 units) when a round was one night, which put the nests hard against the
+// rim — there was nowhere further out to put them.
+var CELL=1.5, GN=80, PLAT=0.30;
 var BUILD_R=11.4;                 // buildable radius, world units
-var EXT=76, GRID=124;
+// The drawn terrain runs past the playable rim so the horizon is not a cliff.
+// GRID is its sampling: keep EXT/GRID near 1.2 units a step or the facets read
+// as a different game.
+var EXT=120, GRID=200;
 
 function gx2w(gx){ return (gx-GN/2+0.5)*CELL; }
 function w2gx(x){ return Math.floor(x/CELL + GN/2); }
@@ -281,10 +288,13 @@ var GEN_DEF={
   freqL:0.028, freqM:0.072, freqH:0.170,       // and their scales
   plat:2.40, fall:9.00,                        // flat margin past the build ring, blend out
   buildR:11.40,
-  dry:26.0,                                    // radius where grass gives way to dry
-  nestN:2, nestR:16.0, nestDist:24.0,          // seeded nests: count, taint radius, distance out
+  dry:46.0,                                    // radius where grass gives way to dry
+  // Count comes from the difficulty now; nestN is only the fallback for a map
+  // that does not say. Distance is the point of the bigger grid: a march to a
+  // nest is a commitment, not a stroll.
+  nestN:5, nestR:17.0, nestDist:46.0,          // seeded nests: count, taint radius, distance out
   infNoise:0.30,                               // how ragged the tainted edge reads
-  trees:520, scrub:420, growth:220
+  trees:1500, scrub:1200, growth:620
 };
 function genOf(g){
   var o={}, k;
@@ -1339,9 +1349,9 @@ var STAT_DEFS={
   worker:{ note:"Gathers by day, mends by night. Cannot fight.", fields:[
     {k:"hp",      label:"Hit points",    def:45,  lo:10, hi:900, step:5, int:true},
     {k:"speed",   label:"Speed",         def:2.45,lo:0.2,hi:10,  step:0.05, unit:"u/s"},
-    {k:"gather",  label:"Gather rate",   def:3.5, lo:0.5,hi:60,  step:0.5, unit:"/s",
+    {k:"gather",  label:"Gather rate",   def:2.4, lo:0.5,hi:60,  step:0.1, unit:"/s",
      hint:"supply pulled from a pile per second"},
-    {k:"carry",   label:"Carry",         def:4,   lo:1,  hi:200, step:1, int:true,
+    {k:"carry",   label:"Carry",         def:3,   lo:1,  hi:200, step:1, int:true,
      hint:"a full load, then it walks back"},
     {k:"repair",  label:"Repair rate",   def:17,  lo:1,  hi:200, step:1, int:true, unit:"hp/s",
      hint:"health put back into a damaged building"},
@@ -1357,8 +1367,11 @@ var STAT_DEFS={
      hint:"share of full health recovered each dawn"},
     {k:"cache",   label:"Cache",          def:320, lo:0,   hi:3000, step:10, int:true, unit:"supply",
      hint:"paid to whoever did the most damage bringing it down"},
-    {k:"guard",   label:"Standing guard", def:6,   lo:0,   hi:40,   step:1,  int:true,
-     hint:"attackers that live at the nest by day"},
+    {k:"guard",   label:"Guard · first night",def:3, lo:0,  hi:40,   step:1,  int:true,
+     hint:"attackers that live at the nest by day, on night one"},
+    {k:"guardStep",label:"Guard · per night",def:2,   lo:0,   hi:10,   step:1,  int:true,
+     hint:"added to that garrison every night you leave it standing"},
+    {k:"guardMax", label:"Guard · cap",      def:16,  lo:0,   hi:80,   step:1,  int:true},
     {k:"callN",   label:"Call · size",    def:4,   lo:0,   hi:30,   step:1,  int:true,
      hint:"defenders it wakes when something starts hitting it"},
     {k:"callGap", label:"Call · cooldown",def:5.0, lo:0.5, hi:60,   step:0.5, unit:"s"},
@@ -1366,21 +1379,22 @@ var STAT_DEFS={
      hint:"how far a guard will follow before going home"},
     // Each night is bigger than the last and the gap widens, so a long game is
     // not a safe one. These live here because it is the nests that send them.
-    {k:"grow",    label:"Night growth",    def:0.20,lo:0,   hi:2,    step:0.01,
-     hint:"how much bigger the second night is than the first"},
-    {k:"accel",   label:"Growth · added",  def:0.06,lo:0,   hi:1,    step:0.01,
-     hint:"added to that growth every further night"},
+    {k:"ramp",    label:"Sends · per night",def:1.20,lo:1,  hi:3,    step:0.01,
+     hint:"multiplies what one nest sends, every night it is left standing"},
     {k:"ehpK",    label:"Attacker health ×",def:1.05,lo:1,  hi:2,    step:0.01,
      hint:"multiplies attacker health each night"}
   ]},
 
+  // Salvage is a slow drip from a deep well, not a morning's work. A round runs
+  // for days now, so a pile has to outlast several of them while paying little
+  // enough per trip that it never funds a defence on its own.
   salvage:{ note:"How much is out there, and how it is spread.", fields:[
-    {k:"nearN",   label:"Piles · inside", def:2,  lo:0,  hi:8,   step:1, int:true,
-     hint:"within the build ring, safe to work"},
-    {k:"farN",    label:"Piles · outside",def:3,  lo:0,  hi:10,  step:1, int:true,
-     hint:"out where the lanes run"},
-    {k:"amt",     label:"Yield · inside", def:95, lo:5,  hi:600, step:2, int:true, unit:"supply"},
-    {k:"farK",    label:"Yield · outside",def:1.75,lo:0.2,hi:6,  step:0.05,
+    {k:"nearN",   label:"Piles · inside", def:3,  lo:0,  hi:12,  step:1, int:true,
+     hint:"close to the plateau, safe to work"},
+    {k:"farN",    label:"Piles · outside",def:7,  lo:0,  hi:20,  step:1, int:true,
+     hint:"out in the open ground between you and the nests"},
+    {k:"amt",     label:"Yield · inside", def:340,lo:5,  hi:4000,step:10,int:true, unit:"supply"},
+    {k:"farK",    label:"Yield · outside",def:1.9,lo:0.2,hi:6,   step:0.05,
      hint:"× the inside yield"}
   ]},
 
