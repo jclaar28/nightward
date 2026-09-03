@@ -1,0 +1,6 @@
+# scratch: screenshots and Playwright runs from development
+*.png
+*.gif
+/serve/
+__pycache__/
+.DS_Store
