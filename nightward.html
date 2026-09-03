@@ -920,6 +920,7 @@
     <div class="panel" id="dayBox" hidden>
       <div class="lab"><span>Daylight</span><b id="dayLeft">2:35</b></div>
       <div class="bar"><span id="dayBar" style="width:100%"></span></div>
+      <div class="lab" style="margin:10px 0 0"><span id="nightNo">Night 1 coming</span><b id="nestsLeft">2 nests</b></div>
     </div>
 
     <div class="panel" id="waveBox" hidden>
@@ -928,6 +929,7 @@
       <div class="lab" style="margin:10px 0 0"><span>Town hall</span><b id="hallPct">100%</b></div>
       <div class="bar"><span id="hallBar" style="width:100%"></span></div>
       <div class="lab" style="margin:10px 0 0"><span>Enemies left</span><b id="wLeft">0</b></div>
+      <div class="lab" style="margin:10px 0 0"><span id="nightNo2">Night 1</span><b id="nestsLeft2">2 nests</b></div>
     </div>
 
     <div class="panel" id="bldPanel" hidden>
@@ -1336,8 +1338,10 @@ function seedNests(seed,gen,centres){
   for(var i=0;i<n;i++){
     var a=a0+i*(Math.PI*2/n)+(rnd()-0.5)*0.5;
     var d=base*(0.90+rnd()*0.20);
+    // No health here: the balance table owns that number, and a copy baked into
+    // the seeded map was silently winning over it.
     out.push({x:Math.cos(a)*d, z:Math.sin(a)*d, r:G.nestR*(0.85+rnd()*0.3),
-              share:1/n, hp:520});
+              share:1/n});
   }
   return out;
 }
@@ -2376,6 +2380,32 @@ var STAT_DEFS={
     {k:"nerve",   label:"Nerve",         def:2.1, lo:0, hi:20,   step:0.1, unit:"u",
      hint:"how close an attacker gets before a worker drops the job and runs"}
   ]},
+  // The nests are the objective and the bank. A round runs until every hall is
+  // gone or every nest is, so these numbers decide how long that takes.
+  nest:{ note:"The source of the horde, and the only thing worth marching out for.", fields:[
+    {k:"hp",      label:"Hit points",     def:2600,lo:200, hi:20000,step:50, int:true,
+     hint:"one committed push, not a chip over several days"},
+    {k:"regen",   label:"Knits back",     def:0.50,lo:0,   hi:1,    step:0.05,
+     hint:"share of full health recovered each dawn"},
+    {k:"cache",   label:"Cache",          def:320, lo:0,   hi:3000, step:10, int:true, unit:"supply",
+     hint:"paid to whoever did the most damage bringing it down"},
+    {k:"guard",   label:"Standing guard", def:6,   lo:0,   hi:40,   step:1,  int:true,
+     hint:"attackers that live at the nest by day"},
+    {k:"callN",   label:"Call · size",    def:4,   lo:0,   hi:30,   step:1,  int:true,
+     hint:"defenders it wakes when something starts hitting it"},
+    {k:"callGap", label:"Call · cooldown",def:5.0, lo:0.5, hi:60,   step:0.5, unit:"s"},
+    {k:"leash",   label:"Guard leash",    def:9.0, lo:1,   hi:30,   step:0.5, unit:"u",
+     hint:"how far a guard will follow before going home"},
+    // Each night is bigger than the last and the gap widens, so a long game is
+    // not a safe one. These live here because it is the nests that send them.
+    {k:"grow",    label:"Night growth",    def:0.20,lo:0,   hi:2,    step:0.01,
+     hint:"how much bigger the second night is than the first"},
+    {k:"accel",   label:"Growth · added",  def:0.06,lo:0,   hi:1,    step:0.01,
+     hint:"added to that growth every further night"},
+    {k:"ehpK",    label:"Attacker health ×",def:1.05,lo:1,  hi:2,    step:0.01,
+     hint:"multiplies attacker health each night"}
+  ]},
+
   salvage:{ note:"How much is out there, and how it is spread.", fields:[
     {k:"nearN",   label:"Piles · inside", def:2,  lo:0,  hi:8,   step:1, int:true,
      hint:"within the build ring, safe to work"},
@@ -3650,8 +3680,12 @@ function buildRigs(makeBatch){
 // Copy resolved stats onto the live tables. Called on boot, at the start of a
 // round, and whenever the Library edits a number — so a change in the editor
 // reaches a round already in progress.
+var NEST={};
 function syncStats(){
   var t,k,st;
+  // The nests are not in TYPES/UNITS/ENEMY, so their block is read straight out
+  // of the balance table here and re-read whenever the library edits it.
+  NEST=M.statsOf("nest")||{};
   for(t in TYPES){
     st=M.statsOf(t);
     if(st) for(k in st) TYPES[t][k]=st[k];
@@ -3766,9 +3800,12 @@ function newGame(seed,map,opt){
   R.setStatic(mesh);
   // live copies: a nest is a target, so it carries hp and takes hits
   var nests=T.nests.map(function(n){
-    var hp=n.hp||520;
+    // A map may pin a nest's health; otherwise the balance table decides. `dmg`
+    // records who has hurt it, because the cache goes to whoever did the work.
+    var hp=n.hp||NEST.hp||2600;
     return {x:n.x, z:n.z, r:n.r||16, share:n.share||1, hp:hp, max:hp,
-            hit:0, kx:0, kz:0, stag:0, nest:true, dead:false, pulse:Math.random()*6.28};
+            hit:0, kx:0, kz:0, stag:0, nest:true, dead:false, pulse:Math.random()*6.28,
+            dmg:{}, callCd:0, guards:0};
   });
   var dayLen=RD.day||DAY_LEN, nightLen=RD.night||NIGHT_LEN;
   S={
@@ -3791,13 +3828,18 @@ function newGame(seed,map,opt){
     dayLeft:dayLen, dayLen:dayLen,
     nightLeft:nightLen, nightLen:nightLen,
     spawnLeft:0, spawnTimer:0, waveClock:0, shake:0, dawnBurn:0,
+    night:1,                       // which night is coming; 1 is the first
+    lastBurn:0, lastHeld:0,        // what the previous night cost, for the HUD
     sel:null, bsel:null, hover:null, flash:0, dist:null, distDirty:true, kills:0,
     rotStep:0, rotAuto:true,
     dayP:0.00, dayTo:0.44, daySpd:DAY_DUSK
   };
   // Everybody starts the same way: one crowned officer standing on open ground
   // with no town behind them.
-  if(S.net!=="guest") for(var pi=0;pi<S.players.length;pi++) spawnCommander(S.players[pi]);
+  if(S.net!=="guest"){
+    for(var pi=0;pi<S.players.length;pi++) spawnCommander(S.players[pi]);
+    garrisonNests();          // the nests are occupied from the first morning
+  }
   cam.az=38; cam.el=36; cam.zoom=17;
   var mySeat=S.players[S.me];
   cam.tx=mySeat.cx; cam.tz=mySeat.cz;
@@ -4581,12 +4623,13 @@ function updateUnits(dt){
           u.atkT=Math.max(0.22,Math.min(0.95,u.cd*0.82));
           u.atk=0;                        // and the animation runs off it
           if(U.melee){
-            tgt.hp-=U.dmg; tgt.hit=1;
+            hurtTarget(tgt,U.dmg,u.own|0);
             spark((u.x+tgt.x)/2,PLAT+0.55,(u.z+tgt.z)/2,3,[1.9,1.9,1.6],1.0,2.2,0.20,0.6);
             if(SND) SND.swing();
           } else {
             S.bolts.push({x:u.x,y:gy(u.x,u.z)+0.95,z:u.z,t:tgt,dmg:U.dmg,rot:0,
-                          spd:34, sc:1, splash:0, splashK:0, friendly:true});
+                          spd:34, sc:1, splash:0, splashK:0, friendly:true,
+                          own:u.own|0});
             if(SND) SND.loose();
           }
         }
@@ -4771,6 +4814,10 @@ function nightfall(){
 function startWave(){
   if(!livePlayers().some(function(p){ return !!p.hall; })||S.phase!=="build") return;
   S.phase="attack"; S.spawnLeft=S.wave; S.spawnTimer=1.2; S.waveClock=0;
+  // The nests empty out. A guard is only a guard by daylight; once the horde is
+  // moving it goes with them, which is why clearing a garrison in the afternoon
+  // is worth doing even though they come back.
+  for(var gq=0;gq<S.enemies.length;gq++){ S.enemies[gq].guard=false; S.enemies[gq].home=null; }
   S.dayLeft=0;
   S.nightLeft=S.nightLen;
   for(var wi=0;wi<S.units.length;wi++){
@@ -4829,6 +4876,38 @@ function strikeFx(m,tx,ty,tz,heavy){
   if(heavy) S.shake=Math.min(0.18,S.shake+0.05);
 }
 
+// Every blow that lands on an attacker or a nest goes through here. (Note the
+// name: hurt() is the colour ramp for a damaged building, and `strike` is a
+// local inside updateUnits — both were tried and both collided.) A nest
+// keeps a ledger of who hurt it, because its cache is paid to whoever did the
+// work, and it wakes defenders when something starts hitting it.
+function hurtTarget(tgt,amt,pid){
+  tgt.hp-=amt; tgt.hit=1;
+  if(!tgt.nest||tgt.dead) return;
+  if(pid!==undefined&&pid!==null) tgt.dmg[pid]=(tgt.dmg[pid]||0)+amt;
+  callDefenders(tgt);
+}
+// A nest under attack empties out. The cooldown is what stops a stream of
+// arrows from summoning an endless queue.
+function callDefenders(n){
+  if(n.dead||n.callCd>0) return;
+  var cnt=NEST.callN===undefined?4:NEST.callN;
+  if(cnt<=0) return;
+  n.callCd=NEST.callGap||5;
+  for(var i=0;i<cnt;i++) spawnGuard(n);
+  if(SND) SND.waveStart();
+}
+// The nearest living defender to a point — what a nest guard reaches for.
+function nearestUnit(x,z,r){
+  var best=null, bd=r;
+  for(var i=0;i<S.units.length;i++){
+    var u=S.units[i];
+    if(u.hp<=0||u.inside) continue;
+    var d=Math.hypot(u.x-x,u.z-z);
+    if(d<bd){ bd=d; best=u; }
+  }
+  return best;
+}
 function liveNests(){
   var out=[];
   for(var i=0;i<S.nests.length;i++) if(!S.nests[i].dead) out.push(S.nests[i]);
@@ -4843,12 +4922,38 @@ function pickNest(){
   for(i=0;i<live.length;i++){ r-=Math.max(0.001,live[i].share); if(r<=0) return live[i]; }
   return live[live.length-1];
 }
+// A guard is an ordinary attacker that belongs to a nest: it lives there by
+// day, chases what comes near, and goes home when the chase runs long. At
+// nightfall it stops being a guard and joins the wave like everything else.
+function spawnGuard(nest){
+  if(!nest||nest.dead) return null;
+  var m=makeAttacker(nest,"shambler");
+  if(!m) return null;
+  m.home=nest; m.guard=true;
+  nest.guards++;
+  return m;
+}
+function garrisonNests(){
+  var want=NEST.guard===undefined?6:NEST.guard;
+  liveNests().forEach(function(n){
+    n.guards=0;
+    for(var i=0;i<S.enemies.length;i++) if(S.enemies[i].home===n) n.guards++;
+    while(n.guards<want && spawnGuard(n)) {}
+  });
+}
 function spawnOne(){
   var nest=pickNest();
   if(!nest) return;                       // every nest down: nothing left to send
+  makeAttacker(nest, S.queue.length?S.queue.shift():"shambler");
+}
+// One attacker, out of one nest. Everything that puts a body on the field goes
+// through here, so a guard and a wave attacker differ only in what is set on
+// them afterwards.
+function makeAttacker(nest,kind){
+  if(!nest||nest.dead) return null;
   var a=Math.random()*Math.PI*2, r=1.1+Math.random()*1.6;
-  var tk=S.queue.length?S.queue.shift():"shambler", E=ENEMY[tk], hp=S.ehp*E.hpK;
-  S.enemies.push({t:tk,x:nest.x+Math.cos(a)*r,z:nest.z+Math.sin(a)*r,hp:hp,max:hp,
+  var tk=kind||"shambler", E=ENEMY[tk], hp=S.ehp*E.hpK;
+  var m={t:tk,x:nest.x+Math.cos(a)*r,z:nest.z+Math.sin(a)*r,hp:hp,max:hp,
     spd:E.speed, dmgB:E.dmgBuild, dmgH:E.dmgHall, reach:E.reach,
     rot:Math.atan2(-nest.z,-nest.x),ox:(Math.random()-0.5)*0.85,oz:(Math.random()-0.5)*0.85,
     sc:E.scBase+Math.random()*E.scVar,hit:0, dx:0, dz:0,
@@ -4856,7 +4961,9 @@ function spawnOne(){
     atk:-1, atkT:0, swung:false,     // attack timer; -1 means not fighting
     stag:0, kx:0, kz:0,              // flinch, and knockback carried by the body
     rec:0,                           // recoil from its own swing — drawn, not simulated
-    rise:0});                        // spawn-in: 0 underground, 1 fully up
+    rise:0};                         // spawn-in: 0 underground, 1 fully up
+  S.enemies.push(m);
+  return m;
 }
 
 // ---- effects --------------------------------------------------------------
@@ -4961,93 +5068,10 @@ function guestStep(dt){
   R.setLamps(packLamps());
 }
 
-function update(dt){
-  if(!active||!S) return;
-  stepPan(dt);
-  // The guest owns nothing: the host decides every position and hit point, and
-  // this side only advances the cosmetic parts so the picture stays smooth
-  // between snapshots.
-  if(S.net==="guest"){ guestStep(dt); return; }
-  stepClock(dt);
-  // effects and defenders run in the build phase too, so you can walk your line
-  // into position before pressing Ready
-  S.flash=Math.max(0,S.flash-dt*2.2);
-  S.shake=Math.max(0,S.shake-dt*0.55);
-  // A hall can reach zero by any route, so elimination is decided from state
-  // rather than hooked onto one damage call.
-  if(S.phase==="attack"||S.phase==="build"){
-    for(var pe=0;pe<S.players.length;pe++){
-      var PE=S.players[pe];
-      if(PE.out) continue;
-      // Once the hall stands it is the objective, as it always was. Before
-      // that there is no hall to lose, so the commander carries the round.
-      if(PE.site&&PE.site.hp<=0) collapseSite(PE);
-      if(PE.hall){ if(PE.hall.hp<=0) eliminate(pe); continue; }
-      if(PE.placed&&!PE.site){ eliminate(pe); continue; }
-      if(!cmdOf(PE)) eliminate(pe);
-    }
-  }
-  for(var nq=0;nq<S.nests.length;nq++){
-    var nz=S.nests[nq];
-    nz.hit=Math.max(0,nz.hit-dt*4);
-    nz.pulse+=dt*1.3;
-    nz.kx=0; nz.kz=0;                       // targetable, but it never moves
-    if(!nz.dead&&nz.hp<=0){
-      nz.dead=true;
-      spark(nz.x,gy(nz.x,nz.z)+1.2,nz.z,22,[0.72,0.20,0.16],1.3,5.2,0.9,1.7);
-      S.shake=Math.min(0.30,S.shake+0.22);
-      if(SND){ SND.death("brute"); SND.impact(true); }
-      if(UI.phase) UI.phase();
-    }
-  }
-  for(var pi=S.parts.length-1;pi>=0;pi--){
-    var pa=S.parts[pi];
-    pa.life-=dt;
-    if(pa.life<=0){ S.parts.splice(pi,1); continue; }
-    pa.vy-=15*dt;
-    pa.x+=pa.vx*dt; pa.y+=pa.vy*dt; pa.z+=pa.vz*dt;
-    var pg=(pa.gnd===undefined?PLAT:pa.gnd)+0.06;
-    if(pa.y<pg){ pa.y=pg; pa.vy*=-0.34; pa.vx*=0.62; pa.vz*=0.62; }
-  }
-  for(var ci=S.corpses.length-1;ci>=0;ci--){
-    var co=S.corpses[ci];
-    co.life-=dt;
-    if(co.life<=0){ S.corpses.splice(ci,1); continue; }
-    if(!co.down){
-      co.vy-=16*dt;
-      co.x+=co.vx*dt; co.z+=co.vz*dt; co.y+=co.vy*dt;
-      co.tum+=co.spin*dt;
-      var fr=Math.exp(-dt*3.0); co.vx*=fr; co.vz*=fr;
-      if(co.y<=PLAT+0.02){                  // landed: stop tumbling, lie flat
-        co.y=PLAT+0.02; co.down=true; co.tum=0;
-      }
-    }
-  }
-  updateUnits(dt);
-  if(S.phase!=="attack") return;
-  S.waveClock+=dt;
-
-  S.nightLeft=Math.max(0,S.nightLeft-dt);
-  if(S.spawnLeft>0){
-    // pull every nest down and the rest of the wave never comes — that is the
-    // whole payoff for marching a line out instead of turtling
-    if(!liveNests().length){
-      S.spawnLeft=0;
-      if(UI.phase) UI.phase();
-    } else {
-      // The wave is paced to arrive across the first four-fifths of the night,
-      // so the last of them still has time to reach you. Falling behind that
-      // schedule shortens the gap rather than dumping the remainder at dawn.
-      S.spawnTimer-=dt;
-      if(S.spawnTimer<=0){
-        var burst=Math.min(S.spawnLeft,2+Math.floor(Math.random()*3));
-        for(var i=0;i<burst;i++){ spawnOne(); S.spawnLeft--; }
-        var runway=Math.max(2,S.nightLeft-S.nightLen*0.20);
-        var due=runway/Math.max(1,S.spawnLeft/3.2);
-        S.spawnTimer=Math.max(0.16,Math.min(2.4,due))*(0.75+Math.random()*0.5);
-      }
-    }
-  }
+// Everything that fights: the horde, the guns, and what they throw. Split out
+// of update() so it can run in the build phase as well, where the only bodies
+// on the field are the nests' own.
+function stepCombat(dt){
   if(S.distDirty) rebuildField();
 
   for(var e=S.enemies.length-1;e>=0;e--){
@@ -5115,9 +5139,36 @@ function update(dt){
         debris(m,hhx,hhz,2.35,m.t==="brute"?7:4);
         strikeFx(m,hhx,PLAT+0.85,hhz,m.t==="brute");
         if(SND&&mine) SND.hallHit();
-        if(S.phase!=="attack") return;      // that blow ended the round
+        // that blow may have ended the round — but this step also runs by day,
+        // so the test is "is it over", not "is it night"
+        if(S.phase==="won"||S.phase==="lost") return;
       }
       continue;
+    }
+    // A guard belongs to its nest. It holds there, chases what comes close, and
+    // turns back once the chase runs past its leash — otherwise a single archer
+    // could walk a whole garrison across the map. At nightfall the flag comes
+    // off and it joins the wave like everything else.
+    if(m.guard){
+      if(!m.home||m.home.dead){ m.guard=false; m.home=null; }
+      else {
+        var leash=NEST.leash||9;
+        var hx3=m.home.x, hz3=m.home.z;
+        var prey=nearestUnit(m.x,m.z,leash);
+        var tgx=hx3, tgz=hz3, hold=1.6+Math.random()*0.2;
+        if(prey && Math.hypot(prey.x-hx3,prey.z-hz3)<=leash){
+          tgx=prey.x; tgz=prey.z; hold=m.reach*0.85;
+        }
+        var gdx=tgx-m.x, gdz=tgz-m.z, gL=Math.hypot(gdx,gdz)||1;
+        if(gL>hold){
+          var gw=m.spd*(m.stag>0?0.45:1)*m.rise;
+          m.x+=gdx/gL*gw*dt; m.z+=gdz/gL*gw*dt;
+          m.rot=Math.atan2(gdz,gdx);
+          m.atk=-1; m.swung=false;
+          m.ph+=dt*gw*(RIG[ENEMY[m.t].asset]?RIG[ENEMY[m.t].asset].gait.cad:2.4);
+        }
+        continue;
+      }
     }
     var step=bestStep(gx,gz); if(!step) continue;
     var blocker=rootOf(cellAt(step[0],step[1]));
@@ -5132,7 +5183,7 @@ function update(dt){
           debris(m,bx,bz,(TYPES[blocker.type].foot*CELL)/2,m.t==="brute"?6:3);
           strikeFx(m,bx,PLAT+0.6,bz,m.t==="brute");
           if(SND) SND.chew();
-          if(S.phase!=="attack") return;
+          if(S.phase==="won"||S.phase==="lost") return;
         }
         continue;
       }
@@ -5170,7 +5221,8 @@ function update(dt){
     var muzY=PLAT+(c.type==="ballista"?2.6:3.0);
     S.bolts.push({x:tx2,y:muzY,z:tz2,t:best,dmg:tyr.dmg,rot:0,
                   spd:tyr.boltSpeed||BOLT_SPEED, sc:tyr.boltScale||1,
-                  splash:tyr.splash||0, splashK:(tyr.splashK===undefined?0.7:tyr.splashK)});
+                  splash:tyr.splash||0, splashK:(tyr.splashK===undefined?0.7:tyr.splashK),
+                  own:c.own|0});
     spark(tx2,muzY,tz2, wantHeavy?4:2, [2.5,1.7,0.7], 0.7, wantHeavy?2.6:1.8, 0.16, 0.7);
     if(SND) SND.shot(c.type);
   }
@@ -5183,7 +5235,7 @@ function update(dt){
     bo.rot=Math.atan2(vz,vx)+Math.PI/2;
     if(L2<sp2*dt){
       var hx2=bo.t.x, hz2=bo.t.z;
-      bo.t.hp-=bo.dmg; bo.t.hit=1;
+      hurtTarget(bo.t,bo.dmg,bo.own);
       // A nest is a legal target and is not an attacker: it has no type in the
       // enemy table and it never moves, so it takes the damage and none of the
       // flinch. Reading its hit points off ENEMY was a crash waiting for the
@@ -5203,7 +5255,7 @@ function update(dt){
           if(se===bo.t||se.hp<=0) continue;
           var sd=Math.hypot(se.x-hx2,se.z-hz2);
           if(sd<bo.splash){
-            se.hp-=bo.dmg*bo.splashK*(1-sd/bo.splash); se.hit=1;
+            hurtTarget(se,bo.dmg*bo.splashK*(1-sd/bo.splash),bo.own);
             var sl=Math.max(0.3,sd), fk=(1-sd/bo.splash)*4.2;
             se.kx+=(se.x-hx2)/sl*fk; se.kz+=(se.z-hz2)/sl*fk;
             se.stag=Math.min(1,se.stag+0.7);
@@ -5219,22 +5271,168 @@ function update(dt){
     }
     bo.x+=vx/L2*sp2*dt; bo.y+=vy/L2*sp2*dt; bo.z+=vz/L2*sp2*dt;
   }
+}
 
-  // Dawn is the win condition: last the night and the light does the rest.
-  // Clearing the field early ends it too, because there is nothing left to hold
-  // against.
-  if(S.nightLeft<=0){
-    S.dawnBurn=S.enemies.length+S.spawnLeft;
-    for(var dz2=S.enemies.length-1;dz2>=0;dz2--){
-      var de=S.enemies[dz2];
-      spark(de.x,gy(de.x,de.z)+0.7,de.z,5,[1.5,1.15,0.62],1.0,2.6,0.4,0.9);
-      dropGib(de.x,de.z,de.rot,de.sc,ENEMY[de.t].gib);
+function update(dt){
+  if(!active||!S) return;
+  stepPan(dt);
+  // The guest owns nothing: the host decides every position and hit point, and
+  // this side only advances the cosmetic parts so the picture stays smooth
+  // between snapshots.
+  if(S.net==="guest"){ guestStep(dt); return; }
+  stepClock(dt);
+  // effects and defenders run in the build phase too, so you can walk your line
+  // into position before pressing Ready
+  S.flash=Math.max(0,S.flash-dt*2.2);
+  S.shake=Math.max(0,S.shake-dt*0.55);
+  // A hall can reach zero by any route, so elimination is decided from state
+  // rather than hooked onto one damage call.
+  if(S.phase==="attack"||S.phase==="build"){
+    for(var pe=0;pe<S.players.length;pe++){
+      var PE=S.players[pe];
+      if(PE.out) continue;
+      // Once the hall stands it is the objective, as it always was. Before
+      // that there is no hall to lose, so the commander carries the round.
+      if(PE.site&&PE.site.hp<=0) collapseSite(PE);
+      if(PE.hall){ if(PE.hall.hp<=0) eliminate(pe); continue; }
+      if(PE.placed&&!PE.site){ eliminate(pe); continue; }
+      if(!cmdOf(PE)) eliminate(pe);
     }
-    S.enemies.length=0; S.spawnLeft=0;
-    endRound(true);
-    return;
   }
-  if(S.spawnLeft===0&&S.enemies.length===0) endRound(true);
+  for(var nq=0;nq<S.nests.length;nq++){
+    var nz=S.nests[nq];
+    nz.hit=Math.max(0,nz.hit-dt*4);
+    nz.pulse+=dt*1.3;
+    nz.kx=0; nz.kz=0;                       // targetable, but it never moves
+    nz.callCd=Math.max(0,nz.callCd-dt);
+    if(!nz.dead&&nz.hp<=0){
+      nz.dead=true;
+      spark(nz.x,gy(nz.x,nz.z)+1.2,nz.z,22,[0.72,0.20,0.16],1.3,5.2,0.9,1.7);
+      S.shake=Math.min(0.30,S.shake+0.22);
+      // The cache goes to whoever did the most damage bringing it down. In a
+      // two-player round that is the answer to "who actually took it".
+      var top=null, best=0;
+      for(var dk in nz.dmg){ if(nz.dmg[dk]>best){ best=nz.dmg[dk]; top=+dk; } }
+      var pay=NEST.cache===undefined?320:NEST.cache;
+      if(top!==null&&S.players[top]&&!S.players[top].out&&pay>0){
+        S.players[top].supply+=pay;
+        if(UI.phase) UI.phase();
+        if(UI.hotbar) UI.hotbar();
+      }
+      // its garrison dies with it — a nest is the only thing holding them here
+      for(var gi=S.enemies.length-1;gi>=0;gi--){
+        var ge=S.enemies[gi];
+        if(ge.home!==nz) continue;
+        spark(ge.x,gy(ge.x,ge.z)+0.6,ge.z,4,[1.3,0.9,0.5],1.0,2.4,0.35,0.8);
+        dropGib(ge.x,ge.z,ge.rot,ge.sc,ENEMY[ge.t].gib);
+        S.enemies.splice(gi,1);
+      }
+      if(SND){ SND.death("brute"); SND.impact(true); }
+      if(UI.phase) UI.phase();
+      // the last nest is the round: nothing is left to send anything
+      if(!liveNests().length){ endRound(true); return; }
+    }
+  }
+  for(var pi=S.parts.length-1;pi>=0;pi--){
+    var pa=S.parts[pi];
+    pa.life-=dt;
+    if(pa.life<=0){ S.parts.splice(pi,1); continue; }
+    pa.vy-=15*dt;
+    pa.x+=pa.vx*dt; pa.y+=pa.vy*dt; pa.z+=pa.vz*dt;
+    var pg=(pa.gnd===undefined?PLAT:pa.gnd)+0.06;
+    if(pa.y<pg){ pa.y=pg; pa.vy*=-0.34; pa.vx*=0.62; pa.vz*=0.62; }
+  }
+  for(var ci=S.corpses.length-1;ci>=0;ci--){
+    var co=S.corpses[ci];
+    co.life-=dt;
+    if(co.life<=0){ S.corpses.splice(ci,1); continue; }
+    if(!co.down){
+      co.vy-=16*dt;
+      co.x+=co.vx*dt; co.z+=co.vz*dt; co.y+=co.vy*dt;
+      co.tum+=co.spin*dt;
+      var fr=Math.exp(-dt*3.0); co.vx*=fr; co.vz*=fr;
+      if(co.y<=PLAT+0.02){                  // landed: stop tumbling, lie flat
+        co.y=PLAT+0.02; co.down=true; co.tum=0;
+      }
+    }
+  }
+  updateUnits(dt);
+  // Attackers, turrets and bolts run in the build phase too. They have to: the
+  // nests keep a standing guard by day, so marching a line out to one is a real
+  // fight and the towers behind you are part of it.
+  if(S.phase!=="build"&&S.phase!=="attack") return;
+  if(S.phase!=="attack"){ stepCombat(dt); return; }
+  S.waveClock+=dt;
+
+  S.nightLeft=Math.max(0,S.nightLeft-dt);
+  if(S.spawnLeft>0){
+    // pull every nest down and the rest of the wave never comes — that is the
+    // whole payoff for marching a line out instead of turtling
+    if(!liveNests().length){
+      S.spawnLeft=0;
+      if(UI.phase) UI.phase();
+    } else {
+      // The wave is paced to arrive across the first four-fifths of the night,
+      // so the last of them still has time to reach you. Falling behind that
+      // schedule shortens the gap rather than dumping the remainder at dawn.
+      S.spawnTimer-=dt;
+      if(S.spawnTimer<=0){
+        var burst=Math.min(S.spawnLeft,2+Math.floor(Math.random()*3));
+        for(var i=0;i<burst;i++){ spawnOne(); S.spawnLeft--; }
+        var runway=Math.max(2,S.nightLeft-S.nightLen*0.20);
+        var due=runway/Math.max(1,S.spawnLeft/3.2);
+        S.spawnTimer=Math.max(0.16,Math.min(2.4,due))*(0.75+Math.random()*0.5);
+      }
+    }
+  }
+  stepCombat(dt);
+  if(S.phase!=="attack") return;
+
+  // Dawn is not the win condition any more — it is the next day. Surviving a
+  // night buys you another one, and the round only ends when every hall is gone
+  // or every nest is.
+  if(S.nightLeft<=0){ dawn(); return; }
+  if(S.spawnLeft===0&&S.enemies.length===0) dawn();
+}
+
+// The light burns off whatever is still standing in the open, the nests knit
+// back together, and the next night is bigger than the one you just held.
+function dawn(){
+  S.dawnBurn=S.enemies.length+S.spawnLeft;
+  for(var i=S.enemies.length-1;i>=0;i--){
+    var de=S.enemies[i];
+    spark(de.x,gy(de.x,de.z)+0.7,de.z,5,[1.5,1.15,0.62],1.0,2.6,0.4,0.9);
+    dropGib(de.x,de.z,de.rot,de.sc,ENEMY[de.t].gib);
+  }
+  S.enemies.length=0; S.spawnLeft=0; S.queue.length=0;
+  if(!liveNests().length){ endRound(true); return; }   // nothing left to send
+  if(!livePlayers().length){ endRound(false); return; }
+
+  S.lastBurn=S.dawnBurn; S.lastHeld=S.night;
+  S.night++;
+  // Accelerating growth: the gap between nights widens, so a long game is not a
+  // safe one. Attacker health creeps up with it.
+  var grow=(NEST.grow===undefined?0.20:NEST.grow);
+  var accel=(NEST.accel===undefined?0.06:NEST.accel);
+  S.wave=Math.max(1,Math.round(S.wave*(1+grow+accel*(S.night-2))));
+  S.ehp=S.ehp*(NEST.ehpK||1.05);
+  // A nest you only wounded is a nest you did not kill.
+  var regen=(NEST.regen===undefined?0.5:NEST.regen);
+  liveNests().forEach(function(n){ n.hp=Math.min(n.max,n.hp+n.max*regen); });
+
+  S.phase="build";
+  S.dayLeft=S.dayLen;
+  S.nightLeft=S.nightLen;
+  S.dayTo=0.44; S.daySpd=DAY_DAWN;
+  for(var wi=0;wi<S.units.length;wi++){       // everyone back to work
+    var wu=S.units[wi];
+    if(UNITS[wu.t].civil&&wu.mode==="flee") wu.mode="idle";
+  }
+  garrisonNests();
+  if(SND) SND.win();
+  if(UI.phase) UI.phase();
+  if(UI.hotbar) UI.hotbar();
+  if(UI.units) UI.units();
 }
 
 // A player whose town hall falls is out. Everything they built goes with it,
@@ -5278,6 +5476,7 @@ function endRound(won){
   if(UI.phase) UI.phase();
   if(onEnd) onEnd({
     won:won, kills:S.kills, wave:S.wave, dawn:(S.dawnBurn|0),
+    nights:Math.max(0,S.night-(won?0:1)), nests:liveNests().length,
     hallPct: me().hall?Math.round(100*me().hall.hp/TYPES.hall.hp):0,
     seconds:Math.round(S.waveClock),
     difficulty:(SET&&SET.difficulty)||"normal"
@@ -5445,7 +5644,7 @@ function snapshot(full){
   if(!S) return null;
   var i, out={
     ph:S.phase, dp:r2(S.dayP), dl:r2(S.dayLeft), sl:S.spawnLeft, kl:S.kills,
-    nl:r2(S.nightLeft),
+    nl:r2(S.nightLeft), ng:S.night|0, wv:S.wave|0,
     pl:S.players.map(function(p){
       return [p.supply|0, p.out?1:0, p.hall?Math.round(p.hall.hp):0, p.placed?1:0,
               p.stance==="pursue"?1:0, p.site?r2(p.site.prog):-1];
@@ -5486,6 +5685,8 @@ function applySnapshot(sn){
   S.phase=sn.ph; S.dayP=sn.dp; S.dayLeft=sn.dl;
   S.spawnLeft=sn.sl; S.kills=sn.kl;
   if(sn.nl!==undefined) S.nightLeft=sn.nl;
+  if(sn.ng) S.night=sn.ng;
+  if(sn.wv) S.wave=sn.wv;
   var i;
   for(i=0;i<sn.pl.length&&i<S.players.length;i++){
     var P=S.players[i], q=sn.pl[i];
@@ -5574,6 +5775,7 @@ function applySnapshot(sn){
     if(UI.phase) UI.phase();
     if(onEnd) onEnd({
       won:won, kills:S.kills, wave:S.wave, dawn:(S.dawnBurn|0),
+      nights:Math.max(0,S.night-(won?0:1)), nests:liveNests().length,
       hallPct: me().hall?Math.round(100*me().hall.hp/TYPES.hall.hp):0,
       seconds:Math.round(S.waveClock),
       difficulty:(SET&&SET.difficulty)||"normal"
@@ -6372,6 +6574,9 @@ return {
   deselectAll:deselectAll,
   startWave:startWave, clearSel:clearSel, RIG:RIG, RIGDEF:RIGDEF,
   liveNests:liveNests, cam:function(){ return cam; }, camera:camera,
+  // exposed so a test can land credited damage on a nest without pretending to
+  // be a soldier; the game itself only ever reaches it through hurtTarget
+  hurtNest:function(n,amt,pid){ hurtTarget(n,amt,pid); },
   // The four ground corners of what the camera can currently see, so the
   // minimap can draw the same box you are looking through.
   viewQuad:function(){
@@ -8478,31 +8683,28 @@ function onRoundEnd(res){
 
   var SS=HFGAME.state(), multi=!!(SS&&SS.multi), mine=multi&&SS.players[SS.me].out;
   var both=multi&&SS.players.every(function(p){ return !p.out; });
+  // A round is won by pulling every nest down, not by seeing one dawn. That
+  // changes what the end screen is congratulating you for.
   el("ovTitle").textContent = res.won
-    ? (mine?"They held without you":"You held")
+    ? (mine?"They finished it without you":"The nests are down")
     : (multi?"Both towns fell":"You were overrun");
-  // Surviving to dawn and clearing the field are different stories, and the
-  // number that was still coming is the whole difference.
-  var dawn=(res.dawn|0)>0;
+  var nights=res.nights|0;
+  var nightsSaid=nights+(nights===1?" night":" nights");
   el("ovBody").textContent = res.won
     ? (mine
-        ? "Your town hall went down, but the other town saw the night out."
-        : dawn
-          ? ("The sun came up with "+res.dawn+" of them still coming, and it burned "+
-             "them off the field. Your hall stood through the night"+
-             (multi&&!both?" — the other town's did not.":"."))
-          : (multi
-              ? (both?"Every attacker is down and both towns are still standing."
-                     :"Every attacker is down. The other town did not make it — yours did.")
-              :"Every attacker is down before dawn — the nests had nothing left to send."))
+        ? "Your town hall went down, but the other town saw it through and cleared the last nest."
+        : (multi
+            ? (both?"Every nest is down and both towns are still standing after "+nightsSaid+"."
+                   :"Every nest is down after "+nightsSaid+". The other town did not make it — yours did.")
+            :"Every nest is down after "+nightsSaid+". There is nothing left out there to send anything."))
     : (multi
-        ? "Neither hall survived the night. Walls buy time, watchtowers do most of the killing, a ballista is what stops a brute — and a nest left standing keeps sending more."
-        : "Your town hall was destroyed. Walls buy time, watchtowers do most of the killing, a ballista is what stops a brute, and soldiers plug the gap the fast ones find. Cover every nest, not just the nearest.");
+        ? "Neither hall survived. Walls buy time, watchtowers do most of the killing, a ballista is what stops a brute — and every night you leave a nest standing, the next one is bigger."
+        : "Your town hall was destroyed. Walls buy time, watchtowers do most of the killing, a ballista is what stops a brute, and soldiers plug the gap the fast ones find. Holding is not winning: every night you leave the nests alone, the next one comes harder.");
   el("ovAgain").hidden=multi;
   el("ovStats").innerHTML=
-    '<div><b>'+res.kills+'</b><span>of '+res.wave+' killed</span></div>'+
-    '<div><b>'+res.hallPct+'%</b><span>town hall left</span></div>'+
-    '<div><b>'+res.seconds+'s</b><span>time taken</span></div>';
+    '<div><b>'+res.kills+'</b><span>killed</span></div>'+
+    '<div><b>'+nights+'</b><span>'+(nights===1?"night held":"nights held")+'</span></div>'+
+    '<div><b>'+res.nests+'</b><span>nests left</span></div>';
   el("overlay").hidden=false;
   setPause(false);
 }
@@ -8843,6 +9045,11 @@ function refreshDay(){
   el("dayBar").style.width=(f*100).toFixed(1)+"%";
   el("dayLeft").textContent=clock(S.dayLeft);
   el("dayBar").classList.toggle("crit",f<0.22);
+  // A round runs until every hall or every nest is gone, so both readouts have
+  // to say where in that it is — the clock alone stopped being the whole story.
+  var live=HFGAME.liveNests().length;
+  el("nightNo").textContent="Night "+S.night+" coming";
+  el("nestsLeft").textContent=live+(live===1?" nest":" nests");
   el("supply").textContent=S.players[S.me].supply;
 }
 function refreshWave(){
@@ -8853,6 +9060,9 @@ function refreshWave(){
   el("nightLeft").textContent=clock(S.nightLeft);
   el("nightBar").classList.toggle("crit",nf<0.20);
   el("wLeft").textContent=S.enemies.length+S.spawnLeft;
+  var lv2=HFGAME.liveNests().length;
+  el("nightNo2").textContent="Night "+S.night;
+  el("nestsLeft2").textContent=lv2+(lv2===1?" nest":" nests");
   el("supply").textContent=S.players[S.me].supply;
   var H=S.players[S.me].hall;
   var f=H?Math.max(0,H.hp/HFGAME.TYPES.hall.hp):0;

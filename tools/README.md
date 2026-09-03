@@ -38,13 +38,22 @@ stands on, the nests sit on their own ground rather than the plateau, the build
 grid locks to exact cell multiples instead of sliding with the cursor, and a
 blocked ghost answers in hue rather than brightness.
 
+**`campaign.mjs`** — the round loop. A night is not the end of anything, so
+these drive several full day/night cycles: dawn hands you the next day, the
+night counter advances, each wave is bigger than the last by a widening margin,
+losing every hall ends it, clearing every nest wins it and pays its cache, and
+the nest garrisons chase what comes close without leaving home or eating your
+workers during the day.
+
 **`balance.mjs`** — plays a full day and holds a night, across seeds and
-difficulty sizes.
+difficulty sizes. `--nights N` plays out that many, which is the meaningful
+measure now that surviving one only buys you the next.
 
 ```sh
 node tools/balance.mjs                          # the current ladder, mid build
 node tools/balance.mjs --waves 400,600,850
 node tools/balance.mjs --build strong,gated,mid,thin --seeds 12
+node tools/balance.mjs --nights 5                # how deep a build gets
 node tools/balance.mjs --ab tower.dmg=20         # that stat vs stock, same seeds
 ```
 

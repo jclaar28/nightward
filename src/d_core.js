@@ -306,8 +306,10 @@ function seedNests(seed,gen,centres){
   for(var i=0;i<n;i++){
     var a=a0+i*(Math.PI*2/n)+(rnd()-0.5)*0.5;
     var d=base*(0.90+rnd()*0.20);
+    // No health here: the balance table owns that number, and a copy baked into
+    // the seeded map was silently winning over it.
     out.push({x:Math.cos(a)*d, z:Math.sin(a)*d, r:G.nestR*(0.85+rnd()*0.3),
-              share:1/n, hp:520});
+              share:1/n});
   }
   return out;
 }
@@ -1346,6 +1348,32 @@ var STAT_DEFS={
     {k:"nerve",   label:"Nerve",         def:2.1, lo:0, hi:20,   step:0.1, unit:"u",
      hint:"how close an attacker gets before a worker drops the job and runs"}
   ]},
+  // The nests are the objective and the bank. A round runs until every hall is
+  // gone or every nest is, so these numbers decide how long that takes.
+  nest:{ note:"The source of the horde, and the only thing worth marching out for.", fields:[
+    {k:"hp",      label:"Hit points",     def:2600,lo:200, hi:20000,step:50, int:true,
+     hint:"one committed push, not a chip over several days"},
+    {k:"regen",   label:"Knits back",     def:0.50,lo:0,   hi:1,    step:0.05,
+     hint:"share of full health recovered each dawn"},
+    {k:"cache",   label:"Cache",          def:320, lo:0,   hi:3000, step:10, int:true, unit:"supply",
+     hint:"paid to whoever did the most damage bringing it down"},
+    {k:"guard",   label:"Standing guard", def:6,   lo:0,   hi:40,   step:1,  int:true,
+     hint:"attackers that live at the nest by day"},
+    {k:"callN",   label:"Call · size",    def:4,   lo:0,   hi:30,   step:1,  int:true,
+     hint:"defenders it wakes when something starts hitting it"},
+    {k:"callGap", label:"Call · cooldown",def:5.0, lo:0.5, hi:60,   step:0.5, unit:"s"},
+    {k:"leash",   label:"Guard leash",    def:9.0, lo:1,   hi:30,   step:0.5, unit:"u",
+     hint:"how far a guard will follow before going home"},
+    // Each night is bigger than the last and the gap widens, so a long game is
+    // not a safe one. These live here because it is the nests that send them.
+    {k:"grow",    label:"Night growth",    def:0.20,lo:0,   hi:2,    step:0.01,
+     hint:"how much bigger the second night is than the first"},
+    {k:"accel",   label:"Growth · added",  def:0.06,lo:0,   hi:1,    step:0.01,
+     hint:"added to that growth every further night"},
+    {k:"ehpK",    label:"Attacker health ×",def:1.05,lo:1,  hi:2,    step:0.01,
+     hint:"multiplies attacker health each night"}
+  ]},
+
   salvage:{ note:"How much is out there, and how it is spread.", fields:[
     {k:"nearN",   label:"Piles · inside", def:2,  lo:0,  hi:8,   step:1, int:true,
      hint:"within the build ring, safe to work"},

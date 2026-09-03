@@ -131,7 +131,8 @@ The habit in this repo is to **measure, not eyeball**. Screenshots are for
 judging how something looks; they are not evidence that it works. Nearly every
 bug found here was found by reading numbers out of the running game.
 
-**Run `node tools/smoke.mjs` and `node tools/instances.mjs` after any change**,
+**Run `node tools/smoke.mjs`, `node tools/instances.mjs` and
+`node tools/campaign.mjs` after any change**,
 and `node tools/balance.mjs --ab id.key=value` for anything touching difficulty.
 `tools/README.md` explains them; read it before writing a new one.
 
@@ -194,6 +195,14 @@ without talking to Jarrod first.
 - **You cannot call the night early.** There is no ready button and no space
   bar. `startWave()` is reachable only from `nightfall()`. The day is a fixed
   budget you spend, not a phase you skip when you feel prepared.
+- **Surviving a night is not winning.** `dawn()` hands you the next day. A round
+  ends only when every hall is gone or every nest is, and each night you leave
+  the nests standing the next one is bigger by a widening margin. Holding
+  forever is not a strategy the game will let you have.
+- **The nests are the objective and the bank.** They are tough, they knit back
+  together each dawn, they keep a standing garrison by day, and they wake
+  defenders when hit. Their cache is the only income after the map is stripped,
+  which is what makes pushing out the thing that pays for pushing out.
 - **The commander walks to the hall and raises it.** Where you put your town
   costs you the time to get there, so the round opens with a decision rather than
   a click. Losing him only matters before the hall stands.

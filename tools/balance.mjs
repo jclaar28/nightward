@@ -11,6 +11,7 @@
 //   node tools/balance.mjs                          # the current ladder
 //   node tools/balance.mjs --waves 400,600,850      # specific wave sizes
 //   node tools/balance.mjs --build mid --seeds 12   # one build, more samples
+//   node tools/balance.mjs --nights 5               # how deep a build gets
 //   node tools/balance.mjs --ab tower.dmg=20        # A/B one stat against stock
 // ---------------------------------------------------------------------------
 import { open, done } from './harness.mjs';
@@ -25,13 +26,15 @@ const WAVES  = arg('waves', '400,600,850').split(',').map(Number);
 const BUILDS = arg('build', 'mid').split(',');
 const NSEEDS = +arg('seeds', 5);
 const AB     = arg('ab', null);   // e.g. "tower.dmg=20" or "wall.hp=200"
+const NIGHTS = +arg('nights', 1); // how many nights to play out per run
 
 const SEEDS = [31337, 5150, 90210, 4242, 8888, 1234, 777, 2468, 13579, 60606, 42, 999]
   .slice(0, Math.max(1, Math.min(12, NSEEDS)));
 
 // The whole run, inside the page. It plays a full day — gather, cottages,
 // defence — then holds a night, and reports what happened.
-function playRound({ seed, wave, build, stat }) {
+function playRound({ seed, wave, build, stat, nights }) {
+  nights = nights || 1;
   const G = window.__hf.game;
   // A/B switch: apply an override, or explicitly restore the shipped default,
   // so both columns of a comparison run through identical code.
@@ -120,15 +123,22 @@ function playRound({ seed, wave, build, stat }) {
   __nw.run(10);
   const unfinished = __nw.roots().filter(b => b.site).length;
 
-  G.startWave();
-  let peak = 0;
-  for (let n = 0; n < 170 && S.phase === 'attack'; n++) {
-    __nw.run(1);
-    peak = Math.max(peak, S.enemies.length);
+  // Holding a night no longer ends the round, so the measure is how many of
+  // them a build survives before the accelerating waves take it.
+  let peak = 0, held = 0, firstWave = S.wave;
+  for (let night = 0; night < nights; night++) {
+    G.startWave();
+    for (let n = 0; n < 200 && S.phase === 'attack'; n++) {
+      __nw.run(1);
+      peak = Math.max(peak, S.enemies.length);
+    }
+    if (S.phase !== 'build') break;      // lost, or the nests are gone
+    held++;
+    __nw.run(Math.max(1, S.dayLen - 2)); // spend the day doing nothing but repair
   }
   return {
-    seed, wave, build, gathered, purse, cottages, unfinished,
-    result: S.phase, kills: S.kills, peak,
+    seed, wave: firstWave, build, gathered, purse, cottages, unfinished,
+    result: S.phase, held, lastWave: S.wave, kills: S.kills, peak,
     hall: S.players[0].hall ? Math.round(100 * S.players[0].hall.hp / G.TYPES.hall.hp) : 0,
     spent,
   };
@@ -153,16 +163,18 @@ for (const wave of WAVES) {
       const out = [];
       for (const on of runs) {
         const r = await page.evaluate(a => window.__play(a),
-          { seed, wave, build, stat: stat ? { ...stat, on } : null });
+          { seed, wave, build, nights: NIGHTS, stat: stat ? { ...stat, on } : null });
         if (r.error) { console.log(`wave ${wave} ${build} seed ${seed}: ${r.error}`); continue; }
         const key = `${wave}|${build}|${on === true ? 'B' : 'A'}`;
-        tally[key] = tally[key] || { held: 0, n: 0 };
+        tally[key] = tally[key] || { held: 0, nights: 0, n: 0 };
         tally[key].n++;
-        if (r.result === 'won') tally[key].held++;
+        tally[key].nights += r.held;
+        if (r.held >= NIGHTS || r.result === 'won') tally[key].held++;
         out.push(r);
       }
       const line = out.map(r =>
-        `${r.result === 'won' ? 'held' : 'FELL'} hall ${String(r.hall).padStart(3)}`).join('  |  ');
+        `${r.held}/${NIGHTS} nights  ${r.result === 'lost' ? 'FELL' : 'held'}` +
+        ` hall ${String(r.hall).padStart(3)}`).join('  |  ');
       const first = out[0] || {};
       console.log(`wave ${String(wave).padStart(4)}  ${build.padEnd(6)} seed ${String(seed).padEnd(6)}` +
                   `  ${line}   kills ${String(first.kills || 0).padStart(4)}` +
@@ -178,7 +190,8 @@ for (const k of Object.keys(tally).sort()) {
   const t = tally[k];
   const label = stat ? (col === 'A' ? 'stock' : `${stat.key}=${stat.value}`) : '';
   console.log(`wave ${wave.padStart(4)}  ${build.padEnd(6)} ${label.padEnd(14)} ` +
-              `${t.held}/${t.n}`);
+              `${t.held}/${t.n} runs full distance   ` +
+              `${(t.nights / t.n).toFixed(1)} nights held on average`);
 }
 
 await close();

@@ -141,31 +141,28 @@ function onRoundEnd(res){
 
   var SS=HFGAME.state(), multi=!!(SS&&SS.multi), mine=multi&&SS.players[SS.me].out;
   var both=multi&&SS.players.every(function(p){ return !p.out; });
+  // A round is won by pulling every nest down, not by seeing one dawn. That
+  // changes what the end screen is congratulating you for.
   el("ovTitle").textContent = res.won
-    ? (mine?"They held without you":"You held")
+    ? (mine?"They finished it without you":"The nests are down")
     : (multi?"Both towns fell":"You were overrun");
-  // Surviving to dawn and clearing the field are different stories, and the
-  // number that was still coming is the whole difference.
-  var dawn=(res.dawn|0)>0;
+  var nights=res.nights|0;
+  var nightsSaid=nights+(nights===1?" night":" nights");
   el("ovBody").textContent = res.won
     ? (mine
-        ? "Your town hall went down, but the other town saw the night out."
-        : dawn
-          ? ("The sun came up with "+res.dawn+" of them still coming, and it burned "+
-             "them off the field. Your hall stood through the night"+
-             (multi&&!both?" — the other town's did not.":"."))
-          : (multi
-              ? (both?"Every attacker is down and both towns are still standing."
-                     :"Every attacker is down. The other town did not make it — yours did.")
-              :"Every attacker is down before dawn — the nests had nothing left to send."))
+        ? "Your town hall went down, but the other town saw it through and cleared the last nest."
+        : (multi
+            ? (both?"Every nest is down and both towns are still standing after "+nightsSaid+"."
+                   :"Every nest is down after "+nightsSaid+". The other town did not make it — yours did.")
+            :"Every nest is down after "+nightsSaid+". There is nothing left out there to send anything."))
     : (multi
-        ? "Neither hall survived the night. Walls buy time, watchtowers do most of the killing, a ballista is what stops a brute — and a nest left standing keeps sending more."
-        : "Your town hall was destroyed. Walls buy time, watchtowers do most of the killing, a ballista is what stops a brute, and soldiers plug the gap the fast ones find. Cover every nest, not just the nearest.");
+        ? "Neither hall survived. Walls buy time, watchtowers do most of the killing, a ballista is what stops a brute — and every night you leave a nest standing, the next one is bigger."
+        : "Your town hall was destroyed. Walls buy time, watchtowers do most of the killing, a ballista is what stops a brute, and soldiers plug the gap the fast ones find. Holding is not winning: every night you leave the nests alone, the next one comes harder.");
   el("ovAgain").hidden=multi;
   el("ovStats").innerHTML=
-    '<div><b>'+res.kills+'</b><span>of '+res.wave+' killed</span></div>'+
-    '<div><b>'+res.hallPct+'%</b><span>town hall left</span></div>'+
-    '<div><b>'+res.seconds+'s</b><span>time taken</span></div>';
+    '<div><b>'+res.kills+'</b><span>killed</span></div>'+
+    '<div><b>'+nights+'</b><span>'+(nights===1?"night held":"nights held")+'</span></div>'+
+    '<div><b>'+res.nests+'</b><span>nests left</span></div>';
   el("overlay").hidden=false;
   setPause(false);
 }
@@ -506,6 +503,11 @@ function refreshDay(){
   el("dayBar").style.width=(f*100).toFixed(1)+"%";
   el("dayLeft").textContent=clock(S.dayLeft);
   el("dayBar").classList.toggle("crit",f<0.22);
+  // A round runs until every hall or every nest is gone, so both readouts have
+  // to say where in that it is — the clock alone stopped being the whole story.
+  var live=HFGAME.liveNests().length;
+  el("nightNo").textContent="Night "+S.night+" coming";
+  el("nestsLeft").textContent=live+(live===1?" nest":" nests");
   el("supply").textContent=S.players[S.me].supply;
 }
 function refreshWave(){
@@ -516,6 +518,9 @@ function refreshWave(){
   el("nightLeft").textContent=clock(S.nightLeft);
   el("nightBar").classList.toggle("crit",nf<0.20);
   el("wLeft").textContent=S.enemies.length+S.spawnLeft;
+  var lv2=HFGAME.liveNests().length;
+  el("nightNo2").textContent="Night "+S.night;
+  el("nestsLeft2").textContent=lv2+(lv2===1?" nest":" nests");
   el("supply").textContent=S.players[S.me].supply;
   var H=S.players[S.me].hall;
   var f=H?Math.max(0,H.hp/HFGAME.TYPES.hall.hp):0;

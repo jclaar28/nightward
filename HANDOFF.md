@@ -39,8 +39,16 @@ The map is a grid. You start with a commander and a small purse. You place the
 town hall, he walks to it and raises it, and it musters two workers. Six minutes
 of daylight: workers strip salvage piles, cottages compound the workforce, and
 you spend the proceeds on walls, towers and troops. Two minutes of night: the
-nests empty and come for the hall. Hold until dawn and the cycle repeats,
-larger.
+nests empty and come for the hall.
+
+Holding until dawn buys you the next day, not a win. The round ends when every
+town hall is gone or every nest is — and each night you leave the nests
+standing, the next one is bigger by a widening margin, so turtling loses slowly.
+The map's salvage runs out on the first day; after that the only income is the
+cache inside a nest, so the thing that pays for pushing out is pushing out.
+Nests are tough, they keep a garrison by day, they wake defenders when you hit
+them, and they knit back together every dawn — a nest has to come down in one
+committed push, with your town left behind you.
 
 Where the code lives:
 
@@ -97,7 +105,8 @@ npm install && npx playwright install chromium   # once
 npm run check                                    # build + smoke + instances
 ```
 
-`tools/smoke.mjs` plays a round end to end. `tools/instances.mjs` captures every
+`tools/smoke.mjs` plays a round end to end. `tools/campaign.mjs` drives several
+day/night cycles and both endings. `tools/instances.mjs` captures every
 instance the renderer is handed for one frame and asserts against it.
 `tools/balance.mjs` plays a full day and holds a night across seeds, with an
 `--ab` mode for comparing one stat against stock. `tools/README.md` covers
@@ -128,10 +137,12 @@ over WebRTC with the host and guest in exact agreement — measured drift of zer
 
 **Rough or unfinished.**
 
-- *Wave sizes want re-tuning.* The current ladder is easy 400 / normal 600 /
-  hard 850. Fixing wall collision made the game meaningfully easier and the
-  numbers haven't been re-derived since. `tools/balance.mjs` is the harness to
-  do it properly.
+- *Wave sizes want re-tuning.* The ladder sets the **first** night at easy 400 /
+  normal 600 / hard 850, and every night after grows. A defence that never grows
+  gets roughly one night from the `mid` build and two to four from `strong` —
+  measured, and about right for a build that never spends a nest cache, but the
+  curve has not been tuned against a player who does. `tools/balance.mjs
+  --nights N` is the harness for it.
 - *The multiplayer invite code is ~855 characters.* It is the WebRTC session
   description itself, so a short code would need a rendezvous server. Jarrod
   decided to leave it alone rather than take on infrastructure — worth knowing
