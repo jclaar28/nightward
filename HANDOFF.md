@@ -1,0 +1,162 @@
+# Nightward — handoff
+
+Tyler: this is the orientation document. It is written for you, not for your
+Claude — point it at [`CLAUDE.md`](CLAUDE.md) instead, which holds the rules and
+invariants it needs to not break things.
+
+The short version: Nightward is a settlement-defence game, roughly *They Are
+Billions* in shape, written as raw WebGL2 in a single self-contained HTML file.
+No engine, no framework, no dependencies, no build step beyond one Python
+script. You can open `nightward.html` from disk and play it.
+
+---
+
+## Getting to a running game
+
+```sh
+git clone https://github.com/jclaar28/nightward
+cd nightward
+python3 src/build.py        # writes nightward.html
+```
+
+Then open `nightward.html`. That is the whole setup — there is nothing to
+install and no server needed for single player.
+
+For the two-player lobby, serve it over http rather than opening the file
+directly — that's the only way it's been tested:
+
+```sh
+python3 -m http.server 8899   # then http://127.0.0.1:8899/nightward.html
+```
+
+**Edit the modules in `src/`, never `nightward.html`.** It's a build product.
+
+---
+
+## The five-minute tour
+
+The map is a grid. You start with a commander and a small purse. You place the
+town hall, he walks to it and raises it, and it musters two workers. Six minutes
+of daylight: workers strip salvage piles, cottages compound the workforce, and
+you spend the proceeds on walls, towers and troops. Two minutes of night: the
+nests empty and come for the hall. Hold until dawn and the cycle repeats,
+larger.
+
+Where the code lives:
+
+| module | what it owns |
+|---|---|
+| `d_core.js` | palette, asset definitions, terrain generation, the balance table |
+| `d_gl.js` | the renderer — instancing, cel shading, shadow maps, ink outlines |
+| `d_snd.js` | synthesised audio; no audio files exist |
+| `d_game.js` | simulation, pathing, input, and the per-frame instance packing |
+| `d_lib.js` | the in-game library — edit any asset or balance number live |
+| `d_map.js` | the map editor |
+| `d_net.js` | the two-player peer connection |
+| `d_app.js` | screens, HUD, settings |
+
+`d_game.js` is where most of the work happens and it's the biggest file. The two
+functions worth reading first are `update(dt)` and `pack()` — the simulation
+step and the routine that turns the world into instance buffers.
+
+---
+
+## Three ideas that explain most of the codebase
+
+**Assets are data, not meshes.** Every building, unit and prop is a list of
+primitives with positions, sizes and a shade. Nothing is modelled in an external
+tool. The in-game library (main menu → Library) lets you select any part of any
+asset and drag it around while the game runs, which is how all of it was built.
+If you want to change how something looks, that's the place to start, and
+`CLAUDE.md` has the part-format details.
+
+**One draw call per kind of thing.** Everything is instanced through a
+twelve-float stride. Hundreds of attackers cost a single draw. Limbs are
+separate bone batches driven by a per-instance pitch value — that's how a horde
+walks without a skeleton per body.
+
+**The balance table is the only source of truth.** Every number — hit points,
+reload, range, build time, gather rate — is defined once in `STAT_DEFS`, edited
+live from the library, and read from that table by both the simulation and the
+HUD. There is deliberately no second copy anywhere. If you add a stat, add it
+there and let it flow.
+
+---
+
+## How we work
+
+The habit worth adopting: **measure rather than eyeball.** The build exposes
+`window.__hf` specifically so a headless browser can drive a full round with no
+input, and nearly every bug found so far was found by reading numbers out of the
+running game rather than by looking at it.
+
+A worked example. "The nests are floating" could have been fixed by nudging a
+constant until it looked right. Instead: terrain height at each nest was −0.17
+and −0.49 against a hard-coded 0.3, so the drift was 0.47 and 0.79 units;
+`gy(x,z)` replaced the constant at ~30 draw sites; then the renderer's instance
+upload was hooked and every Y it received was checked against the terrain
+beneath it — 989 instances, zero below ground, both nests landing exactly on
+their terrain height. That's the standard. `CLAUDE.md` has the technique and the
+traps.
+
+Balance changes get an A/B on the same seeds with one variable switched. Small
+samples lie: a config that looked 5/5 versus 2/5 came back 7/12 versus 7/12 when
+run properly.
+
+---
+
+## Where it stands
+
+**Working and verified.** Full day/night cycle. Commander, workers, soldiers,
+archers, all animated. Walls, gates, towers, ballistae, braziers, barracks,
+archery ranges, cottages. Construction sites. Repair, shelter, stances. Salvage
+economy. The map editor and the live asset/balance library. Two-player rounds
+over WebRTC with the host and guest in exact agreement — measured drift of zero.
+
+**Rough or unfinished.**
+
+- *Wave sizes want re-tuning.* The current ladder is easy 400 / normal 600 /
+  hard 850. Fixing wall collision made the game meaningfully easier and the
+  numbers haven't been re-derived since. The harness to do it properly exists.
+- *The multiplayer invite code is ~855 characters.* It is the WebRTC session
+  description itself, so a short code would need a rendezvous server. Jarrod
+  decided to leave it alone rather than take on infrastructure — worth knowing
+  before you propose shortening it.
+- *No sound design pass.* The audio is synthesised and functional, not composed.
+- *No meta-progression.* Each run is standalone. The original concept had a
+  rogue-lite layer between runs; nothing of it is built.
+- *Single map size, three difficulties.* No campaign, no scenario structure.
+
+**Deliberately left alone.** The design decisions listed under "Design intent"
+in `CLAUDE.md` — no calling the night early, the commander walking to the hall,
+selling only from the hotbar, defenders steering rather than pathing. They look
+like oversights in the code and aren't. Please raise them with Jarrod before
+changing any of them.
+
+---
+
+## Working in parallel
+
+We're two people on one small repo, so the seams matter more than the process.
+
+The cleanest places to work independently:
+
+- **`d_core.js` assets** — adding or reshaping a building or unit touches one
+  array entry and nothing else.
+- **`STAT_DEFS` balance** — numbers only; conflicts are trivial to resolve.
+- **`d_map.js`** and **`d_lib.js`** — largely self-contained tools.
+- **`d_snd.js`** — nothing else depends on its internals.
+
+The places to coordinate before starting:
+
+- **`pack()` in `d_game.js`** — every draw goes through it and it's a long
+  function; two people editing it will conflict.
+- **`d_shell.html` + `d_app.js` HUD** — markup, CSS and wiring are three files
+  apart for one visual change.
+- **The instance batch list** — adding a batch touches five places at once (see
+  `CLAUDE.md`), and two people doing it simultaneously will both be wrong.
+
+Rebuild and commit `nightward.html` with your source changes. It's checked in
+deliberately so the repo is playable without a build, which does mean it
+conflicts on every concurrent edit — take either side and rerun
+`python3 src/build.py`, since it's generated and the sources are what matter.
