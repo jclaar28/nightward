@@ -376,7 +376,9 @@
   /* Whatever is selected puts its verbs here, in the corner the phase readout
      used to hold. The dock below stays what it always is — the things you can
      build — so the row you reach for never moves out from under your hand. */
-  #selCol{position:fixed;top:14px;left:14px;width:212px;
+  /* Anchored to the bottom, so the cards grow up out of the corner rather than
+     down past the edge of the screen when both are showing. */
+  #selCol{position:fixed;bottom:14px;left:14px;width:212px;
     display:flex;flex-direction:column;gap:9px;pointer-events:none;z-index:8}
   #selCol > *{pointer-events:auto}
   #stats{padding:9px 12px;font-family:"IBM Plex Mono",monospace;font-size:11px;
@@ -431,13 +433,13 @@
   /* the night bar empties toward dawn, so it warms rather than reddens */
   .bar span.dawn{background:#5B6E8C}
   .bar span.dawn.crit{background:#D9A24A}
-  #supplyBox{position:fixed;right:14px;bottom:14px;z-index:6;
+  #supplyBox{position:fixed;left:14px;top:14px;z-index:6;
     display:flex;align-items:baseline;gap:10px;padding:9px 14px 10px}
   #supplyBox .lb{font-family:"IBM Plex Mono",monospace;font-size:10px;
     letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}
   #supplyBox b{font-size:22px;font-weight:700;letter-spacing:-.02em;
     font-variant-numeric:tabular-nums;line-height:1}
-  #army{position:fixed;left:14px;bottom:14px;z-index:6;width:196px;padding:10px 12px}
+  #army{position:fixed;right:14px;bottom:14px;z-index:6;width:196px;padding:10px 12px}
   /* the dock is measured from the bottom of its own content, so the slot cards
      can never run off the bottom of the screen the way they used to */
   #dock{position:fixed;left:50%;transform:translateX(-50%);bottom:14px;
