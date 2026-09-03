@@ -451,7 +451,7 @@ function place(t,gx,gz,pid,rotOv){
     S.cells[key(c[0],c[1])] = (c[0]===gx&&c[1]===gz) ? b : {ref:b,type:t,own:p.id};
   });
   p.supply-=TYPES[t].cost;
-  if(SND&&p.id===S.me) SND.place();
+  if(SND&&p.id===S.me) SND.place(M.gx2w(gx),M.gx2w(gz));
   // A hall is not placed, it is started. The commander has to walk over and
   // raise it, and until it stands there is nothing to build behind.
   if(t==="hall"){
@@ -487,7 +487,7 @@ function removeAt(gx,gz,pid){
   if(S.bsel===b) S.bsel=null;
   footCells(b.type,b.gx,b.gz).forEach(function(cc){ delete S.cells[key(cc[0],cc[1])]; });
   if(p) p.supply+=Math.round(TYPES[b.type].cost*0.8);
-  if(SND) SND.remove();
+  if(SND) SND.remove(M.gx2w(b.gx),M.gx2w(b.gz));
   S.distDirty=true; S.netCellsDirty=true;
   if(UI.hotbar) UI.hotbar();
   if(UI.phase) UI.phase();
@@ -616,6 +616,7 @@ function finishBuild(b){
   }
   var fx=M.gx2w(b.gx), fz=M.gx2w(b.gz);
   spark(fx,gy(fx,fz)+0.9,fz,8,[1.05,0.90,0.58],0.9,2.2,0.45,0.9);
+  if(SND) SND.built(fx,fz);
   S.distDirty=true; S.netCellsDirty=true;
   if(UI.hotbar) UI.hotbar();
   if(UI.units) UI.units();
@@ -642,7 +643,7 @@ function finishHall(p,b){
   musterAll(b);
   var hx=M.gx2w(b.gx), hz=M.gx2w(b.gz);
   spark(hx,PLAT+1.6,hz,14,[1.15,0.98,0.62],1.2,3.2,0.55,1.1);
-  if(SND) SND.place();
+  if(SND) SND.built(hx,hz);
   S.distDirty=true; S.netCellsDirty=true;
   if(UI.hotbar) UI.hotbar();
   if(UI.phase) UI.phase();
@@ -855,7 +856,7 @@ function updateWorker(u,U,dt){
       op.supply+=Math.round(u.carry);
       S.gathered+=Math.round(u.carry);
       u.carry=0; u.mode="toNode";
-      if(SND) SND.deposit();
+      if(SND) SND.deposit(u.x,u.z);
       if(UI.hotbar) UI.hotbar();
     }
     return;
@@ -1061,7 +1062,7 @@ function updateUnits(dt){
         var g=u.home.garrison.indexOf(u);
         if(g>=0) u.home.garrison.splice(g,1);
       }
-      if(SND) SND.unitDown();
+      if(SND) SND.unitDown(u.x,u.z);
       S.units.splice(i,1);
       if(UI.units) UI.units();
       continue;
@@ -1124,12 +1125,12 @@ function updateUnits(dt){
           if(U.melee){
             hurtTarget(tgt,U.dmg,u.own|0);
             spark((u.x+tgt.x)/2,PLAT+0.55,(u.z+tgt.z)/2,3,[1.9,1.9,1.6],1.0,2.2,0.20,0.6);
-            if(SND) SND.swing();
+            if(SND) SND.swing(u.x,u.z);
           } else {
             S.bolts.push({x:u.x,y:gy(u.x,u.z)+0.95,z:u.z,t:tgt,dmg:U.dmg,rot:0,
                           spd:34, sc:1, splash:0, splashK:0, friendly:true,
                           own:u.own|0});
-            if(SND) SND.loose();
+            if(SND) SND.loose(u.x,u.z);
           }
         }
       } else if(d<=strike+lead){
@@ -1169,7 +1170,7 @@ function updateUnits(dt){
     if(b.trainCd<=0){
       b.trainCd=0;
       muster(b);
-      if(SND) SND.muster();
+      if(SND) SND.muster(M.gx2w(b.gx),M.gx2w(b.gz));
       if(UI.units) UI.units();
     }
   }
@@ -1609,7 +1610,7 @@ function stepCombat(dt){
       dropCorpse(m);
       spark(m.x,gy(m.x,m.z)+0.55*m.sc,m.z, m.t==="brute"?11:6, EK.gib, 1.1, 3.4, 0.55, 0.9*m.sc);
       if(m.t==="brute") S.shake=Math.min(0.20,S.shake+0.09);
-      if(SND) SND.death(m.t);
+      if(SND) SND.death(m.t,m.x,m.z);
       S.enemies.splice(e,1); S.kills++; continue;
     }
     var gx=M.w2gx(m.x), gz=M.w2gx(m.z);
@@ -1631,7 +1632,7 @@ function stepCombat(dt){
         var bd=Math.hypot(blockU.x-m.x,blockU.z-m.z)||1;
         blockU.x+=(blockU.x-m.x)/bd*0.10; blockU.z+=(blockU.z-m.z)/bd*0.10;
         strikeFx(m,blockU.x,PLAT+0.62,blockU.z,m.t==="brute");
-        if(SND) SND.swing();
+        if(SND) SND.swing(m.x,m.z);
       }
       continue;
     }
@@ -1655,7 +1656,7 @@ function stepCombat(dt){
         }
         debris(m,hhx,hhz,2.35,m.t==="brute"?7:4);
         strikeFx(m,hhx,PLAT+0.85,hhz,m.t==="brute");
-        if(SND&&mine) SND.hallHit();
+        if(SND&&mine) SND.hallHit(hhx,hhz);
         // that blow may have ended the round — but this step also runs by day,
         // so the test is "is it over", not "is it night"
         if(S.phase==="won"||S.phase==="lost") return;
@@ -1699,7 +1700,7 @@ function stepCombat(dt){
           damageBuilding(blocker,m.dmgB*perB);
           debris(m,bx,bz,(TYPES[blocker.type].foot*CELL)/2,m.t==="brute"?6:3);
           strikeFx(m,bx,PLAT+0.6,bz,m.t==="brute");
-          if(SND) SND.chew();
+          if(SND) SND.chew(bx,bz);
           if(S.phase==="won"||S.phase==="lost") return;
         }
         continue;
@@ -1741,7 +1742,7 @@ function stepCombat(dt){
                   splash:tyr.splash||0, splashK:(tyr.splashK===undefined?0.7:tyr.splashK),
                   own:c.own|0});
     spark(tx2,muzY,tz2, wantHeavy?4:2, [2.5,1.7,0.7], 0.7, wantHeavy?2.6:1.8, 0.16, 0.7);
-    if(SND) SND.shot(c.type);
+    if(SND) SND.shot(c.type,tx2,tz2);
   }
 
   for(var b2=S.bolts.length-1;b2>=0;b2--){
@@ -1783,7 +1784,7 @@ function stepCombat(dt){
         S.shake=Math.min(0.18,S.shake+0.05);
       } else spark(hx2,PLAT+0.6,hz2,3,
                    bo.friendly?[1.1,2.2,2.3]:[2.3,1.5,0.6],1.0,2.4,0.22,0.65);
-      if(SND) SND.impact(!!bo.splash);
+      if(SND) SND.impact(!!bo.splash,hx2,hz2);
       S.bolts.splice(b2,1); continue;
     }
     bo.x+=vx/L2*sp2*dt; bo.y+=vy/L2*sp2*dt; bo.z+=vz/L2*sp2*dt;
@@ -1844,7 +1845,7 @@ function update(dt){
         dropGib(ge.x,ge.z,ge.rot,ge.sc,ENEMY[ge.t].gib);
         S.enemies.splice(gi,1);
       }
-      if(SND){ SND.death("brute"); SND.impact(true); }
+      if(SND){ SND.death("brute",nz.x,nz.z); SND.impact(true,nz.x,nz.z); }
       if(UI.phase) UI.phase();
       // the last nest is the round: nothing is left to send anything
       if(!liveNests().length){ endRound(true); return; }
@@ -1944,7 +1945,7 @@ function dawn(){
     if(UNITS[wu.t].civil&&wu.mode==="flee") wu.mode="idle";
   }
   garrisonNests();
-  if(SND) SND.win();
+  if(SND) SND.dawn();
   if(UI.phase) UI.phase();
   if(UI.hotbar) UI.hotbar();
   if(UI.units) UI.units();
@@ -2756,10 +2757,24 @@ function packLamps(){
   return LAMPS;
 }
 
+// The audio listener rides the camera. Sounds carry world positions; the mixer
+// turns the difference into pan, level and how much air is in the way, so a
+// tower on your left fires on your left and a nest across the map is distant.
+var ambT=0, ambOn=false;
 function draw(){
   if(!active||!S) return;
   if(R.setTime) R.setTime(S.dayP);
   if(R.setLamps) R.setLamps(packLamps());
+  if(SND&&SND.listen){
+    var CA=camera(true);
+    SND.listen(CA.target[0],CA.target[2],CA.r[0],CA.r[2],cam.zoom);
+    // The bed is told when the world changes under it — and retried until it
+    // takes, because the first change usually lands before the browser has
+    // allowed any audio at all.
+    if(SND.ambience && (S.phase!==ambT||!ambOn)){
+      ambOn=SND.ambience(S.phase,S.dayP); ambT=S.phase;
+    }
+  }
   pack();
   R.render(camera(),BATCHES,[S.flash*1.5,0,0]);
 }

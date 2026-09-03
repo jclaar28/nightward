@@ -76,6 +76,13 @@ ground. Sites do not shoot, train, house, light, or accept repair, and each of
 those is a separate guard in a separate loop. If you add a behaviour driven by a
 building, ask whether a site should have it, and the answer is almost always no.
 
+**Audio is layered, varied, placed and limited.** Every sound is a transient, a
+body and a tail; nothing repeats without jitter on pitch, filter and timing;
+everything carries a world position so the mixer can pan it, attenuate it and
+dull it with distance; and everything shares one reverb and one soft ceiling.
+A new sound that is one oscillator, at one pitch, dry and centred will sound
+exactly like the thing this pass was undoing. `tools/audio.mjs` measures them.
+
 **Every balance number lives in one table.** `STAT_DEFS` in `d_core.js` defines
 it; `M.statsOf(id)` resolves it including live edits from the library; `syncStats()`
 copies it onto `TYPES` / `UNITS` / `ENEMY`. The HUD reads the same table. Never

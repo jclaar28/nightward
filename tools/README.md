@@ -45,6 +45,23 @@ losing every hall ends it, clearing every nest wins it and pays its cache, and
 the nest garrisons chase what comes close without leaving home or eating your
 workers during the day.
 
+**`audio.mjs`** — renders every sound offline and measures it. "It did not
+throw" is not a test for a sound: it has a level, a length, a weight and a
+stereo position, and every one is a number you can be wrong about. Checks that
+nothing is silent or clipping, that a heavy impact really does carry more
+energy under 180 Hz than a light one, that no sound repeats itself sample for
+sample, that pan and distance work, and that a night-sized volley stays under
+the ceiling.
+
+```sh
+node tools/audio.mjs --report   # the measurements as a table
+```
+
+Two of its own metrics were wrong before the sounds were: counting zero
+crossings across a whole buffer measured the noise under a decayed tail, and an
+absolute end-threshold made a quiet distant sound look shorter than the loud
+near one it came from. Both are now relative to the sound's own peak.
+
 **`economy.mjs`** — how much a day pays and how long the map lasts. Plays a
 settlement out day by day with workers on the nearest live pile and cottages
 bought as they become affordable, then reports income per day, when the piles

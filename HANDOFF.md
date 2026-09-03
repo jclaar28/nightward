@@ -152,7 +152,9 @@ over WebRTC with the host and guest in exact agreement — measured drift of zer
   description itself, so a short code would need a rendezvous server. Jarrod
   decided to leave it alone rather than take on infrastructure — worth knowing
   before you propose shortening it.
-- *No sound design pass.* The audio is synthesised and functional, not composed.
+- *No music.* The sound effects have had a full pass — layered, varied, panned
+  and attenuated by distance, through a shared reverb and limiter, with an
+  ambient bed that crossfades day to night — but there is no score.
 - *No meta-progression.* Each run is standalone. The original concept had a
   rogue-lite layer between runs; nothing of it is built.
 - *Single map size, three difficulties.* No campaign, no scenario structure.
