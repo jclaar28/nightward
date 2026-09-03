@@ -1,0 +1,16 @@
+{
+  "name": "nightward",
+  "private": true,
+  "type": "module",
+  "description": "Headless checks for Nightward. The game itself has no dependencies; these are for the tools in tools/.",
+  "scripts": {
+    "build": "python3 src/build.py",
+    "smoke": "node tools/smoke.mjs",
+    "instances": "node tools/instances.mjs",
+    "balance": "node tools/balance.mjs",
+    "check": "python3 src/build.py && node tools/smoke.mjs && node tools/instances.mjs"
+  },
+  "devDependencies": {
+    "playwright": "^1.49.0"
+  }
+}

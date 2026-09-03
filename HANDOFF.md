@@ -90,6 +90,19 @@ The habit worth adopting: **measure rather than eyeball.** The build exposes
 input, and nearly every bug found so far was found by reading numbers out of the
 running game rather than by looking at it.
 
+That is what `tools/` is:
+
+```sh
+npm install && npx playwright install chromium   # once
+npm run check                                    # build + smoke + instances
+```
+
+`tools/smoke.mjs` plays a round end to end. `tools/instances.mjs` captures every
+instance the renderer is handed for one frame and asserts against it.
+`tools/balance.mjs` plays a full day and holds a night across seeds, with an
+`--ab` mode for comparing one stat against stock. `tools/README.md` covers
+writing new ones and the traps worth knowing.
+
 A worked example. "The nests are floating" could have been fixed by nudging a
 constant until it looked right. Instead: terrain height at each nest was −0.17
 and −0.49 against a hard-coded 0.3, so the drift was 0.47 and 0.79 units;
@@ -117,7 +130,8 @@ over WebRTC with the host and guest in exact agreement — measured drift of zer
 
 - *Wave sizes want re-tuning.* The current ladder is easy 400 / normal 600 /
   hard 850. Fixing wall collision made the game meaningfully easier and the
-  numbers haven't been re-derived since. The harness to do it properly exists.
+  numbers haven't been re-derived since. `tools/balance.mjs` is the harness to
+  do it properly.
 - *The multiplayer invite code is ~855 characters.* It is the WebRTC session
   description itself, so a short code would need a rendezvous server. Jarrod
   decided to leave it alone rather than take on infrastructure — worth knowing
@@ -146,6 +160,7 @@ The cleanest places to work independently:
 - **`STAT_DEFS` balance** — numbers only; conflicts are trivial to resolve.
 - **`d_map.js`** and **`d_lib.js`** — largely self-contained tools.
 - **`d_snd.js`** — nothing else depends on its internals.
+- **`tools/`** — adding a check touches nothing the game reads.
 
 The places to coordinate before starting:
 

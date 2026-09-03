@@ -131,9 +131,14 @@ The habit in this repo is to **measure, not eyeball**. Screenshots are for
 judging how something looks; they are not evidence that it works. Nearly every
 bug found here was found by reading numbers out of the running game.
 
+**Run `node tools/smoke.mjs` and `node tools/instances.mjs` after any change**,
+and `node tools/balance.mjs --ab id.key=value` for anything touching difficulty.
+`tools/README.md` explains them; read it before writing a new one.
+
 The build exposes `window.__hf = { show, game, lib, map, gl, settings, ... }`.
-That is deliberate and is the whole test surface. From it you can drive a round
-headlessly with no input at all:
+That is deliberate and is the whole test surface. `tools/harness.mjs` layers a
+`window.__nw` helper on top of it. From either you can drive a round headlessly
+with no input at all:
 
 ```js
 __hf.show('play');
@@ -143,12 +148,12 @@ G.place('hall', HF.w2gx(0), HF.w2gx(0));
 for (let i = 0; i < 30 * 20; i++) G.update(1/30); // 20 seconds, deterministic
 ```
 
-Run it with Playwright against headless Chromium with SwiftShader:
+Run it with Playwright against headless Chromium with SwiftShader — the harness
+serves the repo itself, so a tool is one command:
 
 ```sh
-python3 src/build.py
-python3 -m http.server 8899           # serve the built file
-node check.mjs                        # chromium --use-gl=swiftshader --enable-unsafe-swiftshader
+npm install && npx playwright install chromium   # once
+python3 src/build.py && node tools/smoke.mjs
 ```
 
 Three techniques that keep the evidence honest:
@@ -173,10 +178,11 @@ Two traps that have each cost an hour: the player is eliminated mid-test and
 `update()` stops simulating, so pin `hall.hp` when you don't care about survival;
 and `S` captured before `G.start()` is a stale object.
 
-**Balance changes get an A/B.** Same harness, same seeds, one variable switched
-via `HF.setStat(id, key, value)` + `syncStats()`. Construction times were shipped
-only after 12 seeds showed 7/12 either way — small samples on knife-edge configs
-swing wildly and will tell you whatever you want to hear.
+**Balance changes get an A/B.** `node tools/balance.mjs --ab tower.dmg=20` runs
+each seed twice through identical code, once with the shipped default and once
+with the override. Construction times were shipped only after 12 seeds showed
+7/12 either way — small samples on knife-edge configs swing wildly and will tell
+you whatever you want to hear.
 
 ---
 

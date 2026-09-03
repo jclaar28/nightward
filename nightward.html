@@ -6414,6 +6414,11 @@ return {
   isActive:function(){ return active; },
   state:function(){ return S; },
   TYPES:TYPES, CATS:CATS, DIFF:DIFF, ENEMY:ENEMY, UI:UI, syncStats:syncStats,
+  // The instance batches, keyed by name. Nothing in the game reads this — it is
+  // here so a test can say "the grid batch" instead of guessing an index into
+  // BATCHES, which is exactly the kind of guess that made an earlier check
+  // measure the ghost building and report that the grid was fine.
+  batches:function(){ return B; },
   canPlace:canPlace, place:place, removeAt:removeAt
 };
 })();
