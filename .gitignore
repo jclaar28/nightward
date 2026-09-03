@@ -6,5 +6,7 @@ __pycache__/
 .DS_Store
 
 # tooling
-node_modules/
+# no trailing slash: that form matches only a real directory, and a symlinked
+# node_modules (handy when playwright lives outside the repo) stayed untracked
+node_modules
 package-lock.json
