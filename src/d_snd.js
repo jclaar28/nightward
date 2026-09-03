@@ -263,27 +263,14 @@ function begin(name,ms,max,x,z,extra){
 }
 
 // ---- ambience -------------------------------------------------------------
-// Two beds, crossfaded by the clock. Wind is noise through a slowly wandering
-// filter; night is a pair of detuned drones an octave down with the same wind
-// underneath, quieter and darker. Neither ever stops, so there is no gap.
+// The bed is a night drone and nothing else. There was a wind layer under both
+// phases — filtered noise on a slow wander — and it was pulled: held for minutes
+// at a time it read as tape hiss rather than weather, and it sat in the same
+// band as the swarm, which is the one thing the player needs to hear coming.
+// Day is deliberately open now; the sparse one-shots below carry it.
 var amb=null, ambTimer=null, ambPhase="build", ambDayP=0;
 function startAmbience(){
   if(amb||!ready) return;
-  function windChain(dark){
-    var s=ctx.createBufferSource();
-    s.buffer=dark?noiseDark:noise; s.loop=true; s.playbackRate.value=dark?0.7:1;
-    var f=ctx.createBiquadFilter();
-    f.type="bandpass"; f.frequency.value=dark?190:430; f.Q.value=0.55;
-    var g=ctx.createGain(); g.gain.value=0.0001;
-    s.connect(f); f.connect(g); g.connect(ambBus);
-    s.start();
-    // a slow wander, so it breathes instead of hissing
-    var lfo=ctx.createOscillator(), la=ctx.createGain();
-    lfo.type="sine"; lfo.frequency.value=dark?0.045:0.07;
-    la.gain.value=dark?70:190;
-    lfo.connect(la); la.connect(f.frequency); lfo.start();
-    return g;
-  }
   function drone(f0){
     var o=ctx.createOscillator(), o2=ctx.createOscillator();
     o.type="sawtooth"; o.frequency.value=f0;
@@ -295,7 +282,7 @@ function startAmbience(){
     o.start(); o2.start();
     return g;
   }
-  amb={ day:windChain(false), night:windChain(true), drone:drone(48) };
+  amb={ drone:drone(48) };
   ambBus.gain.value=0.0;
   scheduleAmbOne();
 }
@@ -331,9 +318,8 @@ function ambience(phase,dayP){
   var over=(phase==="won"||phase==="lost"||phase==="menu");
   var bed=over?0:0.5;
   ambBus.gain.setTargetAtTime(bed,t,1.2);
-  amb.day.gain.setTargetAtTime(night?0.004:0.055,t,night?2.5:4.0);
-  amb.night.gain.setTargetAtTime(night?0.075:0.010,t,2.5);
-  amb.drone.gain.setTargetAtTime(night?0.030:0.0001,t,3.0);
+  // Louder than it was under the wind, because it is no longer competing with it.
+  amb.drone.gain.setTargetAtTime(night?0.042:0.0001,t,3.0);
   return true;
 }
 

@@ -122,8 +122,8 @@ function refreshMenu(){
   el("mBest").textContent=SAVE.runs? (SAVE.bestHall+"%") : "—";
   var lr=SAVE.lastResult;
   el("mLast").textContent = lr
-    ? (lr.won?"won ":"lost ")+"· "+lr.difficulty+" · hall "+lr.hallPct+"% · "+lr.seconds+"s"
-    : "no rounds yet";
+    ? (lr.won?"cleared ":"overrun ")+"· "+lr.difficulty+" · hall "+lr.hallPct+"% · "+lr.seconds+"s"
+    : "you have not been out yet";
   el("mDiffTag").textContent=HFGAME.DIFF[SET.difficulty].label;
   var na=el("mAssets");
   if(na&&M.allAssets) na.textContent=M.allAssets().length+" assets";
@@ -145,25 +145,25 @@ function onRoundEnd(res){
   // A round is won by pulling every nest down, not by seeing one dawn. That
   // changes what the end screen is congratulating you for.
   el("ovTitle").textContent = res.won
-    ? (mine?"They finished it without you":"The nests are down")
-    : (multi?"Both towns fell":"You were overrun");
+    ? (mine?"They finished it without you":"The last nest is cold")
+    : (multi?"Both towns fell":"There is no town left");
   var nights=res.nights|0;
   var nightsSaid=nights+(nights===1?" night":" nights");
   el("ovBody").textContent = res.won
     ? (mine
-        ? "Your town hall went down, but the other town saw it through and cleared the last nest."
+        ? "Your hall went down before the end. The other town carried it the rest of the way and put out the last nest."
         : (multi
-            ? (both?"Every nest is down and both towns are still standing after "+nightsSaid+"."
-                   :"Every nest is down after "+nightsSaid+". The other town did not make it — yours did.")
-            :"Every nest is down after "+nightsSaid+". There is nothing left out there to send anything."))
+            ? (both?"Every nest is cold after "+nightsSaid+", and both towns are still standing to see it."
+                   :"Every nest is cold after "+nightsSaid+". The other town did not live to see it. Yours did.")
+            :"Every nest is cold after "+nightsSaid+". Nothing out there is left to send anything, and the dark is only dark again."))
     : (multi
-        ? "Neither hall survived. Walls buy time, watchtowers do most of the killing, a ballista is what stops a brute — and every night you leave a nest standing, the next one is bigger."
-        : "Your town hall was destroyed. Walls buy time, watchtowers do most of the killing, a ballista is what stops a brute, and soldiers plug the gap the fast ones find. Holding is not winning: every night you leave the nests alone, the next one comes harder.");
+        ? "Neither hall lasted the night. Walls only buy minutes; watchtowers do the killing; a ballista is what stops a brute. And every night a nest is left standing out there, the next one comes harder."
+        : "The hall is gone, and with it the reason to hold this ground. Walls only buy minutes; watchtowers do the killing; a ballista is what stops a brute; soldiers plug the gap the fast ones find. And holding is not winning — every night you leave a nest alone out there, the next one comes harder.");
   el("ovAgain").hidden=multi;
   el("ovStats").innerHTML=
-    '<div><b>'+res.kills+'</b><span>killed</span></div>'+
+    '<div><b>'+res.kills+'</b><span>put down</span></div>'+
     '<div><b>'+nights+'</b><span>'+(nights===1?"night held":"nights held")+'</span></div>'+
-    '<div><b>'+res.nests+'</b><span>nests left</span></div>';
+    '<div><b>'+res.nests+'</b><span>still out there</span></div>';
   el("overlay").hidden=false;
   setPause(false);
 }
@@ -232,7 +232,7 @@ HFGAME.UI.building=function(){
   var T=HFGAME.TYPES[b.type], site=!!b.site;
   var f=site ? Math.max(0,Math.min(1,b.prog/Math.max(0.001,b.need)))
              : Math.max(0,b.hp/b.max);
-  el("bldName").textContent=T.name+(site?" · building":"");
+  el("bldName").textContent=T.name+(site?" · going up":"");
   el("bldHp").textContent=site ? Math.max(0,Math.ceil(b.need-b.prog))+"s"
                               : Math.ceil(f*100)+"%";
   el("bldBar").style.width=(f*100).toFixed(1)+"%";
@@ -244,13 +244,13 @@ HFGAME.UI.building=function(){
   house.hidden=!housed.length;
   if(housed.length){
     el("bldHoused").textContent=housed.length+(housed.length===1?" worker":" workers")+
-      (b.type==="hall"?" in the settlement":" housed here");
-    el("bldIn").textContent=inside?(inside+" inside"):"";
+      (b.type==="hall"?" in the settlement":" living here");
+    el("bldIn").textContent=inside?(inside+" indoors"):"";
   }
   // The rail says what this building is; the dock is where you act on it. One
   // place for state, one place for verbs — and selling only ever happens there.
   el("bldHint").textContent=housed.length
-    ? "right-click the ground to send them there"
+    ? "right-click the ground to put them to work there"
     : "";
   dockActs(b,T,housed);
 };
@@ -267,17 +267,18 @@ function statLine(lab,val){
 // The one-line reason you would build this unit rather than the other one.
 function abilityOf(t,s){
   if(t==="commander")
-    return "Raises the town hall. Allies inside <em>"+num(s.rally,10)+
-           "u</em> swing about <em>"+Math.round((1-s.rallyK)*100)+"% faster</em>.";
+    return "Raises the town hall. Anyone fighting within <em>"+num(s.rally,10)+
+           "u</em> of him swings about <em>"+Math.round((1-s.rallyK)*100)+
+           "% faster</em>.";
   if(t==="archer")
-    return "Shoots from <em>"+num(s.range,10)+"u</em> and holds its ground "+
-           "rather than closing.";
+    return "Kills from <em>"+num(s.range,10)+"u</em> and will not close the "+
+           "distance. Keep something between it and them.";
   if(t==="soldier")
-    return "Bodily blocks the lane — attackers stop to fight it instead of "+
-           "walking past.";
+    return "Stands in the way with his body — attackers stop to fight him "+
+           "instead of walking past.";
   if(t==="worker")
-    return "Gathers by day, mends buildings by night at <em>"+s.repair+
-           " hp/s</em>. Runs from a fight.";
+    return "Hauls salvage by day, mends walls by night at <em>"+s.repair+
+           " hp/s</em>. Runs from anything that fights back.";
   return "";
 }
 function statBlock(t,s,one){
@@ -324,7 +325,7 @@ function dockMode(){
   // is in the selection. Workers get the panel without it.
   el("troopMove").hidden=!selA;
   var st=el("troopStance");
-  st.textContent=(S.stance==="hold")?"hold":"chase";
+  st.textContent=(S.stance==="hold")?"hold ground":"give chase";
   st.setAttribute("aria-pressed",S.stance==="hold"?"true":"false");
 
   // One kind selected: the full card, and a live health reading if it is a
@@ -362,10 +363,10 @@ function dockActs(b,T,housed){
     ds.setAttribute("aria-pressed",on?"true":"false");
   }
   // Same button, same refund — but scrapping something that was never built is
-  // a cancellation, and calling it "sell" would read as a mistake.
+  // calling off work, not tearing a building down, and the word has to say so.
   var dsell=el("dockSell");
   dsell.hidden=(b.type==="hall");
-  dsell.textContent=(b.site?"Cancel +":"Sell +")+Math.round(T.cost*0.8);
+  dsell.textContent=(b.site?"Call it off +":"Tear down +")+Math.round(T.cost*0.8);
 }
 HFGAME.UI.marquee=function(){
   var S=HFGAME.state(); if(!S) return;
@@ -705,8 +706,8 @@ function setPause(on){
     var live=!canFreeze();
     el("pauseTag").textContent=live?"Menu":"Paused";
     el("pauseNote").textContent=live
-      ? "The round keeps running — the other town is still under attack."
-      : "The round is stopped while this is open.";
+      ? "Nothing out there is waiting for you — the other town is still under attack."
+      : "Everything is holding still while this is open.";
   }
 }
 function resumePlay(){
@@ -727,7 +728,7 @@ function refreshRivals(){
   for(var oi=0;oi<order.length;oi++){
     var i=order[oi], p=S.players[i], mine=(i===S.me);
     var f=p.hall?Math.max(0,p.hall.hp/HFGAME.TYPES.hall.hp):(p.placed?0:1);
-    var note=p.out?"out":(p.hall?Math.ceil(f*100)+"%":"no hall yet");
+    var note=p.out?"fallen":(p.hall?Math.ceil(f*100)+"%":"no hall yet");
     html+='<div class="rv'+(p.out?" out":"")+(mine?" me":"")+'">'+
           '<i style="background:'+rgb(p.col)+'"></i>'+
           '<span>'+(mine?"You":"Them")+'</span>'+
@@ -801,9 +802,9 @@ function netHud(){
     // it here rather than having to remember what they last picked.
     var d=HFGAME.DIFF[SET.difficulty];
     el("netMapNote").textContent = (playMap
-      ? "This round will use your map \u201c"+playMap.name+"\u201d"
-      : "This round will use a fresh random map")
-      + " on "+d.label.toLowerCase()+" \u2014 "+d.nests+" nests. "
+      ? "You will both wake up on your map \u201c"+playMap.name+"\u201d"
+      : "You will both wake up on ground neither of you has walked")
+      + ", on "+d.label.toLowerCase()+" \u2014 "+d.nests+" nests out there. "
       + "Change it on the Play screen.";
   }
 
@@ -919,7 +920,7 @@ function startRun(map,opt){
   paused=false; fromPause=false; el("pause").hidden=true;
   refreshRivals();
 }
-// "Play again" must not silently drop out of a two-player round, so it only
+// "Go again" must not silently drop out of a two-player round, so it only
 // restarts what it can restart on its own.
 function playAgain(){
   if(HFNET.active()) return;
@@ -1045,11 +1046,13 @@ function wireSettings(){
 // Everything here is read from the balance table, so a difficulty edited in the
 // Library describes itself correctly without a second copy of its numbers.
 var DIFF_BLURB={
-  easy:  "Three nests, further apart, and the smallest nights. Room to learn what "+
-         "a wall is for before anything tests it.",
-  normal:"Five nests. Holding the line is affordable; clearing them is the game.",
-  hard:  "Eight nests ringing you, and less to start with. Every night you leave "+
-         "one standing, the next comes harder \u2014 and there are eight to pull down."
+  easy:  "Three nests, and none of them close. Room to learn what a wall is for "+
+         "before anything comes to test it.",
+  normal:"Five nests. Holding the line is affordable. Putting them out is the "+
+         "whole of the work.",
+  hard:  "Eight nests ringed around you, and less in the stores to meet them. "+
+         "Every night you leave one standing, the next comes harder \u2014 and there "+
+         "are eight to put out."
 };
 function drawSetup(){
   var box=el("diffPick");
@@ -1071,10 +1074,10 @@ function drawSetup(){
   });
   var C2=HFGAME.DIFF[SET.difficulty];
   el("diffBlurb").textContent=DIFF_BLURB[SET.difficulty]||C2.label;
-  el("newMapName").textContent=playMap?playMap.name:"A fresh random map";
+  el("newMapName").textContent=playMap?playMap.name:"Unfamiliar ground";
   el("newMapNote").textContent=playMap
-    ? "One of yours, from the Maps screen."
-    : "A new seed every round.";
+    ? "One of yours, drawn on the Maps screen."
+    : "Land nobody has walked before.";
   el("newMapPick").textContent=playMap?"Change\u2026":"Choose\u2026";
 }
 el("newGo").addEventListener("click",function(){ startRun(playMap); });

@@ -615,7 +615,7 @@
 <body>
 
 <canvas id="view" aria-label="Nightward"></canvas>
-<div id="fatal" hidden>This needs WebGL2. Try a desktop browser with hardware acceleration enabled.</div>
+<div id="fatal" hidden>Nightward needs WebGL2 to draw itself. Try a desktop browser with hardware acceleration switched on.</div>
 
 <!-- ============================ MENU ============================ -->
 <div class="screen" id="screen-menu">
@@ -646,10 +646,10 @@
     <div>
       <div id="menuStats">
         <div><b id="mRuns">0</b>rounds</div>
-        <div><b id="mWins">0</b>held</div>
+        <div><b id="mWins">0</b>cleared</div>
         <div><b id="mBest">—</b>best hall</div>
       </div>
-      <div id="mLastWrap" style="margin-top:12px">last · <span id="mLast">no rounds yet</span></div>
+      <div id="mLastWrap" style="margin-top:12px">last · <span id="mLast">you have not been out yet</span></div>
     </div>
   </div>
 </div>
@@ -803,21 +803,22 @@
   <div class="panel" id="newCard">
     <div class="eyebrow">New round</div>
     <h2>Before the first night</h2>
-    <p class="lead">Difficulty decides how many nests ring your settlement and how
-      many each one sends. It is fixed for the round.</p>
+    <p class="lead">How many nests are out there in the dark, and how many each one
+      sends when the light goes. Decide it now — nothing about it changes once
+      you are on the ground.</p>
 
     <div id="diffPick" role="group" aria-label="Difficulty"></div>
     <div id="diffBlurb"></div>
 
     <div id="newMapRow">
       <div>
-        <div class="lbl" id="newMapName">A fresh random map</div>
-        <div class="desc" id="newMapNote">A new seed every round.</div>
+        <div class="lbl" id="newMapName">Unfamiliar ground</div>
+        <div class="desc" id="newMapNote">Land nobody has walked before.</div>
       </div>
       <button id="newMapPick" type="button">Choose…</button>
     </div>
 
-    <button id="newGo" type="button">Start the round</button>
+    <button id="newGo" type="button">Set out</button>
     <button id="newBack" type="button">← Menu</button>
   </div>
 </div>
@@ -883,10 +884,10 @@
   <div id="netScrim"></div>
   <div class="panel" id="netCard">
     <div class="eyebrow">Two players</div>
-    <h2>Play together</h2>
-    <p id="netLead">Both of you defend the same map from your own side of it. There is no
-      server — you swap two codes to connect, and after that the game talks
-      directly between the two computers.</p>
+    <h2>Two towns, one dark</h2>
+    <p id="netLead">The same ground, a side each, and one night falling on both of you.
+      There is no server: you swap two codes once, and after that the game talks
+      straight between your two computers.</p>
 
     <div id="netPick">
       <button id="netModeHost" type="button" aria-pressed="true">I'll host</button>
@@ -907,12 +908,12 @@
       </div>
       <div class="netStep">
         <div class="lbl"><b>2</b>Their reply code</div>
-        <div class="desc">Paste what they send back, then start. The round begins on both
-          screens at once.</div>
+        <div class="desc">Paste what they send back, then start. You both wake up on the
+          same ground at the same moment.</div>
         <textarea id="netAnswerIn" spellcheck="false" placeholder="paste their reply here"></textarea>
         <div class="netRow">
           <button id="netConnect" type="button" disabled>Connect</button>
-          <button id="netStart" type="button" class="go" disabled>Start the round</button>
+          <button id="netStart" type="button" class="go" disabled>Set out together</button>
         </div>
         <div id="netMapNote"></div>
       </div>
@@ -930,8 +931,7 @@
       </div>
       <div class="netStep">
         <div class="lbl"><b>2</b>Your reply code</div>
-        <div class="desc">Send this back to the host. When they start, you drop straight
-          into the round.</div>
+        <div class="desc">Send this back to the host. When they set out, so do you.</div>
         <textarea id="netAnswer" readonly spellcheck="false" placeholder="—"></textarea>
         <div class="netRow">
           <button id="netCopyAnswer" type="button" disabled>Copy</button>
@@ -970,7 +970,7 @@
       <div class="lab"><span>Daylight</span><b id="dayLeft">2:35</b></div>
       <div class="bar"><span id="dayBar" style="width:100%"></span></div>
       <div class="lab" style="margin:10px 0 0"><span id="nightNo">Night 1</span><b id="nestsLeft">5 nests</b></div>
-      <div class="lab" style="margin:4px 0 0"><span>Coming</span><b id="nightSend">520</b></div>
+      <div class="lab" style="margin:4px 0 0"><span>Massing</span><b id="nightSend">520</b></div>
     </div>
 
     <div class="panel" id="waveBox" hidden>
@@ -978,7 +978,7 @@
       <div class="bar"><span id="nightBar" class="dawn" style="width:100%"></span></div>
       <div class="lab" style="margin:10px 0 0"><span>Town hall</span><b id="hallPct">100%</b></div>
       <div class="bar"><span id="hallBar" style="width:100%"></span></div>
-      <div class="lab" style="margin:10px 0 0"><span>Enemies left</span><b id="wLeft">0</b></div>
+      <div class="lab" style="margin:10px 0 0"><span>Still coming</span><b id="wLeft">0</b></div>
       <div class="lab" style="margin:10px 0 0"><span id="nightNo2">Night 1</span><b id="nestsLeft2">2 nests</b></div>
     </div>
 
@@ -1002,7 +1002,7 @@
     <div class="panel" id="dockTroops" hidden>
       <span id="troopWhat">3 soldiers</span>
       <div class="uRow" id="troopMove">
-        <span class="uLab">Movement</span>
+        <span class="uLab">Orders</span>
         <button id="troopStance" type="button" aria-pressed="true">hold</button>
       </div>
       <div id="troopStats"></div>
@@ -1032,15 +1032,15 @@
       <button class="pauseBtn" id="pResume" type="button">Resume<span class="sub">esc</span></button>
       <button class="pauseBtn" id="pControls" type="button">Controls<span class="sub">keys · mouse</span></button>
       <button class="pauseBtn" id="pSettings" type="button">Settings<span class="sub">render · audio</span></button>
-      <button class="pauseBtn" id="pQuit" type="button">Abandon round<span class="sub">back to the menu</span></button>
+      <button class="pauseBtn" id="pQuit" type="button">Abandon the town<span class="sub">back to the menu</span></button>
     </div>
     <div id="pauseKeys" hidden>
         <div class="hGrp">Building &mdash; day and night</div>
         <dl>
           <dt>town hall</dt><dd>your commander walks over and raises it</dd>
           <dt>click</dt><dd>place the building you picked</dd>
-          <dt>drag</dt><dd>build a line of wall</dd>
-          <dt>click a building</dt><dd>select it, then use the bar below to sell</dd>
+          <dt>drag</dt><dd>run a line of palisade</dd>
+          <dt>click a building</dt><dd>select it, then tear it down from the bar below</dd>
           <dt>ctrl+D</dt><dd>let go of everything</dd>
           <dt>R &middot; shift+R</dt><dd>turn it &middot; turn it automatically</dd>
           <dt>tab &middot; 1&ndash;3</dt><dd>switch tab &middot; pick a building</dd>
@@ -1048,13 +1048,13 @@
         <div class="hGrp">Your people</div>
         <dl>
           <dt>click &middot; drag</dt><dd>select one &middot; select a group</dd>
-          <dt>right-click</dt><dd>send them there, or to a scrap pile</dd>
+          <dt>right-click</dt><dd>send them there, or onto a salvage pile</dd>
           <dt>right-click a wall</dt><dd>workers mend it, even under attack</dd>
-          <dt>select the hall</dt><dd>take everyone inside, or turn them out</dd>
+          <dt>select the hall</dt><dd>call everyone inside, or turn them out</dd>
           <dt>ctrl+A</dt><dd>select everyone</dd>
-          <dt>H</dt><dd>stay put, or chase enemies</dd>
+          <dt>H</dt><dd>hold the ground, or go after them</dd>
         </dl>
-        <div class="hGrp">Camera</div>
+        <div class="hGrp">The view</div>
         <dl>
           <dt>W A S D</dt><dd>move the view &middot; hold shift to go faster</dd>
           <dt>middle-drag</dt><dd>turn the view (or shift-drag)</dd>
@@ -1068,12 +1068,12 @@
 
 <div id="overlay" hidden>
   <div class="card">
-    <div class="eyebrow">Round complete</div>
+    <div class="eyebrow">How it ended</div>
     <h2 id="ovTitle">You held</h2>
     <p id="ovBody"></p>
     <div id="ovStats"></div>
     <div class="ovBtns">
-      <button id="ovAgain" type="button">Play again</button>
+      <button id="ovAgain" type="button">Go again</button>
       <button id="ovMenu" type="button">Main menu</button>
     </div>
   </div>

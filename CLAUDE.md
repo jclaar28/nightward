@@ -251,6 +251,29 @@ reader who can see the code and wants to know what problem it solves and what
 went wrong before. Match that. A comment that restates the line below it is
 noise; a comment naming the bug the line prevents is worth its space.
 
-Prose in the UI is plain English written for a player mid-round. No error
-message should ever contain a stack trace, an internal state name, or the word
-"invalid".
+**Prose in the UI is written from inside the settlement, in plain words.** Not
+from a manual, and not from a fantasy novel either. Every word in it is one a
+person would actually use — the immersion comes from *what is said*, not from
+archaic vocabulary or invented proper nouns. "The last nest is cold" and "you
+have not been out yet" are the register; "Round complete" is too flat and "the
+Marrow is broken" is too much.
+
+Three things follow from that:
+
+- **A button says what the player is doing, not what the software is doing.**
+  "Set out", not "Start the round". "Tear down", not "Sell". "Call it off" when
+  the thing was never built, because cancelling work and demolishing a building
+  are different acts and the word has to know which one it is.
+- **A readout names the thing, not the data.** "Massing 520" and "Still coming
+  47" are the same numbers as "Coming" and "Enemies left" and cost nothing to
+  read, but they say what the number *is*. Anything the player scans mid-fight
+  still has to parse in one glance — that constraint wins over flavour every
+  time, and it is why the stat lines are still Health / Damage / Range.
+- **Errors stay exact.** Flavour goes in the framing, never in the diagnosis. No
+  error message contains a stack trace, an internal state name, or the word
+  "invalid" — and none of them gets dressed up either. "That reply was written
+  for a different invite" is the whole job.
+
+When a button is renamed, grep for the name: several messages quote button text
+back at the player ("press Set out together"), and a rename that misses one of
+those is worse than not renaming it.

@@ -18,38 +18,38 @@ var B=null, BATCHES=null, buf={};
 // read from live stats so the hotbar never disagrees with the Library.
 var CATS=[
   {id:"core",  name:"Base",     note:"What you are protecting, and what pays for the rest."},
-  {id:"guns",  name:"Defences", note:"Buildings that shoot. They do most of the killing."},
-  {id:"walls", name:"Walls",    note:"Slow them down and steer where they walk."},
-  {id:"muster",name:"Troops",   note:"People you can move around. Right-click to send them."}
+  {id:"guns",  name:"Defences", note:"They do the killing. Put them where you want the fighting to happen."},
+  {id:"walls", name:"Walls",    note:"They stop nothing. They decide where it happens."},
+  {id:"muster",name:"Troops",   note:"People, not buildings. Right-click to send them somewhere."}
 ];
 var TYPES={
   hall : {name:"Town Hall", cat:"core", foot:3, scale:1.00, cost:0,
           colA:M.PAL.plaster, colB:M.PAL.slate, spawns:"worker",
-          blurb:function(t){ return t.cap+" workers · "+t.raise+"s to raise"; }},
+          blurb:function(t){ return t.cap+" live here · raise "+t.raise+"s"; }},
   cottage:{name:"Cottage", cat:"core", foot:1, scale:0.66, spawns:"worker",
           colA:M.PAL.plaster, colB:M.PAL.thatch,
-          blurb:function(t){ return t.cap+" workers · "+t.retrain+"s"; }},
+          blurb:function(t){ return t.cap+" more hands · "+t.retrain+"s each"; }},
   tower: {name:"Watchtower", cat:"guns", foot:1, scale:0.70,
           colA:M.PAL.timberL, colB:M.PAL.iron,
-          blurb:function(t){ return t.dmg+" damage / "+t.fire+"s"; }},
+          blurb:function(t){ return t.dmg+" every "+t.fire+"s · close"; }},
   ballista:{name:"Ballista", cat:"guns", foot:1, scale:0.78, boltScale:2.1,
           colA:M.PAL.timberL, colB:M.PAL.iron,
-          blurb:function(t){ return t.dmg+" damage · splash"; }},
+          blurb:function(t){ return t.dmg+" and splash · slow"; }},
   brazier:{name:"Brazier", cat:"guns", foot:1, scale:0.90,
           colA:M.PAL.stone, colB:M.PAL.iron,
-          blurb:function(t){ return "speeds up nearby towers"; }},
-  wall : {name:"Wall", cat:"walls", foot:1, scale:1.00,
+          blurb:function(t){ return "reloads the guns near it"; }},
+  wall : {name:"Palisade", cat:"walls", foot:1, scale:1.00,
           colA:M.PAL.timber, colB:M.PAL.iron,
-          blurb:function(t){ return t.hp+" health · drag"; }},
+          blurb:function(t){ return t.hp+" health · drag a run"; }},
   gate : {name:"Gate", cat:"walls", foot:1, scale:1.00,
           colA:M.PAL.timberL, colB:M.PAL.iron,
-          blurb:function(t){ return t.hp+" health · you can pass"; }},
+          blurb:function(t){ return t.hp+" health · they like it"; }},
   barracks:{name:"Barracks", cat:"muster", foot:1, scale:0.72, spawns:"soldier",
           colA:M.PAL.timber, colB:M.PAL.slate,
-          blurb:function(t){ return t.cap+" soldiers · "+t.retrain+"s"; }},
+          blurb:function(t){ return t.cap+" soldiers · "+t.retrain+"s each"; }},
   archery:{name:"Archery Range", cat:"muster", foot:1, scale:0.72, spawns:"archer",
           colA:M.PAL.timberL, colB:M.PAL.thatch,
-          blurb:function(t){ return t.cap+" archers · "+t.retrain+"s"; }}
+          blurb:function(t){ return t.cap+" archers · "+t.retrain+"s each"; }}
 };
 
 // ---- defenders ------------------------------------------------------------

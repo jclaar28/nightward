@@ -222,8 +222,10 @@ check('...and is still louder than one shot', !!wall && wall.rms > by3.rms * 1.5
       wall ? `volley rms ${wall.rms} vs one shot ${by3.rms}` : '');
 
 // ---- the bed --------------------------------------------------------------
-// Silence between events is most of why a game sounds thin. The bed has to
-// actually produce signal, and night has to be darker than day.
+// The wind layer was pulled, so day is deliberately open: the only continuous
+// bed left is the night drone. These checks say exactly that, because "the day
+// bed makes sound" used to pass on the wind and would now be asserting that a
+// thing we removed is still there.
 const bed = await page.evaluate(async () => {
   const day = await HFSND.render([['ambience', ['build', 0]]], null, 2.5);
   const night = await HFSND.render([['ambience', ['attack', 1]]], null, 2.5);
@@ -231,13 +233,17 @@ const bed = await page.evaluate(async () => {
   return { day: day && window.__m(day), night: night && window.__m(night),
            over: over && window.__m(over) };
 });
-check('the day bed makes sound', !!bed.day && bed.day.rms > 0.0002,
+check('the night bed makes sound', !!bed.night && bed.night.rms > 0.0002,
+      bed.night ? `rms ${bed.night.rms}` : 'no render');
+check('day is open — no bed under the build phase', !!bed.day && bed.day.rms < 0.0002,
       bed.day ? `rms ${bed.day.rms}` : 'no render');
-check('the night bed is heavier than the day', !!bed.night && bed.night.weight > bed.day.weight,
+check('the night bed is heavier than day', !!bed.night && bed.night.weight > bed.day.weight,
       bed.night ? `night ${bed.night.weight} vs day ${bed.day.weight} under 180 Hz` : '');
 check('the bed sits under everything, not over it',
-      !!bed.day && bed.day.rms < rows.find(r => r.name === 'shot:tower').m.rms,
-      bed.day ? `bed ${bed.day.rms} vs a tower shot ${rows.find(r => r.name === 'shot:tower').m.rms}` : '');
+      !!bed.night && bed.night.rms < rows.find(r => r.name === 'shot:tower').m.rms,
+      bed.night ? `bed ${bed.night.rms} vs a tower shot ${rows.find(r => r.name === 'shot:tower').m.rms}` : '');
+check('the bed stops when the round does', !!bed.over && bed.over.rms < 0.0002,
+      bed.over ? `rms ${bed.over.rms}` : 'no render');
 
 await close();
 done(errors);

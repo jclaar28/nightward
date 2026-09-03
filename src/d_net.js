@@ -74,7 +74,7 @@ function wireChannel(c){
   ch.binaryType="arraybuffer";
   ch.onopen=function(){
     live=true;
-    say(role==="host"?"Connected — starting the round":"Connected — waiting for the host","good");
+    say(role==="host"?"Connected — you can set out":"Connected — waiting on the host","good");
     if(hooks.open) hooks.open(role);
   };
   ch.onclose=function(){ drop("closed"); };
@@ -130,7 +130,7 @@ function accept(code){
     return Promise.reject(new Error("Press Create invite first, then paste their reply here."));
   if(pc.signalingState!=="have-local-offer"){
     return Promise.reject(new Error(live
-      ? "You are already connected — press Start the round."
+      ? "You are already connected — press Set out together."
       : "This invite has already been answered. Press Create invite for a fresh one."));
   }
   var ans;
