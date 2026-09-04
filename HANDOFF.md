@@ -70,7 +70,7 @@ step and the routine that turns the world into instance buffers.
 
 ---
 
-## Three ideas that explain most of the codebase
+## Four ideas that explain most of the codebase
 
 **Assets are data, not meshes.** Every building, unit and prop is a list of
 primitives with positions, sizes and a shade. Nothing is modelled in an external
@@ -89,6 +89,17 @@ reload, range, build time, gather rate — is defined once in `STAT_DEFS`, edite
 live from the library, and read from that table by both the simulation and the
 HUD. There is deliberately no second copy anywhere. If you add a stat, add it
 there and let it flow.
+
+**So is the text table.** Every word the player reads is a key in `TEXT_DEFS`,
+and the Library has a **Text** tab beside **Models** that edits all of them
+live: type in a field and the HUD behind it changes, in a running round. Edits
+persist in your browser, "Copy text edits" gives you a block to paste back into
+`d_core.js`, and "Revert all text" puts the shipped words back. Building and
+unit names are in there too, sharing one string with the Library's name field
+rather than keeping two that drift. Nothing in the markup holds a literal — the
+HTML carries `data-t="key"` — so if you want to try a different voice for the
+whole game, you can do it without touching code, play a round in it, and only
+then decide whether to paste it back.
 
 ---
 
@@ -110,7 +121,8 @@ npm run check                                    # build + smoke + instances
 day/night cycles and both endings. `tools/instances.mjs` captures every
 instance the renderer is handed for one frame and asserts against it.
 `tools/balance.mjs` plays a full day and holds a night across seeds, with an
-`--ab` mode for comparing one stat against stock. `tools/README.md` covers
+`--ab` mode for comparing one stat against stock. `tools/text.mjs` walks every
+screen and fails on a word that no text key owns. `tools/README.md` covers
 writing new ones and the traps worth knowing.
 
 A worked example. "The nests are floating" could have been fixed by nudging a

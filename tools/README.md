@@ -45,6 +45,17 @@ losing every hall ends it, clearing every nest wins it and pays its cache, and
 the nest garrisons chase what comes close without leaving home or eating your
 workers during the day.
 
+**`text.mjs`** — every word on screen comes from `TEXT_DEFS`, and that property
+is invisible in review: a hard-coded label looks identical to a routed one. So
+this walks the live DOM on every screen and fails on any text node whose shape
+no key produces, then drives the Library's Text tab for real — types into a
+field, checks the HUD changed, reloads and checks it stuck, reverts and checks
+every word went back. Two of its checks earned their keep immediately: comparing
+a filled-in readout ("3 nests") against the raw template ("{n} nests") reported
+every composed string as unkeyed, and joining an element's text nodes together
+blamed a card built from three keyed fragments for the concatenation of them.
+Both now compare per text node against the template's *shape*.
+
 **`audio.mjs`** — renders every sound offline and measures it. "It did not
 throw" is not a test for a sound: it has a level, a length, a weight and a
 stereo position, and every one is a number you can be wrong about. Checks that

@@ -13,7 +13,7 @@ function el(id){ return document.getElementById(id); }
 // ---- persistence ----------------------------------------------------------
 var KEY_SET="holdfast.settings.v1", KEY_SAVE="holdfast.save.v1", KEY_ASSETS="holdfast.assets.v1";
 var KEY_STATS="holdfast.stats.v1", KEY_USER="holdfast.user.v1", KEY_META="holdfast.meta.v1";
-var KEY_MAPS="holdfast.maps.v1";
+var KEY_MAPS="holdfast.maps.v1", KEY_TEXT="holdfast.text.v1";
 var playMap=null;                       // the custom map the next round will use
 var SET={ difficulty:"normal", outline:true, scale:1.0, sens:1.0, vol:0.7, help:true };
 var SAVE={ runs:0, wins:0, bestHall:0, bestTime:null, lastResult:null };
@@ -49,6 +49,8 @@ function loadAll(){
   if(mt&&typeof mt==="object") M.setMetaAll(mt);
   var mp=loadJSON(KEY_MAPS,null);
   if(mp&&mp.length) M.setMaps(mp);
+  var tx=loadJSON(KEY_TEXT,null);
+  if(tx&&typeof tx==="object") M.setTextOverrides(tx);
   var g=loadJSON(KEY_SAVE,null);
   if(g){
     SAVE.runs=g.runs|0; SAVE.wins=g.wins|0;
@@ -122,13 +124,15 @@ function refreshMenu(){
   el("mBest").textContent=SAVE.runs? (SAVE.bestHall+"%") : "—";
   var lr=SAVE.lastResult;
   el("mLast").textContent = lr
-    ? (lr.won?"cleared ":"overrun ")+"· "+lr.difficulty+" · hall "+lr.hallPct+"% · "+lr.seconds+"s"
-    : "you have not been out yet";
+    ? M.t("menu.last.line",{result:M.t(lr.won?"menu.last.won":"menu.last.lost"),
+          difficulty:lr.difficulty, hall:lr.hallPct, seconds:lr.seconds})
+    : M.t("menu.last.none");
   el("mDiffTag").textContent=HFGAME.DIFF[SET.difficulty].label;
   var na=el("mAssets");
-  if(na&&M.allAssets) na.textContent=M.allAssets().length+" assets";
+  if(na&&M.allAssets) na.textContent=M.t("menu.library.sub",{n:M.allAssets().length});
   var nm=el("mMapCount");
-  if(nm) nm.textContent=(M.getMaps().length||"no")+" maps";
+  if(nm) nm.textContent=M.getMaps().length
+    ? M.t("menu.maps.sub",{n:M.getMaps().length}) : M.t("menu.maps.none");
 }
 
 // ---- game hooks -----------------------------------------------------------
@@ -145,25 +149,20 @@ function onRoundEnd(res){
   // A round is won by pulling every nest down, not by seeing one dawn. That
   // changes what the end screen is congratulating you for.
   el("ovTitle").textContent = res.won
-    ? (mine?"They finished it without you":"The last nest is cold")
-    : (multi?"Both towns fell":"There is no town left");
+    ? M.t(mine?"end.win.ally.title":"end.win.title")
+    : M.t(multi?"end.lose.multi.title":"end.lose.title");
   var nights=res.nights|0;
-  var nightsSaid=nights+(nights===1?" night":" nights");
+  var nightsSaid=M.t(nights===1?"end.nights.one":"end.nights",{n:nights});
   el("ovBody").textContent = res.won
-    ? (mine
-        ? "Your hall went down before the end. The other town carried it the rest of the way and put out the last nest."
-        : (multi
-            ? (both?"Every nest is cold after "+nightsSaid+", and both towns are still standing to see it."
-                   :"Every nest is cold after "+nightsSaid+". The other town did not live to see it. Yours did.")
-            :"Every nest is cold after "+nightsSaid+". Nothing out there is left to send anything, and the dark is only dark again."))
-    : (multi
-        ? "Neither hall lasted the night. Walls only buy minutes; watchtowers do the killing; a ballista is what stops a brute. And every night a nest is left standing out there, the next one comes harder."
-        : "The hall is gone, and with it the reason to hold this ground. Walls only buy minutes; watchtowers do the killing; a ballista is what stops a brute; soldiers plug the gap the fast ones find. And holding is not winning — every night you leave a nest alone out there, the next one comes harder.");
+    ? (mine ? M.t("end.win.ally")
+            : (multi ? M.t(both?"end.win.both":"end.win.alone",{nights:nightsSaid})
+                     : M.t("end.win.solo",{nights:nightsSaid})))
+    : M.t(multi?"end.lose.multi":"end.lose.solo");
   el("ovAgain").hidden=multi;
   el("ovStats").innerHTML=
-    '<div><b>'+res.kills+'</b><span>put down</span></div>'+
-    '<div><b>'+nights+'</b><span>'+(nights===1?"night held":"nights held")+'</span></div>'+
-    '<div><b>'+res.nests+'</b><span>still out there</span></div>';
+    '<div><b>'+res.kills+'</b><span>'+M.t("end.stat.kills")+'</span></div>'+
+    '<div><b>'+nights+'</b><span>'+M.t(nights===1?"end.stat.nights.one":"end.stat.nights")+'</span></div>'+
+    '<div><b>'+res.nests+'</b><span>'+M.t("end.stat.nests")+'</span></div>';
   el("overlay").hidden=false;
   setPause(false);
 }
@@ -203,7 +202,7 @@ HFGAME.UI.units=function(){
   var wg=HFGAME.groupCount("workers"), ag=HFGAME.groupCount("army");
   el("grpWorkN").textContent=wg.total;
   el("grpArmyN").textContent=ag.total;
-  el("grpWorkIn").textContent=wg.inside?wg.inside+" in":"";
+  el("grpWorkIn").textContent=wg.inside?M.t("hud.workers.in",{n:wg.inside}):"";
   el("grpWorkers").disabled=!wg.out;
   el("grpArmy").disabled=!ag.out;
   var selW=0, selA=0;
@@ -232,8 +231,8 @@ HFGAME.UI.building=function(){
   var T=HFGAME.TYPES[b.type], site=!!b.site;
   var f=site ? Math.max(0,Math.min(1,b.prog/Math.max(0.001,b.need)))
              : Math.max(0,b.hp/b.max);
-  el("bldName").textContent=T.name+(site?" · going up":"");
-  el("bldHp").textContent=site ? Math.max(0,Math.ceil(b.need-b.prog))+"s"
+  el("bldName").textContent=T.name+(site?M.t("sel.site.suffix"):"");
+  el("bldHp").textContent=site ? M.t("sel.site.left",{n:Math.max(0,Math.ceil(b.need-b.prog))})
                               : Math.ceil(f*100)+"%";
   el("bldBar").style.width=(f*100).toFixed(1)+"%";
   el("bldBar").classList.toggle("crit",!site&&f<0.35);
@@ -243,15 +242,13 @@ HFGAME.UI.building=function(){
   var house=el("bldHouse");
   house.hidden=!housed.length;
   if(housed.length){
-    el("bldHoused").textContent=housed.length+(housed.length===1?" worker":" workers")+
-      (b.type==="hall"?" in the settlement":" living here");
-    el("bldIn").textContent=inside?(inside+" indoors"):"";
+    el("bldHoused").textContent=M.t(b.type==="hall"?"sel.housed.hall":"sel.housed.other",
+      {n:housed.length, noun:M.t(housed.length===1?"sel.worker.one":"sel.worker.many")});
+    el("bldIn").textContent=inside?M.t("sel.indoors",{n:inside}):"";
   }
   // The rail says what this building is; the dock is where you act on it. One
   // place for state, one place for verbs — and selling only ever happens there.
-  el("bldHint").textContent=housed.length
-    ? "right-click the ground to put them to work there"
-    : "";
+  el("bldHint").textContent=housed.length?M.t("sel.hint.send"):"";
   dockActs(b,T,housed);
 };
 // ---- what a selected unit is worth ----------------------------------------
@@ -267,34 +264,30 @@ function statLine(lab,val){
 // The one-line reason you would build this unit rather than the other one.
 function abilityOf(t,s){
   if(t==="commander")
-    return "Raises the town hall. Anyone fighting within <em>"+num(s.rally,10)+
-           "u</em> of him swings about <em>"+Math.round((1-s.rallyK)*100)+
-           "% faster</em>.";
-  if(t==="archer")
-    return "Kills from <em>"+num(s.range,10)+"u</em> and will not close the "+
-           "distance. Keep something between it and them.";
-  if(t==="soldier")
-    return "Stands in the way with his body — attackers stop to fight him "+
-           "instead of walking past.";
-  if(t==="worker")
-    return "Hauls salvage by day, mends walls by night at <em>"+s.repair+
-           " hp/s</em>. Runs from anything that fights back.";
+    return M.t("unit.commander.ability",
+               {rally:num(s.rally,10), pct:Math.round((1-s.rallyK)*100)});
+  if(t==="archer") return M.t("unit.archer.ability",{range:num(s.range,10)});
+  if(t==="soldier") return M.t("unit.soldier.ability");
+  if(t==="worker")  return M.t("unit.worker.ability",{repair:s.repair});
   return "";
 }
 function statBlock(t,s,one){
   var U=HFGAME.UNITS[t], h="";
-  h+=statLine("Health", one ? Math.ceil(one.hp)+" / "+s.hp : s.hp);
+  h+=statLine(M.t("sel.stat.health"), one ? Math.ceil(one.hp)+" / "+s.hp : s.hp);
   if(U.civil){
-    h+=statLine("Gather", num(s.gather,10)+"/s · carries "+s.carry);
-    h+=statLine("Repair", s.repair+" hp/s");
+    h+=statLine(M.t("sel.stat.gather"),
+                M.t("sel.stat.gather.v",{rate:num(s.gather,10), carry:s.carry}));
+    h+=statLine(M.t("sel.stat.repair"), M.t("sel.stat.repair.v",{n:s.repair}));
   }else if(U.melee){
-    h+=statLine("Damage", s.dmg+" / "+num(s.swing,100)+"s  ("+dps(s.dmg,s.swing)+" dps)");
-    h+=statLine("Reach",  num(s.reach,100)+"u");
+    h+=statLine(M.t("sel.stat.damage"),
+                M.t("sel.stat.rate.v",{dmg:s.dmg, every:num(s.swing,100), dps:dps(s.dmg,s.swing)}));
+    h+=statLine(M.t("sel.stat.reach"), M.t("sel.stat.units.v",{n:num(s.reach,100)}));
   }else{
-    h+=statLine("Damage", s.dmg+" / "+num(s.fire,100)+"s  ("+dps(s.dmg,s.fire)+" dps)");
-    h+=statLine("Range",  num(s.range,10)+"u");
+    h+=statLine(M.t("sel.stat.damage"),
+                M.t("sel.stat.rate.v",{dmg:s.dmg, every:num(s.fire,100), dps:dps(s.dmg,s.fire)}));
+    h+=statLine(M.t("sel.stat.range"), M.t("sel.stat.units.v",{n:num(s.range,10)}));
   }
-  h+=statLine("Speed", num(s.speed,100)+" u/s");
+  h+=statLine(M.t("sel.stat.speed"), M.t("sel.stat.speed.v",{n:num(s.speed,100)}));
   var ab=abilityOf(t,s);
   if(ab) h+='<div class="uAbil">'+ab+'</div>';
   return h;
@@ -325,7 +318,7 @@ function dockMode(){
   // is in the selection. Workers get the panel without it.
   el("troopMove").hidden=!selA;
   var st=el("troopStance");
-  st.textContent=(S.stance==="hold")?"hold ground":"give chase";
+  st.textContent=M.t((S.stance==="hold")?"sel.stance.hold":"sel.stance.chase");
   st.setAttribute("aria-pressed",S.stance==="hold"?"true":"false");
 
   // One kind selected: the full card, and a live health reading if it is a
@@ -340,8 +333,10 @@ function dockMode(){
     for(var k=0;k<ks.length;k++){
       var kt=ks[k], sk=HF.statsOf(kt);
       if(!sk) continue;
-      h+='<div class="uKind"><span>'+HFGAME.UNITS[kt].name+' ×'+kinds[kt]+'</span>'+
-         '<b>'+sk.hp+' hp'+(HFGAME.UNITS[kt].civil?'':' · '+sk.dmg+' dmg')+'</b></div>';
+      h+='<div class="uKind"><span>'+
+         M.t("sel.kind.line",{name:HFGAME.UNITS[kt].name, n:kinds[kt]})+'</span><b>'+
+         M.t(HFGAME.UNITS[kt].civil?"sel.kind.civil":"sel.kind.armed",{hp:sk.hp, dmg:sk.dmg})+
+         '</b></div>';
     }
     box.innerHTML=h;
   }
@@ -359,14 +354,14 @@ function dockActs(b,T,housed){
   ds.hidden=!housed.length;
   if(housed.length){
     var on=HFGAME.sheltering(b);
-    ds.textContent=on?"Turn them out":"Take them inside";
+    ds.textContent=M.t(on?"sel.shelter.out":"sel.shelter.in");
     ds.setAttribute("aria-pressed",on?"true":"false");
   }
   // Same button, same refund — but scrapping something that was never built is
   // calling off work, not tearing a building down, and the word has to say so.
   var dsell=el("dockSell");
   dsell.hidden=(b.type==="hall");
-  dsell.textContent=(b.site?"Call it off +":"Tear down +")+Math.round(T.cost*0.8);
+  dsell.textContent=M.t(b.site?"sel.cancel":"sel.selldown",{n:Math.round(T.cost*0.8)});
 }
 HFGAME.UI.marquee=function(){
   var S=HFGAME.state(); if(!S) return;
@@ -487,7 +482,8 @@ HFGAME.UI.hotbar=function(){
     n.classList.toggle("locked",!!locked);
     n.setAttribute("aria-pressed",S.sel===t?"true":"false");
     var c=n.querySelector(".c"), b=n.querySelector(".s");
-    if(c) c.textContent=T.cost?(T.cost+" supply"):"free · required";
+    if(c) c.textContent=T.cost?M.t("bld.supply",{n:T.cost})
+                              :(M.t("bld.free")+" · "+M.t("bld.required"));
     if(b) b.textContent=T.blurb?T.blurb(T):"";
   });
 };
@@ -510,8 +506,8 @@ function refreshDay(){
   // What is coming matters more than the clock once a round runs for days: the
   // nests you have not pulled down are the number that keeps climbing.
   var live=HFGAME.liveNests().length;
-  el("nightNo").textContent="Night "+S.night;
-  el("nestsLeft").textContent=live+(live===1?" nest":" nests");
+  el("nightNo").textContent=M.t("hud.night",{n:S.night});
+  el("nestsLeft").textContent=M.t(live===1?"hud.nests.one":"hud.nests",{n:live});
   el("nightSend").textContent=(HFGAME.waveSize?HFGAME.waveSize():S.wave);
   el("supply").textContent=S.players[S.me].supply;
 }
@@ -524,8 +520,8 @@ function refreshWave(){
   el("nightBar").classList.toggle("crit",nf<0.20);
   el("wLeft").textContent=S.enemies.length+S.spawnLeft;
   var lv2=HFGAME.liveNests().length;
-  el("nightNo2").textContent="Night "+S.night;
-  el("nestsLeft2").textContent=lv2+(lv2===1?" nest left":" nests left");
+  el("nightNo2").textContent=M.t("hud.night",{n:S.night});
+  el("nestsLeft2").textContent=M.t(lv2===1?"hud.nests.left.one":"hud.nests.left",{n:lv2});
   el("supply").textContent=S.players[S.me].supply;
   var H=S.players[S.me].hall;
   var f=H?Math.max(0,H.hp/HFGAME.TYPES.hall.hp):0;
@@ -704,10 +700,8 @@ function setPause(on){
     el("pauseKeys").hidden=true;
     el("pControls").setAttribute("aria-pressed","false");
     var live=!canFreeze();
-    el("pauseTag").textContent=live?"Menu":"Paused";
-    el("pauseNote").textContent=live
-      ? "Nothing out there is waiting for you — the other town is still under attack."
-      : "Everything is holding still while this is open.";
+    el("pauseTag").textContent=M.t(live?"pause.tag.live":"pause.tag");
+    el("pauseNote").textContent=M.t(live?"pause.note.live":"pause.note.frozen");
   }
 }
 function resumePlay(){
@@ -728,10 +722,11 @@ function refreshRivals(){
   for(var oi=0;oi<order.length;oi++){
     var i=order[oi], p=S.players[i], mine=(i===S.me);
     var f=p.hall?Math.max(0,p.hall.hp/HFGAME.TYPES.hall.hp):(p.placed?0:1);
-    var note=p.out?"fallen":(p.hall?Math.ceil(f*100)+"%":"no hall yet");
+    var note=p.out?M.t("hud.rival.fallen")
+                  :(p.hall?Math.ceil(f*100)+"%":M.t("hud.rival.nohall"));
     html+='<div class="rv'+(p.out?" out":"")+(mine?" me":"")+'">'+
           '<i style="background:'+rgb(p.col)+'"></i>'+
-          '<span>'+(mine?"You":"Them")+'</span>'+
+          '<span>'+M.t(mine?"hud.rival.you":"hud.rival.them")+'</span>'+
           '<b>'+note+'</b>'+
           '<div class="rvBar"><span style="width:'+(p.out?0:f*100).toFixed(1)+'%"></span></div>'+
           '</div>';
@@ -802,10 +797,9 @@ function netHud(){
     // it here rather than having to remember what they last picked.
     var d=HFGAME.DIFF[SET.difficulty];
     el("netMapNote").textContent = (playMap
-      ? "You will both wake up on your map \u201c"+playMap.name+"\u201d"
-      : "You will both wake up on ground neither of you has walked")
-      + ", on "+d.label.toLowerCase()+" \u2014 "+d.nests+" nests out there. "
-      + "Change it on the Play screen.";
+      ? M.t("net.note.custom",{map:playMap.name})
+      : M.t("net.note.random"))
+      + M.t("net.note.tail",{difficulty:d.label.toLowerCase(), nests:d.nests});
   }
 
   HFNET.init({
@@ -1045,15 +1039,6 @@ function wireSettings(){
 // ---- the pre-game setup screen -------------------------------------------
 // Everything here is read from the balance table, so a difficulty edited in the
 // Library describes itself correctly without a second copy of its numbers.
-var DIFF_BLURB={
-  easy:  "Three nests, and none of them close. Room to learn what a wall is for "+
-         "before anything comes to test it.",
-  normal:"Five nests. Holding the line is affordable. Putting them out is the "+
-         "whole of the work.",
-  hard:  "Eight nests ringed around you, and less in the stores to meet them. "+
-         "Every night you leave one standing, the next comes harder \u2014 and there "+
-         "are eight to put out."
-};
 function drawSetup(){
   var box=el("diffPick");
   if(!box) return;
@@ -1065,20 +1050,20 @@ function drawSetup(){
     b.type="button"; b.className="diffCard"; b.dataset.diff=k;
     b.setAttribute("aria-pressed",k===SET.difficulty?"true":"false");
     b.innerHTML='<span class="dn">'+C.label+'</span><span class="dm">'+
-      C.nests+' nests<br>'+first+' the first night<br>'+
-      C.supply+' supply to start</span>';
+      M.t("setup.card.nests",{n:C.nests})+'<br>'+
+      M.t("setup.card.first",{n:first})+'<br>'+
+      M.t("setup.card.supply",{n:C.supply})+'</span>';
     b.addEventListener("click",function(){
       SET.difficulty=k; applySettings(); refreshMenu(); drawSetup();
     });
     box.appendChild(b);
   });
   var C2=HFGAME.DIFF[SET.difficulty];
-  el("diffBlurb").textContent=DIFF_BLURB[SET.difficulty]||C2.label;
-  el("newMapName").textContent=playMap?playMap.name:"Unfamiliar ground";
-  el("newMapNote").textContent=playMap
-    ? "One of yours, drawn on the Maps screen."
-    : "Land nobody has walked before.";
-  el("newMapPick").textContent=playMap?"Change\u2026":"Choose\u2026";
+  el("diffBlurb").textContent=(M.textRaw("setup.blurb."+SET.difficulty)===null)
+    ? C2.label : M.t("setup.blurb."+SET.difficulty);
+  el("newMapName").textContent=playMap?playMap.name:M.t("setup.map.random");
+  el("newMapNote").textContent=M.t(playMap?"setup.map.custom.note":"setup.map.random.note");
+  el("newMapPick").textContent=M.t(playMap?"setup.map.change":"setup.map.choose");
 }
 el("newGo").addEventListener("click",function(){ startRun(playMap); });
 el("newBack").addEventListener("click",function(){ show("menu"); });
@@ -1119,8 +1104,39 @@ window.addEventListener("keydown",function(ev){
   }
 });
 
+// ---- text -----------------------------------------------------------------
+// Static markup carries a key, not a string: `data-t` fills textContent and
+// `data-t-ph` a placeholder. Nothing in the HTML holds a copy of the words, so
+// a line edited in the Library's Text tab has exactly one place to change.
+// Anything the game composes at runtime calls M.t() at the point of use
+// instead, which is why applyText only has to walk the document once per edit.
+function applyText(root){
+  (root||document).querySelectorAll("[data-t]").forEach(function(n){
+    n.textContent=M.t(n.dataset.t);
+  });
+  (root||document).querySelectorAll("[data-t-ph]").forEach(function(n){
+    n.placeholder=M.t(n.dataset.tPh);
+  });
+}
+// A text edit can land while any screen is up, so everything that prints a
+// composed string is refreshed too rather than waiting for the next event that
+// happens to redraw it.
+function retext(){
+  applyText();
+  refreshMenu();
+  if(el("screen-setup")&&!el("screen-setup").hidden) drawSetup();
+  buildHotbar();
+  if(HFGAME.UI.hotbar) HFGAME.UI.hotbar();
+  if(HFGAME.state()){
+    if(HFGAME.UI.phase) HFGAME.UI.phase();
+    if(HFGAME.UI.units) HFGAME.UI.units();
+    if(HFGAME.UI.building) HFGAME.UI.building();
+  }
+}
+
 // ---- boot -----------------------------------------------------------------
 loadAll();
+applyText();
 applySettings();
 HFGAME.init(R,canvas,SET,onRoundEnd);
 buildHotbar();
@@ -1137,8 +1153,9 @@ HFLIB.init(R,canvas,function(){
   saveJSON(KEY_STATS,M.getStatOverrides());
   saveJSON(KEY_USER,M.getUserAssets());
   saveJSON(KEY_META,M.getMeta());
+  saveJSON(KEY_TEXT,M.getTextOverrides());
   HFGAME.rebuildAssets();
-  HFGAME.UI.hotbar&&HFGAME.UI.hotbar();
+  retext();
 });
 wireSettings();
 show("menu");

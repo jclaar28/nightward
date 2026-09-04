@@ -237,6 +237,65 @@
   #libBalance .fk{min-width:98px}
   #libBalance .fh{color:var(--faint)}
   #libBalNote{margin:0 0 9px;font-size:11.5px;line-height:1.6;color:var(--muted)}
+
+  /* ---- the text tab ----
+     A full-width column rather than the model editor's rail-and-panel: prose is
+     read across, and a 334px inspector would wrap every line into a ribbon. */
+  #libModes{display:flex;gap:1px;margin-left:6px}
+  #libModes button{background:var(--panel);border:1px solid var(--line);
+    padding:6px 13px;font-size:11.5px;font-weight:600;color:var(--muted)}
+  #libModes button[aria-pressed="true"]{border-color:var(--accent);color:var(--accent);
+    background:rgba(217,113,74,.14)}
+  body[data-libmode="text"] #libRail,
+  body[data-libmode="text"] #libPanel,
+  body[data-libmode="text"] #libHint,
+  body[data-libmode="text"] #libTools,
+  body[data-libmode="text"] #libAssetBtns,
+  body[data-libmode="text"] #libXform{display:none}
+  body:not([data-libmode="text"]) #libTextPane{display:none}
+  #libTextPane{position:absolute;left:14px;right:14px;top:60px;bottom:14px;
+    display:flex;flex-direction:column;background:var(--panel);
+    border:1px solid var(--line);border-radius:3px;backdrop-filter:blur(9px)}
+  #libTextBar{display:flex;align-items:center;gap:8px;padding:10px 12px;
+    border-bottom:1px solid var(--line);flex-wrap:wrap}
+  #libTextFind{flex:0 0 240px;background:var(--solid);border:1px solid var(--line);
+    border-radius:2px;color:var(--ink);font-size:12.5px;padding:6px 9px}
+  #libTextFind:focus{border-color:var(--accent);outline:none}
+  #libTextGroups{display:flex;gap:4px;flex-wrap:wrap}
+  #libTextGroups button{background:transparent;border:1px solid var(--line);
+    border-radius:2px;padding:4px 9px;font-family:"IBM Plex Mono",monospace;
+    font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+  #libTextGroups button[aria-pressed="true"]{border-color:var(--accent);color:var(--accent)}
+  #libTextActs{margin-left:auto;display:flex;gap:6px;align-items:center}
+  #libTextCount{font-family:"IBM Plex Mono",monospace;font-size:10px;color:var(--faint)}
+  #libTextActs button{background:transparent;border:1px solid var(--line);
+    border-radius:2px;padding:6px 11px;font-size:11.5px;font-weight:600;color:var(--muted)}
+  #libTextActs button:hover:not(:disabled){border-color:var(--line-hi);color:var(--ink)}
+  #libTextActs button:disabled{opacity:.35;cursor:not-allowed}
+  #libTextList{flex:1 1 auto;overflow:auto;padding:4px 12px 14px}
+  .tGroup{font-family:"IBM Plex Mono",monospace;font-size:9.5px;letter-spacing:.16em;
+    text-transform:uppercase;color:var(--accent);padding:14px 0 6px;
+    border-bottom:1px solid var(--line);margin-bottom:8px}
+  .tRow{display:grid;grid-template-columns:210px 1fr auto;gap:10px;align-items:start;
+    padding:5px 0}
+  .tKey{font-family:"IBM Plex Mono",monospace;font-size:10px;color:var(--muted);
+    line-height:1.5;word-break:break-all;padding-top:6px}
+  .tKey.tEdit{color:var(--accent)}
+  .tVars{display:block;color:var(--faint);font-size:9px;letter-spacing:.08em}
+  .tRow textarea{background:var(--solid);border:1px solid var(--line);border-radius:2px;
+    color:var(--ink);font-family:Archivo,sans-serif;font-size:12.5px;line-height:1.45;
+    padding:6px 8px;width:100%;resize:vertical;min-height:31px}
+  .tRow textarea:focus{border-color:var(--accent);outline:none}
+  .tRow textarea.tBad{border-color:var(--bad)}
+  .tRow .tUndo{background:transparent;border:0;color:var(--accent);padding:6px 2px;
+    font-family:"IBM Plex Mono",monospace;font-size:9.5px;letter-spacing:.12em;
+    visibility:hidden}
+  .tRow.tIsEdit .tUndo{visibility:visible}
+  .tRow .tUndo:hover{text-decoration:underline}
+  #libTextWarn{font-size:11.5px;color:var(--bad);padding:0 12px 8px;margin:0}
+  #libTextOut{display:block;width:100%;height:150px;background:var(--solid);
+    border:1px solid var(--line);border-radius:2px;color:var(--muted);
+    font-family:"IBM Plex Mono",monospace;font-size:10.5px;padding:8px;resize:none}
   #libAssetBtns{display:flex;gap:6px;padding:8px;border-top:1px solid var(--line)}
   #libAssetBtns button{flex:1;background:transparent;border:1px solid var(--line);
     border-radius:2px;padding:6px 4px;font-size:11px;font-weight:600;color:var(--muted);cursor:pointer}
@@ -615,7 +674,7 @@
 <body>
 
 <canvas id="view" aria-label="Nightward"></canvas>
-<div id="fatal" hidden>Nightward needs WebGL2 to draw itself. Try a desktop browser with hardware acceleration switched on.</div>
+<div id="fatal" hidden data-t="sys.fatal"></div>
 
 <!-- ============================ MENU ============================ -->
 <div class="screen" id="screen-menu">
@@ -627,29 +686,29 @@
 
     <nav class="menuNav">
       <button class="navBtn" id="btnPlay" type="button">
-        Play <span class="sub" id="mDiffTag">Normal</span>
+        <span data-t="menu.play"></span> <span class="sub" id="mDiffTag"></span>
       </button>
       <button class="navBtn" id="btnLibrary" type="button">
-        Library <span class="sub" id="mAssets">— assets</span>
+        <span data-t="menu.library"></span> <span class="sub" id="mAssets"></span>
       </button>
       <button class="navBtn" id="btnMaps" type="button">
-        Maps <span class="sub" id="mMapCount">— maps</span>
+        <span data-t="menu.maps"></span> <span class="sub" id="mMapCount"></span>
       </button>
       <button class="navBtn" id="btnSettings" type="button">
-        Settings <span class="sub">render · audio</span>
+        <span data-t="menu.settings"></span> <span class="sub" data-t="menu.settings.sub"></span>
       </button>
       <button class="navBtn" id="btnNet" type="button">
-        Two players <span class="sub">one map · two towns</span>
+        <span data-t="menu.net"></span> <span class="sub" data-t="menu.net.sub"></span>
       </button>
     </nav>
 
     <div>
       <div id="menuStats">
-        <div><b id="mRuns">0</b>rounds</div>
-        <div><b id="mWins">0</b>cleared</div>
-        <div><b id="mBest">—</b>best hall</div>
+        <div><b id="mRuns">0</b><span data-t="menu.stat.rounds"></span></div>
+        <div><b id="mWins">0</b><span data-t="menu.stat.cleared"></span></div>
+        <div><b id="mBest">—</b><span data-t="menu.stat.besthall"></span></div>
       </div>
-      <div id="mLastWrap" style="margin-top:12px">last · <span id="mLast">you have not been out yet</span></div>
+      <div id="mLastWrap" style="margin-top:12px"><span data-t="menu.last.label"></span><span id="mLast"></span></div>
     </div>
   </div>
 </div>
@@ -661,7 +720,11 @@
     <span class="pageTitle">Library</span>
     <button class="histBtn" id="libUndo" type="button" title="undo (Ctrl+Z)" disabled>↶ Undo</button>
     <button class="histBtn" id="libRedo" type="button" title="redo (Ctrl+Shift+Z)" disabled>↷ Redo</button>
-    <span class="eyebrow">edit any model in the game</span>
+    <div id="libModes" role="group" aria-label="What to edit">
+      <button id="libModeModels" type="button" aria-pressed="true">Models</button>
+      <button id="libModeText" type="button" aria-pressed="false">Text</button>
+    </div>
+    <span class="eyebrow" id="libEyebrow">edit any model in the game</span>
   </div>
 
   <div id="libRail">
@@ -735,6 +798,26 @@
     </label>
   </div>
   <div id="libHint">click a part to select · click empty space to deselect · drag a handle to edit · <b>W</b> move · <b>E</b> rotate · <b>R</b> scale · drag anywhere else to orbit</div>
+
+  <!-- Every word the player reads, editable in place. Edits apply as you type
+       and persist in this browser; Export gives you a block to paste into
+       d_core.js so a change can outlive the browser it was made in. -->
+  <div id="libTextPane">
+    <div id="libTextBar">
+      <input id="libTextFind" type="search" placeholder="find a word or a key" spellcheck="false">
+      <div id="libTextGroups"></div>
+      <div id="libTextActs">
+        <span id="libTextCount"></span>
+        <button id="libTextCopy" type="button">Copy text edits</button>
+        <button id="libTextRevert" type="button" disabled>Revert all text</button>
+      </div>
+    </div>
+    <p id="libTextWarn" hidden></p>
+    <div id="libTextList"></div>
+    <div id="libTextOutWrap" hidden style="padding:0 12px 12px">
+      <textarea id="libTextOut" readonly spellcheck="false"></textarea>
+    </div>
+  </div>
 </div>
 
 <!-- ============================== MAPS ============================== -->
@@ -801,25 +884,23 @@
 <div class="screen" id="screen-setup" hidden>
   <div id="newScrim"></div>
   <div class="panel" id="newCard">
-    <div class="eyebrow">New round</div>
-    <h2>Before the first night</h2>
-    <p class="lead">How many nests are out there in the dark, and how many each one
-      sends when the light goes. Decide it now — nothing about it changes once
-      you are on the ground.</p>
+    <div class="eyebrow" data-t="setup.eyebrow"></div>
+    <h2 data-t="setup.title"></h2>
+    <p class="lead" data-t="setup.lead"></p>
 
     <div id="diffPick" role="group" aria-label="Difficulty"></div>
     <div id="diffBlurb"></div>
 
     <div id="newMapRow">
       <div>
-        <div class="lbl" id="newMapName">Unfamiliar ground</div>
-        <div class="desc" id="newMapNote">Land nobody has walked before.</div>
+        <div class="lbl" id="newMapName"></div>
+        <div class="desc" id="newMapNote"></div>
       </div>
-      <button id="newMapPick" type="button">Choose…</button>
+      <button id="newMapPick" type="button"></button>
     </div>
 
-    <button id="newGo" type="button">Set out</button>
-    <button id="newBack" type="button">← Menu</button>
+    <button id="newGo" type="button" data-t="setup.go"></button>
+    <button id="newBack" type="button" data-t="setup.back"></button>
   </div>
 </div>
 
@@ -883,37 +964,33 @@
 <div class="screen" id="screen-net" hidden>
   <div id="netScrim"></div>
   <div class="panel" id="netCard">
-    <div class="eyebrow">Two players</div>
-    <h2>Two towns, one dark</h2>
-    <p id="netLead">The same ground, a side each, and one night falling on both of you.
-      There is no server: you swap two codes once, and after that the game talks
-      straight between your two computers.</p>
+    <div class="eyebrow" data-t="net.eyebrow"></div>
+    <h2 data-t="net.title"></h2>
+    <p id="netLead" data-t="net.lead"></p>
 
     <div id="netPick">
-      <button id="netModeHost" type="button" aria-pressed="true">I'll host</button>
-      <button id="netModeJoin" type="button" aria-pressed="false">I'm joining</button>
+      <button id="netModeHost" type="button" aria-pressed="true" data-t="net.host"></button>
+      <button id="netModeJoin" type="button" aria-pressed="false" data-t="net.join"></button>
     </div>
 
     <!-- host -->
     <div id="netHost">
       <div class="netStep">
-        <div class="lbl"><b>1</b>Your invite code</div>
-        <div class="desc">Press Create, then send this whole block to the other player
-          however you like — chat, email, a text.</div>
-        <textarea id="netOffer" readonly spellcheck="false" placeholder="press Create"></textarea>
+        <div class="lbl"><b>1</b><span data-t="net.h1.lbl"></span></div>
+        <div class="desc" data-t="net.h1.desc"></div>
+        <textarea id="netOffer" readonly spellcheck="false" data-t-ph="net.h1.ph"></textarea>
         <div class="netRow">
-          <button id="netCreate" type="button" class="go">Create invite</button>
-          <button id="netCopyOffer" type="button" disabled>Copy</button>
+          <button id="netCreate" type="button" class="go" data-t="net.create"></button>
+          <button id="netCopyOffer" type="button" disabled data-t="net.copy"></button>
         </div>
       </div>
       <div class="netStep">
-        <div class="lbl"><b>2</b>Their reply code</div>
-        <div class="desc">Paste what they send back, then start. You both wake up on the
-          same ground at the same moment.</div>
-        <textarea id="netAnswerIn" spellcheck="false" placeholder="paste their reply here"></textarea>
+        <div class="lbl"><b>2</b><span data-t="net.h2.lbl"></span></div>
+        <div class="desc" data-t="net.h2.desc"></div>
+        <textarea id="netAnswerIn" spellcheck="false" data-t-ph="net.h2.ph"></textarea>
         <div class="netRow">
-          <button id="netConnect" type="button" disabled>Connect</button>
-          <button id="netStart" type="button" class="go" disabled>Set out together</button>
+          <button id="netConnect" type="button" disabled data-t="net.connect"></button>
+          <button id="netStart" type="button" class="go" disabled data-t="net.start"></button>
         </div>
         <div id="netMapNote"></div>
       </div>
@@ -922,25 +999,25 @@
     <!-- guest -->
     <div id="netJoin" hidden>
       <div class="netStep">
-        <div class="lbl"><b>1</b>Their invite code</div>
-        <div class="desc">Paste the block the host sent you.</div>
-        <textarea id="netOfferIn" spellcheck="false" placeholder="paste the invite here"></textarea>
+        <div class="lbl"><b>1</b><span data-t="net.g1.lbl"></span></div>
+        <div class="desc" data-t="net.g1.desc"></div>
+        <textarea id="netOfferIn" spellcheck="false" data-t-ph="net.g1.ph"></textarea>
         <div class="netRow">
-          <button id="netReply" type="button" class="go">Make my reply</button>
+          <button id="netReply" type="button" class="go" data-t="net.reply"></button>
         </div>
       </div>
       <div class="netStep">
-        <div class="lbl"><b>2</b>Your reply code</div>
-        <div class="desc">Send this back to the host. When they set out, so do you.</div>
+        <div class="lbl"><b>2</b><span data-t="net.g2.lbl"></span></div>
+        <div class="desc" data-t="net.g2.desc"></div>
         <textarea id="netAnswer" readonly spellcheck="false" placeholder="—"></textarea>
         <div class="netRow">
-          <button id="netCopyAnswer" type="button" disabled>Copy</button>
+          <button id="netCopyAnswer" type="button" disabled data-t="net.copy"></button>
         </div>
       </div>
     </div>
 
-    <p id="netStatus">Not connected.</p>
-    <div style="margin-top:16px"><button class="backBtn" type="button" id="netBack">← Menu</button></div>
+    <p id="netStatus" data-t="net.status.none"></p>
+    <div style="margin-top:16px"><button class="backBtn" type="button" id="netBack" data-t="net.back"></button></div>
   </div>
 </div>
 
@@ -949,16 +1026,16 @@
   <div id="worldBars"></div>
 
   <div class="panel" id="supplyBox">
-    <span class="lb">Supply</span><b id="supply">180</b>
+    <span class="lb" data-t="hud.supply"></span><b id="supply">180</b>
   </div>
 
   <div class="panel" id="army" hidden>
     <div id="grpRow">
       <button class="grp" id="grpWorkers" type="button">
-        <span>Workers</span><b id="grpWorkN">0</b><em id="grpWorkIn"></em>
+        <span data-t="hud.workers"></span><b id="grpWorkN">0</b><em id="grpWorkIn"></em>
       </button>
       <button class="grp" id="grpArmy" type="button">
-        <span>Army</span><b id="grpArmyN">0</b><em></em>
+        <span data-t="hud.army"></span><b id="grpArmyN">0</b><em></em>
       </button>
     </div>
   </div>
@@ -967,18 +1044,18 @@
     <canvas id="minimap" width="180" height="180"></canvas>
 
     <div class="panel" id="dayBox" hidden>
-      <div class="lab"><span>Daylight</span><b id="dayLeft">2:35</b></div>
+      <div class="lab"><span data-t="hud.daylight"></span><b id="dayLeft">2:35</b></div>
       <div class="bar"><span id="dayBar" style="width:100%"></span></div>
       <div class="lab" style="margin:10px 0 0"><span id="nightNo">Night 1</span><b id="nestsLeft">5 nests</b></div>
-      <div class="lab" style="margin:4px 0 0"><span>Massing</span><b id="nightSend">520</b></div>
+      <div class="lab" style="margin:4px 0 0"><span data-t="hud.massing"></span><b id="nightSend">520</b></div>
     </div>
 
     <div class="panel" id="waveBox" hidden>
-      <div class="lab"><span>Until dawn</span><b id="nightLeft">2:00</b></div>
+      <div class="lab"><span data-t="hud.untildawn"></span><b id="nightLeft">2:00</b></div>
       <div class="bar"><span id="nightBar" class="dawn" style="width:100%"></span></div>
-      <div class="lab" style="margin:10px 0 0"><span>Town hall</span><b id="hallPct">100%</b></div>
+      <div class="lab" style="margin:10px 0 0"><span data-t="hud.hall"></span><b id="hallPct">100%</b></div>
       <div class="bar"><span id="hallBar" style="width:100%"></span></div>
-      <div class="lab" style="margin:10px 0 0"><span>Still coming</span><b id="wLeft">0</b></div>
+      <div class="lab" style="margin:10px 0 0"><span data-t="hud.stillcoming"></span><b id="wLeft">0</b></div>
       <div class="lab" style="margin:10px 0 0"><span id="nightNo2">Night 1</span><b id="nestsLeft2">2 nests</b></div>
     </div>
 
@@ -1002,16 +1079,16 @@
     <div class="panel" id="dockTroops" hidden>
       <span id="troopWhat">3 soldiers</span>
       <div class="uRow" id="troopMove">
-        <span class="uLab">Orders</span>
+        <span class="uLab" data-t="sel.orders"></span>
         <button id="troopStance" type="button" aria-pressed="true">hold</button>
       </div>
       <div id="troopStats"></div>
     </div>
     <div class="panel" id="dockActs" hidden>
       <span id="dockWhat">Watchtower</span>
-      <button id="dockShelter" type="button" hidden>Take them inside</button>
-      <button id="dockSell" type="button">Sell +24</button>
-      <span class="dkHint">ctrl+D to deselect</span>
+      <button id="dockShelter" type="button" hidden></button>
+      <button id="dockSell" type="button"></button>
+      <span class="dkHint" data-t="sel.deselect"></span>
     </div>
   </div>
 
@@ -1026,40 +1103,40 @@
 <div id="pause" hidden>
   <div id="pauseScrim"></div>
   <div class="panel" id="pauseCard">
-    <div class="eyebrow" id="pauseTag">Paused</div>
-    <h2>Nightward</h2>
+    <div class="eyebrow" id="pauseTag"></div>
+    <h2 data-t="pause.title"></h2>
     <div class="pauseNav">
-      <button class="pauseBtn" id="pResume" type="button">Resume<span class="sub">esc</span></button>
-      <button class="pauseBtn" id="pControls" type="button">Controls<span class="sub">keys · mouse</span></button>
-      <button class="pauseBtn" id="pSettings" type="button">Settings<span class="sub">render · audio</span></button>
-      <button class="pauseBtn" id="pQuit" type="button">Abandon the town<span class="sub">back to the menu</span></button>
+      <button class="pauseBtn" id="pResume" type="button"><span data-t="pause.resume"></span><span class="sub" data-t="pause.resume.sub"></span></button>
+      <button class="pauseBtn" id="pControls" type="button"><span data-t="pause.controls"></span><span class="sub" data-t="pause.controls.sub"></span></button>
+      <button class="pauseBtn" id="pSettings" type="button"><span data-t="pause.settings"></span><span class="sub" data-t="pause.settings.sub"></span></button>
+      <button class="pauseBtn" id="pQuit" type="button"><span data-t="pause.quit"></span><span class="sub" data-t="pause.quit.sub"></span></button>
     </div>
     <div id="pauseKeys" hidden>
-        <div class="hGrp">Building &mdash; day and night</div>
+        <div class="hGrp" data-t="pause.h.build"></div>
         <dl>
-          <dt>town hall</dt><dd>your commander walks over and raises it</dd>
-          <dt>click</dt><dd>place the building you picked</dd>
-          <dt>drag</dt><dd>run a line of palisade</dd>
-          <dt>click a building</dt><dd>select it, then tear it down from the bar below</dd>
-          <dt>ctrl+D</dt><dd>let go of everything</dd>
-          <dt>R &middot; shift+R</dt><dd>turn it &middot; turn it automatically</dd>
-          <dt>tab &middot; 1&ndash;3</dt><dd>switch tab &middot; pick a building</dd>
+          <dt data-t="pause.b1.k"></dt><dd data-t="pause.b1.v"></dd>
+          <dt data-t="pause.b2.k"></dt><dd data-t="pause.b2.v"></dd>
+          <dt data-t="pause.b3.k"></dt><dd data-t="pause.b3.v"></dd>
+          <dt data-t="pause.b4.k"></dt><dd data-t="pause.b4.v"></dd>
+          <dt data-t="pause.b5.k"></dt><dd data-t="pause.b5.v"></dd>
+          <dt data-t="pause.b6.k"></dt><dd data-t="pause.b6.v"></dd>
+          <dt data-t="pause.b7.k"></dt><dd data-t="pause.b7.v"></dd>
         </dl>
-        <div class="hGrp">Your people</div>
+        <div class="hGrp" data-t="pause.h.people"></div>
         <dl>
-          <dt>click &middot; drag</dt><dd>select one &middot; select a group</dd>
-          <dt>right-click</dt><dd>send them there, or onto a salvage pile</dd>
-          <dt>right-click a wall</dt><dd>workers mend it, even under attack</dd>
-          <dt>select the hall</dt><dd>call everyone inside, or turn them out</dd>
-          <dt>ctrl+A</dt><dd>select everyone</dd>
-          <dt>H</dt><dd>hold the ground, or go after them</dd>
+          <dt data-t="pause.p1.k"></dt><dd data-t="pause.p1.v"></dd>
+          <dt data-t="pause.p2.k"></dt><dd data-t="pause.p2.v"></dd>
+          <dt data-t="pause.p3.k"></dt><dd data-t="pause.p3.v"></dd>
+          <dt data-t="pause.p4.k"></dt><dd data-t="pause.p4.v"></dd>
+          <dt data-t="pause.p5.k"></dt><dd data-t="pause.p5.v"></dd>
+          <dt data-t="pause.p6.k"></dt><dd data-t="pause.p6.v"></dd>
         </dl>
-        <div class="hGrp">The view</div>
+        <div class="hGrp" data-t="pause.h.view"></div>
         <dl>
-          <dt>W A S D</dt><dd>move the view &middot; hold shift to go faster</dd>
-          <dt>middle-drag</dt><dd>turn the view (or shift-drag)</dd>
-          <dt>Q &middot; E</dt><dd>turn it a step at a time</dd>
-          <dt>wheel</dt><dd>zoom in and out</dd>
+          <dt data-t="pause.v1.k"></dt><dd data-t="pause.v1.v"></dd>
+          <dt data-t="pause.v2.k"></dt><dd data-t="pause.v2.v"></dd>
+          <dt data-t="pause.v3.k"></dt><dd data-t="pause.v3.v"></dd>
+          <dt data-t="pause.v4.k"></dt><dd data-t="pause.v4.v"></dd>
         </dl>
     </div>
     <p id="pauseNote"></p>
@@ -1068,13 +1145,13 @@
 
 <div id="overlay" hidden>
   <div class="card">
-    <div class="eyebrow">How it ended</div>
-    <h2 id="ovTitle">You held</h2>
+    <div class="eyebrow" data-t="end.eyebrow"></div>
+    <h2 id="ovTitle"></h2>
     <p id="ovBody"></p>
     <div id="ovStats"></div>
     <div class="ovBtns">
-      <button id="ovAgain" type="button">Go again</button>
-      <button id="ovMenu" type="button">Main menu</button>
+      <button id="ovAgain" type="button" data-t="end.again"></button>
+      <button id="ovMenu" type="button" data-t="end.menu"></button>
     </div>
   </div>
 </div>
@@ -2585,6 +2662,329 @@ function setStatOverrides(o){
   }
 }
 
+// ---- text ------------------------------------------------------------------
+// Every word the player reads, in one table, for the same reason the balance
+// numbers are in one table: a second copy of a string somewhere in the UI is a
+// copy that will not follow when the first one is rewritten. `t(key,vars)`
+// resolves a key through the live overrides, so a line edited in the Library's
+// Text tab changes on screen in a running round.
+//
+// A def may carry {placeholders}. They are filled from the vars object, and the
+// Text tab lists them next to the field so an edit cannot silently drop one —
+// a line that loses its {n} is a readout with no number in it.
+var TEXT_GROUPS=[
+  {id:"menu",  name:"Menu"},
+  {id:"setup", name:"New round"},
+  {id:"hud",   name:"Readouts"},
+  {id:"sel",   name:"Selection"},
+  {id:"bld",   name:"Buildings"},
+  {id:"unit",  name:"People"},
+  {id:"pause", name:"Pause & controls"},
+  {id:"end",   name:"End of round"},
+  {id:"net",   name:"Two players"},
+  {id:"sys",   name:"System"}
+];
+var TEXT_DEFS={
+  // ---- system
+  "sys.fatal":{g:"sys",def:"Nightward needs WebGL2 to draw itself. Try a desktop browser with hardware acceleration switched on."},
+
+  // ---- menu
+  "menu.play":{g:"menu",def:"Play"},
+  "menu.library":{g:"menu",def:"Library"},
+  "menu.library.sub":{g:"menu",def:"{n} assets"},
+  "menu.maps":{g:"menu",def:"Maps"},
+  "menu.maps.sub":{g:"menu",def:"{n} maps"},
+  "menu.maps.none":{g:"menu",def:"no maps"},
+  "menu.settings":{g:"menu",def:"Settings"},
+  "menu.settings.sub":{g:"menu",def:"render · audio"},
+  "menu.net":{g:"menu",def:"Two players"},
+  "menu.net.sub":{g:"menu",def:"one map · two towns"},
+  "menu.stat.rounds":{g:"menu",def:"rounds"},
+  "menu.stat.cleared":{g:"menu",def:"cleared"},
+  "menu.stat.besthall":{g:"menu",def:"best hall"},
+  "menu.last.label":{g:"menu",def:"last · "},
+  "menu.last.none":{g:"menu",def:"you have not been out yet"},
+  "menu.last.won":{g:"menu",def:"cleared"},
+  "menu.last.lost":{g:"menu",def:"overrun"},
+  "menu.last.line":{g:"menu",def:"{result} · {difficulty} · hall {hall}% · {seconds}s"},
+
+  // ---- new round
+  "setup.eyebrow":{g:"setup",def:"New round"},
+  "setup.title":{g:"setup",def:"Before the first night"},
+  "setup.lead":{g:"setup",def:"How many nests are out there in the dark, and how many each one sends when the light goes. Decide it now — nothing about it changes once you are on the ground."},
+  "setup.card.nests":{g:"setup",def:"{n} nests"},
+  "setup.card.first":{g:"setup",def:"{n} the first night"},
+  "setup.card.supply":{g:"setup",def:"{n} supply to start"},
+  "setup.diff.easy":{g:"setup",def:"Easy"},
+  "setup.diff.normal":{g:"setup",def:"Normal"},
+  "setup.diff.hard":{g:"setup",def:"Hard"},
+  "setup.blurb.easy":{g:"setup",def:"Three nests, and none of them close. Room to learn what a wall is for before anything comes to test it."},
+  "setup.blurb.normal":{g:"setup",def:"Five nests. Holding the line is affordable. Putting them out is the whole of the work."},
+  "setup.blurb.hard":{g:"setup",def:"Eight nests ringed around you, and less in the stores to meet them. Every night you leave one standing, the next comes harder — and there are eight to put out."},
+  "setup.map.random":{g:"setup",def:"Unfamiliar ground"},
+  "setup.map.random.note":{g:"setup",def:"Land nobody has walked before."},
+  "setup.map.custom.note":{g:"setup",def:"One of yours, drawn on the Maps screen."},
+  "setup.map.choose":{g:"setup",def:"Choose…"},
+  "setup.map.change":{g:"setup",def:"Change…"},
+  "setup.go":{g:"setup",def:"Set out"},
+  "setup.back":{g:"setup",def:"← Menu"},
+
+  // ---- readouts
+  "hud.supply":{g:"hud",def:"Supply"},
+  "hud.workers":{g:"hud",def:"Workers"},
+  "hud.army":{g:"hud",def:"Army"},
+  "hud.workers.in":{g:"hud",def:"{n} in"},
+  "hud.daylight":{g:"hud",def:"Daylight"},
+  "hud.untildawn":{g:"hud",def:"Until dawn"},
+  "hud.night":{g:"hud",def:"Night {n}"},
+  "hud.nests":{g:"hud",def:"{n} nests"},
+  "hud.nests.one":{g:"hud",def:"{n} nest"},
+  "hud.nests.left":{g:"hud",def:"{n} nests left"},
+  "hud.nests.left.one":{g:"hud",def:"{n} nest left"},
+  "hud.massing":{g:"hud",def:"Massing"},
+  "hud.hall":{g:"hud",def:"Town hall"},
+  "hud.stillcoming":{g:"hud",def:"Still coming"},
+  "hud.rival.you":{g:"hud",def:"You"},
+  "hud.rival.them":{g:"hud",def:"Them"},
+  "hud.rival.fallen":{g:"hud",def:"fallen"},
+  "hud.rival.nohall":{g:"hud",def:"no hall yet"},
+
+  // ---- selection
+  "sel.orders":{g:"sel",def:"Orders"},
+  "sel.stance.hold":{g:"sel",def:"hold ground"},
+  "sel.stance.chase":{g:"sel",def:"give chase"},
+  "sel.shelter.in":{g:"sel",def:"Take them inside"},
+  "sel.shelter.out":{g:"sel",def:"Turn them out"},
+  "sel.selldown":{g:"sel",def:"Tear down +{n}"},
+  "sel.cancel":{g:"sel",def:"Call it off +{n}"},
+  "sel.deselect":{g:"sel",def:"ctrl+D to deselect"},
+  "sel.site.suffix":{g:"sel",def:" · going up"},
+  "sel.site.left":{g:"sel",def:"{n}s"},
+  "sel.worker.one":{g:"sel",def:"worker"},
+  "sel.worker.many":{g:"sel",def:"workers"},
+  "sel.housed.hall":{g:"sel",def:"{n} {noun} in the settlement"},
+  "sel.housed.other":{g:"sel",def:"{n} {noun} living here"},
+  "sel.indoors":{g:"sel",def:"{n} indoors"},
+  "sel.hint.send":{g:"sel",def:"right-click the ground to put them to work there"},
+  "sel.stat.health":{g:"sel",def:"Health"},
+  "sel.stat.gather":{g:"sel",def:"Gather"},
+  "sel.stat.repair":{g:"sel",def:"Repair"},
+  "sel.stat.damage":{g:"sel",def:"Damage"},
+  "sel.stat.reach":{g:"sel",def:"Reach"},
+  "sel.stat.range":{g:"sel",def:"Range"},
+  "sel.stat.speed":{g:"sel",def:"Speed"},
+  "sel.stat.gather.v":{g:"sel",def:"{rate}/s · carries {carry}"},
+  "sel.stat.repair.v":{g:"sel",def:"{n} hp/s"},
+  "sel.stat.rate.v":{g:"sel",def:"{dmg} / {every}s  ({dps} dps)"},
+  "sel.stat.units.v":{g:"sel",def:"{n}u"},
+  "sel.stat.speed.v":{g:"sel",def:"{n} u/s"},
+  "sel.kind.line":{g:"sel",def:"{name} ×{n}"},
+  "sel.kind.civil":{g:"sel",def:"{hp} hp"},
+  "sel.kind.armed":{g:"sel",def:"{hp} hp · {dmg} dmg"},
+
+  // ---- buildings
+  "bld.cat.core":{g:"bld",def:"Base"},
+  "bld.cat.core.note":{g:"bld",def:"What you are protecting, and what pays for the rest."},
+  "bld.cat.guns":{g:"bld",def:"Defences"},
+  "bld.cat.guns.note":{g:"bld",def:"They do the killing. Put them where you want the fighting to happen."},
+  "bld.cat.walls":{g:"bld",def:"Walls"},
+  "bld.cat.walls.note":{g:"bld",def:"They stop nothing. They decide where it happens."},
+  "bld.cat.muster":{g:"bld",def:"Troops"},
+  "bld.cat.muster.note":{g:"bld",def:"People, not buildings. Right-click to send them somewhere."},
+  "bld.hall.name":{g:"bld",def:"Town Hall"},
+  "bld.hall.blurb":{g:"bld",def:"{cap} live here · raise {raise}s"},
+  "bld.cottage.name":{g:"bld",def:"Cottage"},
+  "bld.cottage.blurb":{g:"bld",def:"{cap} more hands · {retrain}s each"},
+  "bld.tower.name":{g:"bld",def:"Watchtower"},
+  "bld.tower.blurb":{g:"bld",def:"{dmg} every {fire}s · close"},
+  "bld.ballista.name":{g:"bld",def:"Ballista"},
+  "bld.ballista.blurb":{g:"bld",def:"{dmg} and splash · slow"},
+  "bld.brazier.name":{g:"bld",def:"Brazier"},
+  "bld.brazier.blurb":{g:"bld",def:"reloads the guns near it"},
+  "bld.wall.name":{g:"bld",def:"Palisade"},
+  "bld.wall.blurb":{g:"bld",def:"{hp} health · drag a run"},
+  "bld.gate.name":{g:"bld",def:"Gate"},
+  "bld.gate.blurb":{g:"bld",def:"{hp} health · they like it"},
+  "bld.barracks.name":{g:"bld",def:"Barracks"},
+  "bld.barracks.blurb":{g:"bld",def:"{cap} soldiers · {retrain}s each"},
+  "bld.archery.name":{g:"bld",def:"Archery Range"},
+  "bld.archery.blurb":{g:"bld",def:"{cap} archers · {retrain}s each"},
+  "bld.free":{g:"bld",def:"free"},
+  "bld.required":{g:"bld",def:"required"},
+  "bld.supply":{g:"bld",def:"{n} supply"},
+
+  // ---- people
+  "unit.commander.name":{g:"unit",def:"Commander"},
+  "unit.commander.ability":{g:"unit",def:"Raises the town hall. Anyone fighting within <em>{rally}u</em> of him swings about <em>{pct}% faster</em>."},
+  "unit.soldier.name":{g:"unit",def:"Soldier"},
+  "unit.soldier.ability":{g:"unit",def:"Stands in the way with his body — attackers stop to fight him instead of walking past."},
+  "unit.archer.name":{g:"unit",def:"Archer"},
+  "unit.archer.ability":{g:"unit",def:"Kills from <em>{range}u</em> and will not close the distance. Keep something between it and them."},
+  "unit.worker.name":{g:"unit",def:"Worker"},
+  "unit.worker.ability":{g:"unit",def:"Hauls salvage by day, mends walls by night at <em>{repair} hp/s</em>. Runs from anything that fights back."},
+
+  // ---- pause & controls
+  "pause.tag":{g:"pause",def:"Paused"},
+  "pause.tag.live":{g:"pause",def:"Menu"},
+  "pause.title":{g:"pause",def:"Nightward"},
+  "pause.resume":{g:"pause",def:"Resume"},
+  "pause.resume.sub":{g:"pause",def:"esc"},
+  "pause.controls":{g:"pause",def:"Controls"},
+  "pause.controls.sub":{g:"pause",def:"keys · mouse"},
+  "pause.settings":{g:"pause",def:"Settings"},
+  "pause.settings.sub":{g:"pause",def:"render · audio"},
+  "pause.quit":{g:"pause",def:"Abandon the town"},
+  "pause.quit.sub":{g:"pause",def:"back to the menu"},
+  "pause.note.live":{g:"pause",def:"Nothing out there is waiting for you — the other town is still under attack."},
+  "pause.note.frozen":{g:"pause",def:"Everything is holding still while this is open."},
+  "pause.h.build":{g:"pause",def:"Building — day and night"},
+  "pause.h.people":{g:"pause",def:"Your people"},
+  "pause.h.view":{g:"pause",def:"The view"},
+  "pause.b1.k":{g:"pause",def:"town hall"},
+  "pause.b1.v":{g:"pause",def:"your commander walks over and raises it"},
+  "pause.b2.k":{g:"pause",def:"click"},
+  "pause.b2.v":{g:"pause",def:"place the building you picked"},
+  "pause.b3.k":{g:"pause",def:"drag"},
+  "pause.b3.v":{g:"pause",def:"run a line of palisade"},
+  "pause.b4.k":{g:"pause",def:"click a building"},
+  "pause.b4.v":{g:"pause",def:"select it, then tear it down from the bar below"},
+  "pause.b5.k":{g:"pause",def:"ctrl+D"},
+  "pause.b5.v":{g:"pause",def:"let go of everything"},
+  "pause.b6.k":{g:"pause",def:"R · shift+R"},
+  "pause.b6.v":{g:"pause",def:"turn it · turn it automatically"},
+  "pause.b7.k":{g:"pause",def:"tab · 1–3"},
+  "pause.b7.v":{g:"pause",def:"switch tab · pick a building"},
+  "pause.p1.k":{g:"pause",def:"click · drag"},
+  "pause.p1.v":{g:"pause",def:"select one · select a group"},
+  "pause.p2.k":{g:"pause",def:"right-click"},
+  "pause.p2.v":{g:"pause",def:"send them there, or onto a salvage pile"},
+  "pause.p3.k":{g:"pause",def:"right-click a wall"},
+  "pause.p3.v":{g:"pause",def:"workers mend it, even under attack"},
+  "pause.p4.k":{g:"pause",def:"select the hall"},
+  "pause.p4.v":{g:"pause",def:"call everyone inside, or turn them out"},
+  "pause.p5.k":{g:"pause",def:"ctrl+A"},
+  "pause.p5.v":{g:"pause",def:"select everyone"},
+  "pause.p6.k":{g:"pause",def:"H"},
+  "pause.p6.v":{g:"pause",def:"hold the ground, or go after them"},
+  "pause.v1.k":{g:"pause",def:"W A S D"},
+  "pause.v1.v":{g:"pause",def:"move the view · hold shift to go faster"},
+  "pause.v2.k":{g:"pause",def:"middle-drag"},
+  "pause.v2.v":{g:"pause",def:"turn the view (or shift-drag)"},
+  "pause.v3.k":{g:"pause",def:"Q · E"},
+  "pause.v3.v":{g:"pause",def:"turn it a step at a time"},
+  "pause.v4.k":{g:"pause",def:"wheel"},
+  "pause.v4.v":{g:"pause",def:"zoom in and out"},
+
+  // ---- end of round
+  "end.eyebrow":{g:"end",def:"How it ended"},
+  "end.win.title":{g:"end",def:"The last nest is cold"},
+  "end.win.ally.title":{g:"end",def:"They finished it without you"},
+  "end.lose.title":{g:"end",def:"There is no town left"},
+  "end.lose.multi.title":{g:"end",def:"Both towns fell"},
+  "end.win.solo":{g:"end",def:"Every nest is cold after {nights}. Nothing out there is left to send anything, and the dark is only dark again."},
+  "end.win.both":{g:"end",def:"Every nest is cold after {nights}, and both towns are still standing to see it."},
+  "end.win.alone":{g:"end",def:"Every nest is cold after {nights}. The other town did not live to see it. Yours did."},
+  "end.win.ally":{g:"end",def:"Your hall went down before the end. The other town carried it the rest of the way and put out the last nest."},
+  "end.lose.solo":{g:"end",def:"The hall is gone, and with it the reason to hold this ground. Walls only buy minutes; watchtowers do the killing; a ballista is what stops a brute; soldiers plug the gap the fast ones find. And holding is not winning — every night you leave a nest alone out there, the next one comes harder."},
+  "end.lose.multi":{g:"end",def:"Neither hall lasted the night. Walls only buy minutes; watchtowers do the killing; a ballista is what stops a brute. And every night a nest is left standing out there, the next one comes harder."},
+  "end.nights":{g:"end",def:"{n} nights"},
+  "end.nights.one":{g:"end",def:"{n} night"},
+  "end.stat.kills":{g:"end",def:"put down"},
+  "end.stat.nights":{g:"end",def:"nights held"},
+  "end.stat.nights.one":{g:"end",def:"night held"},
+  "end.stat.nests":{g:"end",def:"still out there"},
+  "end.again":{g:"end",def:"Go again"},
+  "end.menu":{g:"end",def:"Main menu"},
+
+  // ---- two players
+  "net.eyebrow":{g:"net",def:"Two players"},
+  "net.title":{g:"net",def:"Two towns, one dark"},
+  "net.lead":{g:"net",def:"The same ground, a side each, and one night falling on both of you. There is no server: you swap two codes once, and after that the game talks straight between your two computers."},
+  "net.host":{g:"net",def:"I'll host"},
+  "net.join":{g:"net",def:"I'm joining"},
+  "net.h1.lbl":{g:"net",def:"Your invite code"},
+  "net.h1.desc":{g:"net",def:"Press Create, then send this whole block to the other player however you like — chat, email, a text."},
+  "net.h1.ph":{g:"net",def:"press Create"},
+  "net.create":{g:"net",def:"Create invite"},
+  "net.copy":{g:"net",def:"Copy"},
+  "net.h2.lbl":{g:"net",def:"Their reply code"},
+  "net.h2.desc":{g:"net",def:"Paste what they send back, then start. You both wake up on the same ground at the same moment."},
+  "net.h2.ph":{g:"net",def:"paste their reply here"},
+  "net.connect":{g:"net",def:"Connect"},
+  "net.start":{g:"net",def:"Set out together"},
+  "net.g1.lbl":{g:"net",def:"Their invite code"},
+  "net.g1.desc":{g:"net",def:"Paste the block the host sent you."},
+  "net.g1.ph":{g:"net",def:"paste the invite here"},
+  "net.reply":{g:"net",def:"Make my reply"},
+  "net.g2.lbl":{g:"net",def:"Your reply code"},
+  "net.g2.desc":{g:"net",def:"Send this back to the host. When they set out, so do you."},
+  "net.status.none":{g:"net",def:"Not connected."},
+  "net.note.custom":{g:"net",def:"You will both wake up on your map “{map}”"},
+  "net.note.random":{g:"net",def:"You will both wake up on ground neither of you has walked"},
+  "net.note.tail":{g:"net",def:", on {difficulty} — {nests} nests out there. Change it on the Play screen."},
+  "net.back":{g:"net",def:"← Menu"}
+};
+
+// Asset ids whose display name IS a text key. The Library's asset panel and the
+// Text tab therefore edit the same string rather than two that drift apart.
+var TEXT_ASSET_NAME={
+  hall:"bld.hall.name", cottage:"bld.cottage.name", tower:"bld.tower.name",
+  ballista:"bld.ballista.name", brazier:"bld.brazier.name",
+  wall:"bld.wall.name", gate:"bld.gate.name",
+  barracks:"bld.barracks.name", archery:"bld.archery.name",
+  commander:"unit.commander.name", soldier:"unit.soldier.name",
+  archer:"unit.archer.name", worker:"unit.worker.name"
+};
+
+var TEXT_OVER={};
+var PLACEHOLDER=/\{(\w+)\}/g;
+function textDef(key){ return TEXT_DEFS[key]||null; }
+function textRaw(key){
+  var d=TEXT_DEFS[key];
+  if(!d) return null;
+  return (TEXT_OVER[key]!==undefined)?TEXT_OVER[key]:d.def;
+}
+// Missing keys return the key itself rather than an empty string: a blank label
+// looks like a layout bug and sends you hunting in the CSS, where "hud.massing"
+// on screen names the thing that is actually wrong.
+function t(key,vars){
+  var s=textRaw(key);
+  if(s===null) return key;
+  if(!vars) return s;
+  return s.replace(PLACEHOLDER,function(m,k){
+    return (vars[k]===undefined||vars[k]===null)?m:String(vars[k]);
+  });
+}
+// The placeholders a def declares, so an edit that drops one can be flagged
+// rather than quietly shipping a sentence with a hole where the number was.
+function textVars(key){
+  var d=TEXT_DEFS[key];
+  if(!d) return [];
+  var out=[], m;
+  PLACEHOLDER.lastIndex=0;
+  while((m=PLACEHOLDER.exec(d.def))!==null) if(out.indexOf(m[1])<0) out.push(m[1]);
+  return out;
+}
+function setText(key,v){
+  if(!TEXT_DEFS[key]) return;
+  if(v===undefined||v===null) return;
+  v=String(v);
+  if(v===TEXT_DEFS[key].def) delete TEXT_OVER[key];
+  else TEXT_OVER[key]=v;
+}
+function textEdited(key){ return TEXT_OVER[key]!==undefined; }
+function resetText(key){ delete TEXT_OVER[key]; }
+function resetAllText(){ TEXT_OVER={}; }
+function textKeys(){ return Object.keys(TEXT_DEFS); }
+function textGroups(){ return TEXT_GROUPS; }
+function getTextOverrides(){ return TEXT_OVER; }
+function setTextOverrides(o){
+  TEXT_OVER={};
+  if(!o) return;
+  for(var k in o) setText(k,o[k]);   // unknown keys dropped on load
+}
+function textNameKey(id){ return TEXT_ASSET_NAME[id]||null; }
+
 // ---- user assets + metadata ----------------------------------------------
 // Shipped assets stay immutable; anything you change about one is a metadata
 // override, and anything you invent is a user asset. Both persist, both export.
@@ -2606,22 +3006,32 @@ function assetMeta(id){
   if(!b) return null;
   var m=META[id]||{}, out={id:id};
   for(var k in META_KEYS) out[k]=(m[k]!==undefined)?m[k]:b[k];
+  // A building's name is one string, not two. For the ids the player actually
+  // reads, the Library's name field and the Text tab are the same store, so
+  // renaming a Watchtower in either place renames it everywhere.
+  var nk=TEXT_ASSET_NAME[id];
+  if(nk) out.name=t(nk);
   out.slots=b.slots||[];
   return out;
 }
 function setMeta(id,k,v){
   if(!META_KEYS[k]||!baseById(id)) return;
+  if(k==="name"&&TEXT_ASSET_NAME[id]){ setText(TEXT_ASSET_NAME[id],v); return; }
   if(isUser(id)){ baseById(id)[k]=v; return; }
   if(!META[id]) META[id]={};
   META[id][k]=v;
 }
 function metaEdited(id){
+  if(TEXT_ASSET_NAME[id]&&textEdited(TEXT_ASSET_NAME[id])) return true;
   var m=META[id];
   if(!m) return false;
   for(var k in m) return true;
   return false;
 }
-function resetMeta(id){ delete META[id]; }
+function resetMeta(id){
+  if(TEXT_ASSET_NAME[id]) resetText(TEXT_ASSET_NAME[id]);
+  delete META[id];
+}
 function getMeta(){ return META; }
 function setMetaAll(o){ META={}; if(o) for(var id in o) if(baseById(id)) META[id]=o[id]; }
 function getUserAssets(){ return USER; }
@@ -2831,6 +3241,10 @@ return {
   STAT_DEFS:STAT_DEFS, statDefs:statDefs, hasStats:hasStats, statsOf:statsOf,
   statField:statField, setStat:setStat, statsEdited:statsEdited, resetStats:resetStats,
   getStatOverrides:getStatOverrides, setStatOverrides:setStatOverrides,
+  t:t, textDef:textDef, textRaw:textRaw, textVars:textVars, setText:setText,
+  textEdited:textEdited, resetText:resetText, resetAllText:resetAllText,
+  textKeys:textKeys, textGroups:textGroups, textNameKey:textNameKey,
+  getTextOverrides:getTextOverrides, setTextOverrides:setTextOverrides,
   expandRep:expandRep, resolveParts:resolveParts, anchoredY:anchoredY, partRot:partRot,
   wedge:wedge, xform:xform,
   buildBone:buildBone, jointTop:jointTop, partBase:partBase,
@@ -3963,40 +4377,37 @@ var B=null, BATCHES=null, buf={};
 // hall keeps cost 0 — it is placed, not bought.
 // `cat` places a building in the hotbar; `blurb(b)` is its one-line summary,
 // read from live stats so the hotbar never disagrees with the Library.
-var CATS=[
-  {id:"core",  name:"Base",     note:"What you are protecting, and what pays for the rest."},
-  {id:"guns",  name:"Defences", note:"They do the killing. Put them where you want the fighting to happen."},
-  {id:"walls", name:"Walls",    note:"They stop nothing. They decide where it happens."},
-  {id:"muster",name:"Troops",   note:"People, not buildings. Right-click to send them somewhere."}
-];
+// name and note come from the text table, refreshed by syncStats() so a line
+// edited in the Library reaches the hotbar without a reload.
+var CATS=[{id:"core"},{id:"guns"},{id:"walls"},{id:"muster"}];
 var TYPES={
-  hall : {name:"Town Hall", cat:"core", foot:3, scale:1.00, cost:0,
+  hall : {cat:"core", foot:3, scale:1.00, cost:0,
           colA:M.PAL.plaster, colB:M.PAL.slate, spawns:"worker",
-          blurb:function(t){ return t.cap+" live here · raise "+t.raise+"s"; }},
-  cottage:{name:"Cottage", cat:"core", foot:1, scale:0.66, spawns:"worker",
+          blurb:function(t){ return M.t("bld.hall.blurb",{cap:t.cap, raise:t.raise}); }},
+  cottage:{cat:"core", foot:1, scale:0.66, spawns:"worker",
           colA:M.PAL.plaster, colB:M.PAL.thatch,
-          blurb:function(t){ return t.cap+" more hands · "+t.retrain+"s each"; }},
-  tower: {name:"Watchtower", cat:"guns", foot:1, scale:0.70,
+          blurb:function(t){ return M.t("bld.cottage.blurb",{cap:t.cap, retrain:t.retrain}); }},
+  tower: {cat:"guns", foot:1, scale:0.70,
           colA:M.PAL.timberL, colB:M.PAL.iron,
-          blurb:function(t){ return t.dmg+" every "+t.fire+"s · close"; }},
-  ballista:{name:"Ballista", cat:"guns", foot:1, scale:0.78, boltScale:2.1,
+          blurb:function(t){ return M.t("bld.tower.blurb",{dmg:t.dmg, fire:t.fire}); }},
+  ballista:{cat:"guns", foot:1, scale:0.78, boltScale:2.1,
           colA:M.PAL.timberL, colB:M.PAL.iron,
-          blurb:function(t){ return t.dmg+" and splash · slow"; }},
-  brazier:{name:"Brazier", cat:"guns", foot:1, scale:0.90,
+          blurb:function(t){ return M.t("bld.ballista.blurb",{dmg:t.dmg}); }},
+  brazier:{cat:"guns", foot:1, scale:0.90,
           colA:M.PAL.stone, colB:M.PAL.iron,
-          blurb:function(t){ return "reloads the guns near it"; }},
-  wall : {name:"Palisade", cat:"walls", foot:1, scale:1.00,
+          blurb:function(t){ return M.t("bld.brazier.blurb",{}); }},
+  wall : {cat:"walls", foot:1, scale:1.00,
           colA:M.PAL.timber, colB:M.PAL.iron,
-          blurb:function(t){ return t.hp+" health · drag a run"; }},
-  gate : {name:"Gate", cat:"walls", foot:1, scale:1.00,
+          blurb:function(t){ return M.t("bld.wall.blurb",{hp:t.hp}); }},
+  gate : {cat:"walls", foot:1, scale:1.00,
           colA:M.PAL.timberL, colB:M.PAL.iron,
-          blurb:function(t){ return t.hp+" health · they like it"; }},
-  barracks:{name:"Barracks", cat:"muster", foot:1, scale:0.72, spawns:"soldier",
+          blurb:function(t){ return M.t("bld.gate.blurb",{hp:t.hp}); }},
+  barracks:{cat:"muster", foot:1, scale:0.72, spawns:"soldier",
           colA:M.PAL.timber, colB:M.PAL.slate,
-          blurb:function(t){ return t.cap+" soldiers · "+t.retrain+"s each"; }},
-  archery:{name:"Archery Range", cat:"muster", foot:1, scale:0.72, spawns:"archer",
+          blurb:function(t){ return M.t("bld.barracks.blurb",{cap:t.cap, retrain:t.retrain}); }},
+  archery:{cat:"muster", foot:1, scale:0.72, spawns:"archer",
           colA:M.PAL.timberL, colB:M.PAL.thatch,
-          blurb:function(t){ return t.cap+" archers · "+t.retrain+"s each"; }}
+          blurb:function(t){ return M.t("bld.archery.blurb",{cap:t.cap, retrain:t.retrain}); }}
 };
 
 // ---- defenders ------------------------------------------------------------
@@ -4004,19 +4415,19 @@ var TYPES={
 // to anything that reaches them. Both are mustered by a building and belong to
 // it, so losing the building costs you the replacements, not the survivors.
 var UNITS={
-  soldier:{name:"Soldier", asset:"soldier", melee:true,
+  soldier:{asset:"soldier", melee:true,
            scBase:1.26, scVar:0.08, colA:[0.475,0.395,0.262], colB:[0.610,0.650,0.685],
            gib:[0.72,0.70,0.58]},
-  archer :{name:"Archer",  asset:"archer",  melee:false,
+  archer :{asset:"archer",  melee:false,
            scBase:1.20, scVar:0.08, colA:[0.352,0.430,0.372], colB:[0.545,0.470,0.300],
            gib:[0.62,0.70,0.60]},
-  worker :{name:"Worker",  asset:"worker",  civil:true,
+  worker :{asset:"worker",  civil:true,
            scBase:1.18, scVar:0.08, colA:[0.430,0.398,0.300], colB:[0.545,0.520,0.470],
            gib:[0.70,0.66,0.56]},
   // One per player, on the field before anything is built. It is the only unit
   // that can raise a hall, which is why the round starts with a walk rather
   // than a click: where you put the hall costs you the time to get there.
-  commander:{name:"Commander", asset:"commander", melee:true, hero:true,
+  commander:{asset:"commander", melee:true, hero:true,
            scBase:1.42, scVar:0.00, colA:[0.300,0.330,0.395], colB:[0.545,0.560,0.590],
            gib:[0.62,0.66,0.72]}
 };
@@ -4108,8 +4519,22 @@ function buildRigs(makeBatch){
 // round, and whenever the Library edits a number — so a change in the editor
 // reaches a round already in progress.
 var NEST={};
+// Names and one-line summaries live in the text table, and the table is live:
+// re-reading them here means an edit in the Library's Text tab reaches the
+// hotbar and the selection panels on the next sync rather than the next reload.
+function syncText(){
+  var i,t;
+  for(i=0;i<CATS.length;i++){
+    CATS[i].name=M.t("bld.cat."+CATS[i].id);
+    CATS[i].note=M.t("bld.cat."+CATS[i].id+".note");
+  }
+  for(t in DIFF) DIFF[t].label=M.t("setup.diff."+t);
+  for(t in TYPES) TYPES[t].name=M.t("bld."+t+".name");
+  for(t in UNITS) UNITS[t].name=M.t("unit."+t+".name");
+}
 function syncStats(){
   var t,k,st;
+  syncText();
   // The nests are not in TYPES/UNITS/ENEMY, so their block is read straight out
   // of the balance table here and re-read whenever the library edits it.
   NEST=M.statsOf("nest")||{};
@@ -4126,20 +4551,23 @@ function syncStats(){
     if(st) for(k in st) UNITS[t][k]=st[k];
   }
 }
-syncStats();
 // Difficulty sets the shape of the game, not just its numbers: how many nests
 // ring you, and how many each one sends on the first night. The wave is the sum
 // of what the living nests send, so pulling one down is a permanent cut to
 // every night after — which is the whole reason to leave the walls.
 // `send` is per nest per night one; `nests` is how many the map seeds.
 var DIFF={
-  easy  :{supply:60, nests:3, send:112, hp:36, label:"Easy",
+  easy  :{supply:60, nests:3, send:112, hp:36,
           mix:{shambler:0.76, runner:0.20, brute:0.04}},
-  normal:{supply:45, nests:5, send:104, hp:42, label:"Normal",
+  normal:{supply:45, nests:5, send:104, hp:42,
           mix:{shambler:0.66, runner:0.25, brute:0.09}},
-  hard  :{supply:30, nests:8, send:98,  hp:46, label:"Hard",
+  hard  :{supply:30, nests:8, send:98,  hp:46,
           mix:{shambler:0.58, runner:0.28, brute:0.14}}
 };
+// After DIFF, not before: syncText() names the difficulties out of the text
+// table, and `for (t in undefined)` runs zero times without complaining — so a
+// sync placed above this declaration would silently leave every label blank.
+syncStats();
 var BOLT_SPEED=30;
 // Two settlements sit this far either side of the middle, far enough apart that
 // their build rings never touch but close enough to see each other fight.
@@ -7228,6 +7656,7 @@ function init(renderer, cv, editCb){
   pickBatch=R.makeBatch(M.buildAsset("hall",{idColors:true}),false);
   buildList();
   wireInput();
+  wireText();
   E("libGuides").addEventListener("click",function(){
     showGuides=!showGuides; this.setAttribute("aria-pressed",showGuides?"true":"false");
   });
@@ -8132,6 +8561,10 @@ function wireInput(){
 }
 function keydown(ev){
   if(!active) return false;
+  // W/E/R are tool shortcuts, and every one of them is also a letter somebody
+  // is trying to type into a text field. The field wins.
+  var tg=ev.target&&ev.target.tagName;
+  if(txMode==="text"||tg==="TEXTAREA"||tg==="INPUT") return false;
   var meta=ev.ctrlKey||ev.metaKey;
   if(meta&&(ev.key==="z"||ev.key==="Z")){
     ev.preventDefault();
@@ -8152,9 +8585,165 @@ function keydown(ev){
   return false;
 }
 
+// ===========================================================================
+// The text tab
+// ===========================================================================
+// The model editor and this one share the screen and nothing else: this one has
+// no asset, no history and no 3D, because a string is not a thing you can undo
+// a drag on. What it does share is `onEdit` — the same persist-and-refresh hook
+// the balance sliders use — so a word typed here reaches the running game by
+// exactly the route a number does.
+var txMode="models", txFind="", txGroup="all";
+function setLibMode(m){
+  txMode=(m==="text")?"text":"models";
+  document.body.dataset.libmode=txMode;
+  E("libModeModels").setAttribute("aria-pressed",txMode==="models"?"true":"false");
+  E("libModeText").setAttribute("aria-pressed",txMode==="text"?"true":"false");
+  E("libEyebrow").textContent = txMode==="text"
+    ? "edit any word in the game" : "edit any model in the game";
+  // Undo/redo belong to the model editor's history, which text edits are not in.
+  E("libUndo").hidden=E("libRedo").hidden=(txMode==="text");
+  if(txMode==="text") renderText();
+}
+// A def's placeholders are the one thing an edit can break that the eye will
+// not catch: a line that loses its {n} still reads fine and just has no number
+// in it. So they are listed beside the key and checked on every keystroke.
+function missingVars(key,val){
+  var want=M.textVars(key), out=[];
+  for(var i=0;i<want.length;i++)
+    if(val.indexOf("{"+want[i]+"}")<0) out.push(want[i]);
+  return out;
+}
+function txMatch(key){
+  if(txGroup!=="all" && M.textDef(key).g!==txGroup) return false;
+  if(!txFind) return true;
+  var q=txFind.toLowerCase();
+  return key.toLowerCase().indexOf(q)>=0 ||
+         String(M.textRaw(key)).toLowerCase().indexOf(q)>=0;
+}
+function renderText(){
+  var groups=M.textGroups(), keys=M.textKeys();
+  var gb=E("libTextGroups");
+  if(!gb.childElementCount){
+    var gh='<button type="button" data-g="all" aria-pressed="true">All</button>';
+    groups.forEach(function(g){
+      gh+='<button type="button" data-g="'+g.id+'" aria-pressed="false">'+g.name+'</button>';
+    });
+    gb.innerHTML=gh;
+    gb.querySelectorAll("[data-g]").forEach(function(b){
+      b.addEventListener("click",function(){
+        txGroup=b.dataset.g;
+        gb.querySelectorAll("[data-g]").forEach(function(o){
+          o.setAttribute("aria-pressed",o.dataset.g===txGroup?"true":"false");
+        });
+        renderText();
+      });
+    });
+  }
+  var shown=keys.filter(txMatch), html="", lastG=null, edits=0;
+  keys.forEach(function(k){ if(M.textEdited(k)) edits++; });
+  groups.forEach(function(g){
+    var mine=shown.filter(function(k){ return M.textDef(k).g===g.id; });
+    if(!mine.length) return;
+    html+='<div class="tGroup">'+g.name+'</div>';
+    mine.forEach(function(k){
+      var v=M.textRaw(k), on=M.textEdited(k), vars=M.textVars(k);
+      html+='<div class="tRow'+(on?' tIsEdit':'')+'" data-row="'+k+'">'+
+            '<div class="tKey'+(on?' tEdit':'')+'">'+k+
+              (vars.length?'<span class="tVars">{'+vars.join("} {")+'}</span>':'')+'</div>'+
+            '<textarea data-key="'+k+'" rows="1" spellcheck="false"></textarea>'+
+            '<button class="tUndo" type="button" data-undo="'+k+'">reset</button></div>';
+    });
+  });
+  E("libTextList").innerHTML=html ||
+    '<p class="libEmpty" style="padding:14px 0">Nothing matches that.</p>';
+  // set values as properties, never as markup: a string with a quote or an
+  // angle bracket in it must not be able to close the field it lives in
+  E("libTextList").querySelectorAll("[data-key]").forEach(function(ta){
+    ta.value=M.textRaw(ta.dataset.key);
+    fitRow(ta);
+    ta.addEventListener("input",function(){ applyTextEdit(ta); });
+  });
+  E("libTextList").querySelectorAll("[data-undo]").forEach(function(b){
+    b.addEventListener("click",function(){
+      M.resetText(b.dataset.undo);
+      commitText();
+      renderText();
+    });
+  });
+  E("libTextCount").textContent=shown.length+" of "+keys.length+
+    (edits?" · "+edits+" edited":"");
+  E("libTextRevert").disabled=!edits;
+  checkTextWarn();
+}
+function fitRow(ta){
+  ta.style.height="auto";
+  ta.style.height=Math.min(150,Math.max(31,ta.scrollHeight+2))+"px";
+}
+function applyTextEdit(ta){
+  var k=ta.dataset.key;
+  M.setText(k,ta.value);
+  commitText();
+  fitRow(ta);
+  var row=ta.closest(".tRow"), on=M.textEdited(k);
+  row.classList.toggle("tIsEdit",on);
+  row.querySelector(".tKey").classList.toggle("tEdit",on);
+  ta.classList.toggle("tBad",missingVars(k,ta.value).length>0);
+  var edits=0;
+  M.textKeys().forEach(function(key){ if(M.textEdited(key)) edits++; });
+  E("libTextRevert").disabled=!edits;
+  checkTextWarn();
+}
+function checkTextWarn(){
+  var bad=[];
+  M.textKeys().forEach(function(k){
+    var miss=missingVars(k,String(M.textRaw(k)));
+    if(miss.length) bad.push(k+" is missing {"+miss.join("} {")+"}");
+  });
+  var w=E("libTextWarn");
+  w.hidden=!bad.length;
+  w.textContent=bad.length
+    ? (bad.length===1?bad[0]:bad.length+" lines have lost a placeholder: "+bad[0]+", …")
+    : "";
+}
+// The same shape the asset export uses: a block you paste back into d_core.js,
+// so an edit made in a browser can become the shipped default.
+function copyTextEdits(){
+  var over=M.getTextOverrides(), keys=Object.keys(over).sort(), out;
+  if(!keys.length) out="// no text edits";
+  else{
+    out="// paste into TEXT_DEFS in d_core.js, replacing each key's def\n";
+    keys.forEach(function(k){
+      out+='"'+k+'":{g:"'+M.textDef(k).g+'",def:'+JSON.stringify(over[k])+'},\n';
+    });
+  }
+  E("libTextOut").value=out;
+  E("libTextOutWrap").hidden=false;
+  E("libTextOut").focus(); E("libTextOut").select();
+  try{ document.execCommand("copy"); }catch(e){}
+}
+function commitText(){ if(onEdit) onEdit(); }
+function wireText(){
+  E("libModeModels").addEventListener("click",function(){ setLibMode("models"); });
+  E("libModeText").addEventListener("click",function(){ setLibMode("text"); });
+  E("libTextFind").addEventListener("input",function(){
+    txFind=this.value.trim(); renderText();
+  });
+  E("libTextCopy").addEventListener("click",copyTextEdits);
+  E("libTextRevert").addEventListener("click",function(){
+    M.resetAllText();
+    E("libTextOutWrap").hidden=true;
+    commitText();
+    renderText();
+  });
+  setLibMode("models");
+}
+
 return { init:init, enter:enter, exit:exit, update:update, draw:draw,
          select:select, refreshCounts:refreshCounts, keydown:keydown,
          refreshStats:renderStats, rebuildList:buildList,
+         mode:function(){ return txMode; }, setMode:setLibMode,
+         renderText:renderText,
          hitAt:function(x,y){ return partUnder(x,y); },
          handleAt:function(x,y){ return handleUnder(x,y); },
          // where each axis handle lands on screen, for verification
@@ -9035,7 +9624,7 @@ function el(id){ return document.getElementById(id); }
 // ---- persistence ----------------------------------------------------------
 var KEY_SET="holdfast.settings.v1", KEY_SAVE="holdfast.save.v1", KEY_ASSETS="holdfast.assets.v1";
 var KEY_STATS="holdfast.stats.v1", KEY_USER="holdfast.user.v1", KEY_META="holdfast.meta.v1";
-var KEY_MAPS="holdfast.maps.v1";
+var KEY_MAPS="holdfast.maps.v1", KEY_TEXT="holdfast.text.v1";
 var playMap=null;                       // the custom map the next round will use
 var SET={ difficulty:"normal", outline:true, scale:1.0, sens:1.0, vol:0.7, help:true };
 var SAVE={ runs:0, wins:0, bestHall:0, bestTime:null, lastResult:null };
@@ -9071,6 +9660,8 @@ function loadAll(){
   if(mt&&typeof mt==="object") M.setMetaAll(mt);
   var mp=loadJSON(KEY_MAPS,null);
   if(mp&&mp.length) M.setMaps(mp);
+  var tx=loadJSON(KEY_TEXT,null);
+  if(tx&&typeof tx==="object") M.setTextOverrides(tx);
   var g=loadJSON(KEY_SAVE,null);
   if(g){
     SAVE.runs=g.runs|0; SAVE.wins=g.wins|0;
@@ -9144,13 +9735,15 @@ function refreshMenu(){
   el("mBest").textContent=SAVE.runs? (SAVE.bestHall+"%") : "—";
   var lr=SAVE.lastResult;
   el("mLast").textContent = lr
-    ? (lr.won?"cleared ":"overrun ")+"· "+lr.difficulty+" · hall "+lr.hallPct+"% · "+lr.seconds+"s"
-    : "you have not been out yet";
+    ? M.t("menu.last.line",{result:M.t(lr.won?"menu.last.won":"menu.last.lost"),
+          difficulty:lr.difficulty, hall:lr.hallPct, seconds:lr.seconds})
+    : M.t("menu.last.none");
   el("mDiffTag").textContent=HFGAME.DIFF[SET.difficulty].label;
   var na=el("mAssets");
-  if(na&&M.allAssets) na.textContent=M.allAssets().length+" assets";
+  if(na&&M.allAssets) na.textContent=M.t("menu.library.sub",{n:M.allAssets().length});
   var nm=el("mMapCount");
-  if(nm) nm.textContent=(M.getMaps().length||"no")+" maps";
+  if(nm) nm.textContent=M.getMaps().length
+    ? M.t("menu.maps.sub",{n:M.getMaps().length}) : M.t("menu.maps.none");
 }
 
 // ---- game hooks -----------------------------------------------------------
@@ -9167,25 +9760,20 @@ function onRoundEnd(res){
   // A round is won by pulling every nest down, not by seeing one dawn. That
   // changes what the end screen is congratulating you for.
   el("ovTitle").textContent = res.won
-    ? (mine?"They finished it without you":"The last nest is cold")
-    : (multi?"Both towns fell":"There is no town left");
+    ? M.t(mine?"end.win.ally.title":"end.win.title")
+    : M.t(multi?"end.lose.multi.title":"end.lose.title");
   var nights=res.nights|0;
-  var nightsSaid=nights+(nights===1?" night":" nights");
+  var nightsSaid=M.t(nights===1?"end.nights.one":"end.nights",{n:nights});
   el("ovBody").textContent = res.won
-    ? (mine
-        ? "Your hall went down before the end. The other town carried it the rest of the way and put out the last nest."
-        : (multi
-            ? (both?"Every nest is cold after "+nightsSaid+", and both towns are still standing to see it."
-                   :"Every nest is cold after "+nightsSaid+". The other town did not live to see it. Yours did.")
-            :"Every nest is cold after "+nightsSaid+". Nothing out there is left to send anything, and the dark is only dark again."))
-    : (multi
-        ? "Neither hall lasted the night. Walls only buy minutes; watchtowers do the killing; a ballista is what stops a brute. And every night a nest is left standing out there, the next one comes harder."
-        : "The hall is gone, and with it the reason to hold this ground. Walls only buy minutes; watchtowers do the killing; a ballista is what stops a brute; soldiers plug the gap the fast ones find. And holding is not winning — every night you leave a nest alone out there, the next one comes harder.");
+    ? (mine ? M.t("end.win.ally")
+            : (multi ? M.t(both?"end.win.both":"end.win.alone",{nights:nightsSaid})
+                     : M.t("end.win.solo",{nights:nightsSaid})))
+    : M.t(multi?"end.lose.multi":"end.lose.solo");
   el("ovAgain").hidden=multi;
   el("ovStats").innerHTML=
-    '<div><b>'+res.kills+'</b><span>put down</span></div>'+
-    '<div><b>'+nights+'</b><span>'+(nights===1?"night held":"nights held")+'</span></div>'+
-    '<div><b>'+res.nests+'</b><span>still out there</span></div>';
+    '<div><b>'+res.kills+'</b><span>'+M.t("end.stat.kills")+'</span></div>'+
+    '<div><b>'+nights+'</b><span>'+M.t(nights===1?"end.stat.nights.one":"end.stat.nights")+'</span></div>'+
+    '<div><b>'+res.nests+'</b><span>'+M.t("end.stat.nests")+'</span></div>';
   el("overlay").hidden=false;
   setPause(false);
 }
@@ -9225,7 +9813,7 @@ HFGAME.UI.units=function(){
   var wg=HFGAME.groupCount("workers"), ag=HFGAME.groupCount("army");
   el("grpWorkN").textContent=wg.total;
   el("grpArmyN").textContent=ag.total;
-  el("grpWorkIn").textContent=wg.inside?wg.inside+" in":"";
+  el("grpWorkIn").textContent=wg.inside?M.t("hud.workers.in",{n:wg.inside}):"";
   el("grpWorkers").disabled=!wg.out;
   el("grpArmy").disabled=!ag.out;
   var selW=0, selA=0;
@@ -9254,8 +9842,8 @@ HFGAME.UI.building=function(){
   var T=HFGAME.TYPES[b.type], site=!!b.site;
   var f=site ? Math.max(0,Math.min(1,b.prog/Math.max(0.001,b.need)))
              : Math.max(0,b.hp/b.max);
-  el("bldName").textContent=T.name+(site?" · going up":"");
-  el("bldHp").textContent=site ? Math.max(0,Math.ceil(b.need-b.prog))+"s"
+  el("bldName").textContent=T.name+(site?M.t("sel.site.suffix"):"");
+  el("bldHp").textContent=site ? M.t("sel.site.left",{n:Math.max(0,Math.ceil(b.need-b.prog))})
                               : Math.ceil(f*100)+"%";
   el("bldBar").style.width=(f*100).toFixed(1)+"%";
   el("bldBar").classList.toggle("crit",!site&&f<0.35);
@@ -9265,15 +9853,13 @@ HFGAME.UI.building=function(){
   var house=el("bldHouse");
   house.hidden=!housed.length;
   if(housed.length){
-    el("bldHoused").textContent=housed.length+(housed.length===1?" worker":" workers")+
-      (b.type==="hall"?" in the settlement":" living here");
-    el("bldIn").textContent=inside?(inside+" indoors"):"";
+    el("bldHoused").textContent=M.t(b.type==="hall"?"sel.housed.hall":"sel.housed.other",
+      {n:housed.length, noun:M.t(housed.length===1?"sel.worker.one":"sel.worker.many")});
+    el("bldIn").textContent=inside?M.t("sel.indoors",{n:inside}):"";
   }
   // The rail says what this building is; the dock is where you act on it. One
   // place for state, one place for verbs — and selling only ever happens there.
-  el("bldHint").textContent=housed.length
-    ? "right-click the ground to put them to work there"
-    : "";
+  el("bldHint").textContent=housed.length?M.t("sel.hint.send"):"";
   dockActs(b,T,housed);
 };
 // ---- what a selected unit is worth ----------------------------------------
@@ -9289,34 +9875,30 @@ function statLine(lab,val){
 // The one-line reason you would build this unit rather than the other one.
 function abilityOf(t,s){
   if(t==="commander")
-    return "Raises the town hall. Anyone fighting within <em>"+num(s.rally,10)+
-           "u</em> of him swings about <em>"+Math.round((1-s.rallyK)*100)+
-           "% faster</em>.";
-  if(t==="archer")
-    return "Kills from <em>"+num(s.range,10)+"u</em> and will not close the "+
-           "distance. Keep something between it and them.";
-  if(t==="soldier")
-    return "Stands in the way with his body — attackers stop to fight him "+
-           "instead of walking past.";
-  if(t==="worker")
-    return "Hauls salvage by day, mends walls by night at <em>"+s.repair+
-           " hp/s</em>. Runs from anything that fights back.";
+    return M.t("unit.commander.ability",
+               {rally:num(s.rally,10), pct:Math.round((1-s.rallyK)*100)});
+  if(t==="archer") return M.t("unit.archer.ability",{range:num(s.range,10)});
+  if(t==="soldier") return M.t("unit.soldier.ability");
+  if(t==="worker")  return M.t("unit.worker.ability",{repair:s.repair});
   return "";
 }
 function statBlock(t,s,one){
   var U=HFGAME.UNITS[t], h="";
-  h+=statLine("Health", one ? Math.ceil(one.hp)+" / "+s.hp : s.hp);
+  h+=statLine(M.t("sel.stat.health"), one ? Math.ceil(one.hp)+" / "+s.hp : s.hp);
   if(U.civil){
-    h+=statLine("Gather", num(s.gather,10)+"/s · carries "+s.carry);
-    h+=statLine("Repair", s.repair+" hp/s");
+    h+=statLine(M.t("sel.stat.gather"),
+                M.t("sel.stat.gather.v",{rate:num(s.gather,10), carry:s.carry}));
+    h+=statLine(M.t("sel.stat.repair"), M.t("sel.stat.repair.v",{n:s.repair}));
   }else if(U.melee){
-    h+=statLine("Damage", s.dmg+" / "+num(s.swing,100)+"s  ("+dps(s.dmg,s.swing)+" dps)");
-    h+=statLine("Reach",  num(s.reach,100)+"u");
+    h+=statLine(M.t("sel.stat.damage"),
+                M.t("sel.stat.rate.v",{dmg:s.dmg, every:num(s.swing,100), dps:dps(s.dmg,s.swing)}));
+    h+=statLine(M.t("sel.stat.reach"), M.t("sel.stat.units.v",{n:num(s.reach,100)}));
   }else{
-    h+=statLine("Damage", s.dmg+" / "+num(s.fire,100)+"s  ("+dps(s.dmg,s.fire)+" dps)");
-    h+=statLine("Range",  num(s.range,10)+"u");
+    h+=statLine(M.t("sel.stat.damage"),
+                M.t("sel.stat.rate.v",{dmg:s.dmg, every:num(s.fire,100), dps:dps(s.dmg,s.fire)}));
+    h+=statLine(M.t("sel.stat.range"), M.t("sel.stat.units.v",{n:num(s.range,10)}));
   }
-  h+=statLine("Speed", num(s.speed,100)+" u/s");
+  h+=statLine(M.t("sel.stat.speed"), M.t("sel.stat.speed.v",{n:num(s.speed,100)}));
   var ab=abilityOf(t,s);
   if(ab) h+='<div class="uAbil">'+ab+'</div>';
   return h;
@@ -9347,7 +9929,7 @@ function dockMode(){
   // is in the selection. Workers get the panel without it.
   el("troopMove").hidden=!selA;
   var st=el("troopStance");
-  st.textContent=(S.stance==="hold")?"hold ground":"give chase";
+  st.textContent=M.t((S.stance==="hold")?"sel.stance.hold":"sel.stance.chase");
   st.setAttribute("aria-pressed",S.stance==="hold"?"true":"false");
 
   // One kind selected: the full card, and a live health reading if it is a
@@ -9362,8 +9944,10 @@ function dockMode(){
     for(var k=0;k<ks.length;k++){
       var kt=ks[k], sk=HF.statsOf(kt);
       if(!sk) continue;
-      h+='<div class="uKind"><span>'+HFGAME.UNITS[kt].name+' ×'+kinds[kt]+'</span>'+
-         '<b>'+sk.hp+' hp'+(HFGAME.UNITS[kt].civil?'':' · '+sk.dmg+' dmg')+'</b></div>';
+      h+='<div class="uKind"><span>'+
+         M.t("sel.kind.line",{name:HFGAME.UNITS[kt].name, n:kinds[kt]})+'</span><b>'+
+         M.t(HFGAME.UNITS[kt].civil?"sel.kind.civil":"sel.kind.armed",{hp:sk.hp, dmg:sk.dmg})+
+         '</b></div>';
     }
     box.innerHTML=h;
   }
@@ -9381,14 +9965,14 @@ function dockActs(b,T,housed){
   ds.hidden=!housed.length;
   if(housed.length){
     var on=HFGAME.sheltering(b);
-    ds.textContent=on?"Turn them out":"Take them inside";
+    ds.textContent=M.t(on?"sel.shelter.out":"sel.shelter.in");
     ds.setAttribute("aria-pressed",on?"true":"false");
   }
   // Same button, same refund — but scrapping something that was never built is
   // calling off work, not tearing a building down, and the word has to say so.
   var dsell=el("dockSell");
   dsell.hidden=(b.type==="hall");
-  dsell.textContent=(b.site?"Call it off +":"Tear down +")+Math.round(T.cost*0.8);
+  dsell.textContent=M.t(b.site?"sel.cancel":"sel.selldown",{n:Math.round(T.cost*0.8)});
 }
 HFGAME.UI.marquee=function(){
   var S=HFGAME.state(); if(!S) return;
@@ -9509,7 +10093,8 @@ HFGAME.UI.hotbar=function(){
     n.classList.toggle("locked",!!locked);
     n.setAttribute("aria-pressed",S.sel===t?"true":"false");
     var c=n.querySelector(".c"), b=n.querySelector(".s");
-    if(c) c.textContent=T.cost?(T.cost+" supply"):"free · required";
+    if(c) c.textContent=T.cost?M.t("bld.supply",{n:T.cost})
+                              :(M.t("bld.free")+" · "+M.t("bld.required"));
     if(b) b.textContent=T.blurb?T.blurb(T):"";
   });
 };
@@ -9532,8 +10117,8 @@ function refreshDay(){
   // What is coming matters more than the clock once a round runs for days: the
   // nests you have not pulled down are the number that keeps climbing.
   var live=HFGAME.liveNests().length;
-  el("nightNo").textContent="Night "+S.night;
-  el("nestsLeft").textContent=live+(live===1?" nest":" nests");
+  el("nightNo").textContent=M.t("hud.night",{n:S.night});
+  el("nestsLeft").textContent=M.t(live===1?"hud.nests.one":"hud.nests",{n:live});
   el("nightSend").textContent=(HFGAME.waveSize?HFGAME.waveSize():S.wave);
   el("supply").textContent=S.players[S.me].supply;
 }
@@ -9546,8 +10131,8 @@ function refreshWave(){
   el("nightBar").classList.toggle("crit",nf<0.20);
   el("wLeft").textContent=S.enemies.length+S.spawnLeft;
   var lv2=HFGAME.liveNests().length;
-  el("nightNo2").textContent="Night "+S.night;
-  el("nestsLeft2").textContent=lv2+(lv2===1?" nest left":" nests left");
+  el("nightNo2").textContent=M.t("hud.night",{n:S.night});
+  el("nestsLeft2").textContent=M.t(lv2===1?"hud.nests.left.one":"hud.nests.left",{n:lv2});
   el("supply").textContent=S.players[S.me].supply;
   var H=S.players[S.me].hall;
   var f=H?Math.max(0,H.hp/HFGAME.TYPES.hall.hp):0;
@@ -9726,10 +10311,8 @@ function setPause(on){
     el("pauseKeys").hidden=true;
     el("pControls").setAttribute("aria-pressed","false");
     var live=!canFreeze();
-    el("pauseTag").textContent=live?"Menu":"Paused";
-    el("pauseNote").textContent=live
-      ? "Nothing out there is waiting for you — the other town is still under attack."
-      : "Everything is holding still while this is open.";
+    el("pauseTag").textContent=M.t(live?"pause.tag.live":"pause.tag");
+    el("pauseNote").textContent=M.t(live?"pause.note.live":"pause.note.frozen");
   }
 }
 function resumePlay(){
@@ -9750,10 +10333,11 @@ function refreshRivals(){
   for(var oi=0;oi<order.length;oi++){
     var i=order[oi], p=S.players[i], mine=(i===S.me);
     var f=p.hall?Math.max(0,p.hall.hp/HFGAME.TYPES.hall.hp):(p.placed?0:1);
-    var note=p.out?"fallen":(p.hall?Math.ceil(f*100)+"%":"no hall yet");
+    var note=p.out?M.t("hud.rival.fallen")
+                  :(p.hall?Math.ceil(f*100)+"%":M.t("hud.rival.nohall"));
     html+='<div class="rv'+(p.out?" out":"")+(mine?" me":"")+'">'+
           '<i style="background:'+rgb(p.col)+'"></i>'+
-          '<span>'+(mine?"You":"Them")+'</span>'+
+          '<span>'+M.t(mine?"hud.rival.you":"hud.rival.them")+'</span>'+
           '<b>'+note+'</b>'+
           '<div class="rvBar"><span style="width:'+(p.out?0:f*100).toFixed(1)+'%"></span></div>'+
           '</div>';
@@ -9824,10 +10408,9 @@ function netHud(){
     // it here rather than having to remember what they last picked.
     var d=HFGAME.DIFF[SET.difficulty];
     el("netMapNote").textContent = (playMap
-      ? "You will both wake up on your map \u201c"+playMap.name+"\u201d"
-      : "You will both wake up on ground neither of you has walked")
-      + ", on "+d.label.toLowerCase()+" \u2014 "+d.nests+" nests out there. "
-      + "Change it on the Play screen.";
+      ? M.t("net.note.custom",{map:playMap.name})
+      : M.t("net.note.random"))
+      + M.t("net.note.tail",{difficulty:d.label.toLowerCase(), nests:d.nests});
   }
 
   HFNET.init({
@@ -10067,15 +10650,6 @@ function wireSettings(){
 // ---- the pre-game setup screen -------------------------------------------
 // Everything here is read from the balance table, so a difficulty edited in the
 // Library describes itself correctly without a second copy of its numbers.
-var DIFF_BLURB={
-  easy:  "Three nests, and none of them close. Room to learn what a wall is for "+
-         "before anything comes to test it.",
-  normal:"Five nests. Holding the line is affordable. Putting them out is the "+
-         "whole of the work.",
-  hard:  "Eight nests ringed around you, and less in the stores to meet them. "+
-         "Every night you leave one standing, the next comes harder \u2014 and there "+
-         "are eight to put out."
-};
 function drawSetup(){
   var box=el("diffPick");
   if(!box) return;
@@ -10087,20 +10661,20 @@ function drawSetup(){
     b.type="button"; b.className="diffCard"; b.dataset.diff=k;
     b.setAttribute("aria-pressed",k===SET.difficulty?"true":"false");
     b.innerHTML='<span class="dn">'+C.label+'</span><span class="dm">'+
-      C.nests+' nests<br>'+first+' the first night<br>'+
-      C.supply+' supply to start</span>';
+      M.t("setup.card.nests",{n:C.nests})+'<br>'+
+      M.t("setup.card.first",{n:first})+'<br>'+
+      M.t("setup.card.supply",{n:C.supply})+'</span>';
     b.addEventListener("click",function(){
       SET.difficulty=k; applySettings(); refreshMenu(); drawSetup();
     });
     box.appendChild(b);
   });
   var C2=HFGAME.DIFF[SET.difficulty];
-  el("diffBlurb").textContent=DIFF_BLURB[SET.difficulty]||C2.label;
-  el("newMapName").textContent=playMap?playMap.name:"Unfamiliar ground";
-  el("newMapNote").textContent=playMap
-    ? "One of yours, drawn on the Maps screen."
-    : "Land nobody has walked before.";
-  el("newMapPick").textContent=playMap?"Change\u2026":"Choose\u2026";
+  el("diffBlurb").textContent=(M.textRaw("setup.blurb."+SET.difficulty)===null)
+    ? C2.label : M.t("setup.blurb."+SET.difficulty);
+  el("newMapName").textContent=playMap?playMap.name:M.t("setup.map.random");
+  el("newMapNote").textContent=M.t(playMap?"setup.map.custom.note":"setup.map.random.note");
+  el("newMapPick").textContent=M.t(playMap?"setup.map.change":"setup.map.choose");
 }
 el("newGo").addEventListener("click",function(){ startRun(playMap); });
 el("newBack").addEventListener("click",function(){ show("menu"); });
@@ -10141,8 +10715,39 @@ window.addEventListener("keydown",function(ev){
   }
 });
 
+// ---- text -----------------------------------------------------------------
+// Static markup carries a key, not a string: `data-t` fills textContent and
+// `data-t-ph` a placeholder. Nothing in the HTML holds a copy of the words, so
+// a line edited in the Library's Text tab has exactly one place to change.
+// Anything the game composes at runtime calls M.t() at the point of use
+// instead, which is why applyText only has to walk the document once per edit.
+function applyText(root){
+  (root||document).querySelectorAll("[data-t]").forEach(function(n){
+    n.textContent=M.t(n.dataset.t);
+  });
+  (root||document).querySelectorAll("[data-t-ph]").forEach(function(n){
+    n.placeholder=M.t(n.dataset.tPh);
+  });
+}
+// A text edit can land while any screen is up, so everything that prints a
+// composed string is refreshed too rather than waiting for the next event that
+// happens to redraw it.
+function retext(){
+  applyText();
+  refreshMenu();
+  if(el("screen-setup")&&!el("screen-setup").hidden) drawSetup();
+  buildHotbar();
+  if(HFGAME.UI.hotbar) HFGAME.UI.hotbar();
+  if(HFGAME.state()){
+    if(HFGAME.UI.phase) HFGAME.UI.phase();
+    if(HFGAME.UI.units) HFGAME.UI.units();
+    if(HFGAME.UI.building) HFGAME.UI.building();
+  }
+}
+
 // ---- boot -----------------------------------------------------------------
 loadAll();
+applyText();
 applySettings();
 HFGAME.init(R,canvas,SET,onRoundEnd);
 buildHotbar();
@@ -10159,8 +10764,9 @@ HFLIB.init(R,canvas,function(){
   saveJSON(KEY_STATS,M.getStatOverrides());
   saveJSON(KEY_USER,M.getUserAssets());
   saveJSON(KEY_META,M.getMeta());
+  saveJSON(KEY_TEXT,M.getTextOverrides());
   HFGAME.rebuildAssets();
-  HFGAME.UI.hotbar&&HFGAME.UI.hotbar();
+  retext();
 });
 wireSettings();
 show("menu");

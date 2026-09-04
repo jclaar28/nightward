@@ -10,3 +10,6 @@ __pycache__/
 # node_modules (handy when playwright lives outside the repo) stayed untracked
 node_modules
 package-lock.json
+
+# transfer zips used to move work between machines
+*.zip

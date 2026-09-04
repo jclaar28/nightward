@@ -16,40 +16,37 @@ var B=null, BATCHES=null, buf={};
 // hall keeps cost 0 — it is placed, not bought.
 // `cat` places a building in the hotbar; `blurb(b)` is its one-line summary,
 // read from live stats so the hotbar never disagrees with the Library.
-var CATS=[
-  {id:"core",  name:"Base",     note:"What you are protecting, and what pays for the rest."},
-  {id:"guns",  name:"Defences", note:"They do the killing. Put them where you want the fighting to happen."},
-  {id:"walls", name:"Walls",    note:"They stop nothing. They decide where it happens."},
-  {id:"muster",name:"Troops",   note:"People, not buildings. Right-click to send them somewhere."}
-];
+// name and note come from the text table, refreshed by syncStats() so a line
+// edited in the Library reaches the hotbar without a reload.
+var CATS=[{id:"core"},{id:"guns"},{id:"walls"},{id:"muster"}];
 var TYPES={
-  hall : {name:"Town Hall", cat:"core", foot:3, scale:1.00, cost:0,
+  hall : {cat:"core", foot:3, scale:1.00, cost:0,
           colA:M.PAL.plaster, colB:M.PAL.slate, spawns:"worker",
-          blurb:function(t){ return t.cap+" live here · raise "+t.raise+"s"; }},
-  cottage:{name:"Cottage", cat:"core", foot:1, scale:0.66, spawns:"worker",
+          blurb:function(t){ return M.t("bld.hall.blurb",{cap:t.cap, raise:t.raise}); }},
+  cottage:{cat:"core", foot:1, scale:0.66, spawns:"worker",
           colA:M.PAL.plaster, colB:M.PAL.thatch,
-          blurb:function(t){ return t.cap+" more hands · "+t.retrain+"s each"; }},
-  tower: {name:"Watchtower", cat:"guns", foot:1, scale:0.70,
+          blurb:function(t){ return M.t("bld.cottage.blurb",{cap:t.cap, retrain:t.retrain}); }},
+  tower: {cat:"guns", foot:1, scale:0.70,
           colA:M.PAL.timberL, colB:M.PAL.iron,
-          blurb:function(t){ return t.dmg+" every "+t.fire+"s · close"; }},
-  ballista:{name:"Ballista", cat:"guns", foot:1, scale:0.78, boltScale:2.1,
+          blurb:function(t){ return M.t("bld.tower.blurb",{dmg:t.dmg, fire:t.fire}); }},
+  ballista:{cat:"guns", foot:1, scale:0.78, boltScale:2.1,
           colA:M.PAL.timberL, colB:M.PAL.iron,
-          blurb:function(t){ return t.dmg+" and splash · slow"; }},
-  brazier:{name:"Brazier", cat:"guns", foot:1, scale:0.90,
+          blurb:function(t){ return M.t("bld.ballista.blurb",{dmg:t.dmg}); }},
+  brazier:{cat:"guns", foot:1, scale:0.90,
           colA:M.PAL.stone, colB:M.PAL.iron,
-          blurb:function(t){ return "reloads the guns near it"; }},
-  wall : {name:"Palisade", cat:"walls", foot:1, scale:1.00,
+          blurb:function(t){ return M.t("bld.brazier.blurb",{}); }},
+  wall : {cat:"walls", foot:1, scale:1.00,
           colA:M.PAL.timber, colB:M.PAL.iron,
-          blurb:function(t){ return t.hp+" health · drag a run"; }},
-  gate : {name:"Gate", cat:"walls", foot:1, scale:1.00,
+          blurb:function(t){ return M.t("bld.wall.blurb",{hp:t.hp}); }},
+  gate : {cat:"walls", foot:1, scale:1.00,
           colA:M.PAL.timberL, colB:M.PAL.iron,
-          blurb:function(t){ return t.hp+" health · they like it"; }},
-  barracks:{name:"Barracks", cat:"muster", foot:1, scale:0.72, spawns:"soldier",
+          blurb:function(t){ return M.t("bld.gate.blurb",{hp:t.hp}); }},
+  barracks:{cat:"muster", foot:1, scale:0.72, spawns:"soldier",
           colA:M.PAL.timber, colB:M.PAL.slate,
-          blurb:function(t){ return t.cap+" soldiers · "+t.retrain+"s each"; }},
-  archery:{name:"Archery Range", cat:"muster", foot:1, scale:0.72, spawns:"archer",
+          blurb:function(t){ return M.t("bld.barracks.blurb",{cap:t.cap, retrain:t.retrain}); }},
+  archery:{cat:"muster", foot:1, scale:0.72, spawns:"archer",
           colA:M.PAL.timberL, colB:M.PAL.thatch,
-          blurb:function(t){ return t.cap+" archers · "+t.retrain+"s each"; }}
+          blurb:function(t){ return M.t("bld.archery.blurb",{cap:t.cap, retrain:t.retrain}); }}
 };
 
 // ---- defenders ------------------------------------------------------------
@@ -57,19 +54,19 @@ var TYPES={
 // to anything that reaches them. Both are mustered by a building and belong to
 // it, so losing the building costs you the replacements, not the survivors.
 var UNITS={
-  soldier:{name:"Soldier", asset:"soldier", melee:true,
+  soldier:{asset:"soldier", melee:true,
            scBase:1.26, scVar:0.08, colA:[0.475,0.395,0.262], colB:[0.610,0.650,0.685],
            gib:[0.72,0.70,0.58]},
-  archer :{name:"Archer",  asset:"archer",  melee:false,
+  archer :{asset:"archer",  melee:false,
            scBase:1.20, scVar:0.08, colA:[0.352,0.430,0.372], colB:[0.545,0.470,0.300],
            gib:[0.62,0.70,0.60]},
-  worker :{name:"Worker",  asset:"worker",  civil:true,
+  worker :{asset:"worker",  civil:true,
            scBase:1.18, scVar:0.08, colA:[0.430,0.398,0.300], colB:[0.545,0.520,0.470],
            gib:[0.70,0.66,0.56]},
   // One per player, on the field before anything is built. It is the only unit
   // that can raise a hall, which is why the round starts with a walk rather
   // than a click: where you put the hall costs you the time to get there.
-  commander:{name:"Commander", asset:"commander", melee:true, hero:true,
+  commander:{asset:"commander", melee:true, hero:true,
            scBase:1.42, scVar:0.00, colA:[0.300,0.330,0.395], colB:[0.545,0.560,0.590],
            gib:[0.62,0.66,0.72]}
 };
@@ -161,8 +158,22 @@ function buildRigs(makeBatch){
 // round, and whenever the Library edits a number — so a change in the editor
 // reaches a round already in progress.
 var NEST={};
+// Names and one-line summaries live in the text table, and the table is live:
+// re-reading them here means an edit in the Library's Text tab reaches the
+// hotbar and the selection panels on the next sync rather than the next reload.
+function syncText(){
+  var i,t;
+  for(i=0;i<CATS.length;i++){
+    CATS[i].name=M.t("bld.cat."+CATS[i].id);
+    CATS[i].note=M.t("bld.cat."+CATS[i].id+".note");
+  }
+  for(t in DIFF) DIFF[t].label=M.t("setup.diff."+t);
+  for(t in TYPES) TYPES[t].name=M.t("bld."+t+".name");
+  for(t in UNITS) UNITS[t].name=M.t("unit."+t+".name");
+}
 function syncStats(){
   var t,k,st;
+  syncText();
   // The nests are not in TYPES/UNITS/ENEMY, so their block is read straight out
   // of the balance table here and re-read whenever the library edits it.
   NEST=M.statsOf("nest")||{};
@@ -179,20 +190,23 @@ function syncStats(){
     if(st) for(k in st) UNITS[t][k]=st[k];
   }
 }
-syncStats();
 // Difficulty sets the shape of the game, not just its numbers: how many nests
 // ring you, and how many each one sends on the first night. The wave is the sum
 // of what the living nests send, so pulling one down is a permanent cut to
 // every night after — which is the whole reason to leave the walls.
 // `send` is per nest per night one; `nests` is how many the map seeds.
 var DIFF={
-  easy  :{supply:60, nests:3, send:112, hp:36, label:"Easy",
+  easy  :{supply:60, nests:3, send:112, hp:36,
           mix:{shambler:0.76, runner:0.20, brute:0.04}},
-  normal:{supply:45, nests:5, send:104, hp:42, label:"Normal",
+  normal:{supply:45, nests:5, send:104, hp:42,
           mix:{shambler:0.66, runner:0.25, brute:0.09}},
-  hard  :{supply:30, nests:8, send:98,  hp:46, label:"Hard",
+  hard  :{supply:30, nests:8, send:98,  hp:46,
           mix:{shambler:0.58, runner:0.28, brute:0.14}}
 };
+// After DIFF, not before: syncText() names the difficulties out of the text
+// table, and `for (t in undefined)` runs zero times without complaining — so a
+// sync placed above this declaration would silently leave every label blank.
+syncStats();
 var BOLT_SPEED=30;
 // Two settlements sit this far either side of the middle, far enough apart that
 // their build rings never touch but close enough to see each other fight.

@@ -83,6 +83,18 @@ dull it with distance; and everything shares one reverb and one soft ceiling.
 A new sound that is one oscillator, at one pitch, dry and centred will sound
 exactly like the thing this pass was undoing. `tools/audio.mjs` measures them.
 
+**Every player-facing string lives in one table too.** `TEXT_DEFS` in
+`d_core.js` defines it; `M.t(key, vars)` resolves it through the live overrides.
+Static markup carries `data-t="key"` (or `data-t-ph` for a placeholder) and gets
+filled by `applyText()`; anything composed at runtime calls `M.t()` at the point
+of use. A def may carry `{placeholders}`, and dropping one is the failure mode
+that hurts — the sentence still reads, it just has no number in it — so the Text
+tab flags a missing one and `tools/text.mjs` sweeps the whole table. Building and
+unit names come from the same table, which is why `TYPES[t].name` is assigned in
+`syncText()` rather than written in the literal. **Never type a player-facing
+string into markup or a template.** `node tools/text.mjs` walks every screen and
+fails on one that no key owns.
+
 **Every balance number lives in one table.** `STAT_DEFS` in `d_core.js` defines
 it; `M.statsOf(id)` resolves it including live edits from the library; `syncStats()`
 copies it onto `TYPES` / `UNITS` / `ENEMY`. The HUD reads the same table. Never
@@ -139,7 +151,8 @@ judging how something looks; they are not evidence that it works. Nearly every
 bug found here was found by reading numbers out of the running game.
 
 **Run `node tools/smoke.mjs`, `node tools/instances.mjs` and
-`node tools/campaign.mjs` after any change**, plus `node tools/economy.mjs` for
+`node tools/campaign.mjs` after any change**, plus `node tools/text.mjs` for
+anything that puts words on screen, `node tools/economy.mjs` for
 anything touching salvage, workers or the map,
 and `node tools/balance.mjs --ab id.key=value` for anything touching difficulty.
 `tools/README.md` explains them; read it before writing a new one.
@@ -250,6 +263,10 @@ The comments in this codebase explain *why*, not *what*. They are written for a
 reader who can see the code and wants to know what problem it solves and what
 went wrong before. Match that. A comment that restates the line below it is
 noise; a comment naming the bug the line prevents is worth its space.
+
+All of it lives in `TEXT_DEFS` and is editable in the Library's **Text** tab
+while a round runs — so a rewrite is a thing you try rather than a thing you
+guess at, and this section says what to aim for rather than what to type.
 
 **Prose in the UI is written from inside the settlement, in plain words.** Not
 from a manual, and not from a fantasy novel either. Every word in it is one a

@@ -1503,6 +1503,329 @@ function setStatOverrides(o){
   }
 }
 
+// ---- text ------------------------------------------------------------------
+// Every word the player reads, in one table, for the same reason the balance
+// numbers are in one table: a second copy of a string somewhere in the UI is a
+// copy that will not follow when the first one is rewritten. `t(key,vars)`
+// resolves a key through the live overrides, so a line edited in the Library's
+// Text tab changes on screen in a running round.
+//
+// A def may carry {placeholders}. They are filled from the vars object, and the
+// Text tab lists them next to the field so an edit cannot silently drop one —
+// a line that loses its {n} is a readout with no number in it.
+var TEXT_GROUPS=[
+  {id:"menu",  name:"Menu"},
+  {id:"setup", name:"New round"},
+  {id:"hud",   name:"Readouts"},
+  {id:"sel",   name:"Selection"},
+  {id:"bld",   name:"Buildings"},
+  {id:"unit",  name:"People"},
+  {id:"pause", name:"Pause & controls"},
+  {id:"end",   name:"End of round"},
+  {id:"net",   name:"Two players"},
+  {id:"sys",   name:"System"}
+];
+var TEXT_DEFS={
+  // ---- system
+  "sys.fatal":{g:"sys",def:"Nightward needs WebGL2 to draw itself. Try a desktop browser with hardware acceleration switched on."},
+
+  // ---- menu
+  "menu.play":{g:"menu",def:"Play"},
+  "menu.library":{g:"menu",def:"Library"},
+  "menu.library.sub":{g:"menu",def:"{n} assets"},
+  "menu.maps":{g:"menu",def:"Maps"},
+  "menu.maps.sub":{g:"menu",def:"{n} maps"},
+  "menu.maps.none":{g:"menu",def:"no maps"},
+  "menu.settings":{g:"menu",def:"Settings"},
+  "menu.settings.sub":{g:"menu",def:"render · audio"},
+  "menu.net":{g:"menu",def:"Two players"},
+  "menu.net.sub":{g:"menu",def:"one map · two towns"},
+  "menu.stat.rounds":{g:"menu",def:"rounds"},
+  "menu.stat.cleared":{g:"menu",def:"cleared"},
+  "menu.stat.besthall":{g:"menu",def:"best hall"},
+  "menu.last.label":{g:"menu",def:"last · "},
+  "menu.last.none":{g:"menu",def:"you have not been out yet"},
+  "menu.last.won":{g:"menu",def:"cleared"},
+  "menu.last.lost":{g:"menu",def:"overrun"},
+  "menu.last.line":{g:"menu",def:"{result} · {difficulty} · hall {hall}% · {seconds}s"},
+
+  // ---- new round
+  "setup.eyebrow":{g:"setup",def:"New round"},
+  "setup.title":{g:"setup",def:"Before the first night"},
+  "setup.lead":{g:"setup",def:"How many nests are out there in the dark, and how many each one sends when the light goes. Decide it now — nothing about it changes once you are on the ground."},
+  "setup.card.nests":{g:"setup",def:"{n} nests"},
+  "setup.card.first":{g:"setup",def:"{n} the first night"},
+  "setup.card.supply":{g:"setup",def:"{n} supply to start"},
+  "setup.diff.easy":{g:"setup",def:"Easy"},
+  "setup.diff.normal":{g:"setup",def:"Normal"},
+  "setup.diff.hard":{g:"setup",def:"Hard"},
+  "setup.blurb.easy":{g:"setup",def:"Three nests, and none of them close. Room to learn what a wall is for before anything comes to test it."},
+  "setup.blurb.normal":{g:"setup",def:"Five nests. Holding the line is affordable. Putting them out is the whole of the work."},
+  "setup.blurb.hard":{g:"setup",def:"Eight nests ringed around you, and less in the stores to meet them. Every night you leave one standing, the next comes harder — and there are eight to put out."},
+  "setup.map.random":{g:"setup",def:"Unfamiliar ground"},
+  "setup.map.random.note":{g:"setup",def:"Land nobody has walked before."},
+  "setup.map.custom.note":{g:"setup",def:"One of yours, drawn on the Maps screen."},
+  "setup.map.choose":{g:"setup",def:"Choose…"},
+  "setup.map.change":{g:"setup",def:"Change…"},
+  "setup.go":{g:"setup",def:"Set out"},
+  "setup.back":{g:"setup",def:"← Menu"},
+
+  // ---- readouts
+  "hud.supply":{g:"hud",def:"Supply"},
+  "hud.workers":{g:"hud",def:"Workers"},
+  "hud.army":{g:"hud",def:"Army"},
+  "hud.workers.in":{g:"hud",def:"{n} in"},
+  "hud.daylight":{g:"hud",def:"Daylight"},
+  "hud.untildawn":{g:"hud",def:"Until dawn"},
+  "hud.night":{g:"hud",def:"Night {n}"},
+  "hud.nests":{g:"hud",def:"{n} nests"},
+  "hud.nests.one":{g:"hud",def:"{n} nest"},
+  "hud.nests.left":{g:"hud",def:"{n} nests left"},
+  "hud.nests.left.one":{g:"hud",def:"{n} nest left"},
+  "hud.massing":{g:"hud",def:"Massing"},
+  "hud.hall":{g:"hud",def:"Town hall"},
+  "hud.stillcoming":{g:"hud",def:"Still coming"},
+  "hud.rival.you":{g:"hud",def:"You"},
+  "hud.rival.them":{g:"hud",def:"Them"},
+  "hud.rival.fallen":{g:"hud",def:"fallen"},
+  "hud.rival.nohall":{g:"hud",def:"no hall yet"},
+
+  // ---- selection
+  "sel.orders":{g:"sel",def:"Orders"},
+  "sel.stance.hold":{g:"sel",def:"hold ground"},
+  "sel.stance.chase":{g:"sel",def:"give chase"},
+  "sel.shelter.in":{g:"sel",def:"Take them inside"},
+  "sel.shelter.out":{g:"sel",def:"Turn them out"},
+  "sel.selldown":{g:"sel",def:"Tear down +{n}"},
+  "sel.cancel":{g:"sel",def:"Call it off +{n}"},
+  "sel.deselect":{g:"sel",def:"ctrl+D to deselect"},
+  "sel.site.suffix":{g:"sel",def:" · going up"},
+  "sel.site.left":{g:"sel",def:"{n}s"},
+  "sel.worker.one":{g:"sel",def:"worker"},
+  "sel.worker.many":{g:"sel",def:"workers"},
+  "sel.housed.hall":{g:"sel",def:"{n} {noun} in the settlement"},
+  "sel.housed.other":{g:"sel",def:"{n} {noun} living here"},
+  "sel.indoors":{g:"sel",def:"{n} indoors"},
+  "sel.hint.send":{g:"sel",def:"right-click the ground to put them to work there"},
+  "sel.stat.health":{g:"sel",def:"Health"},
+  "sel.stat.gather":{g:"sel",def:"Gather"},
+  "sel.stat.repair":{g:"sel",def:"Repair"},
+  "sel.stat.damage":{g:"sel",def:"Damage"},
+  "sel.stat.reach":{g:"sel",def:"Reach"},
+  "sel.stat.range":{g:"sel",def:"Range"},
+  "sel.stat.speed":{g:"sel",def:"Speed"},
+  "sel.stat.gather.v":{g:"sel",def:"{rate}/s · carries {carry}"},
+  "sel.stat.repair.v":{g:"sel",def:"{n} hp/s"},
+  "sel.stat.rate.v":{g:"sel",def:"{dmg} / {every}s  ({dps} dps)"},
+  "sel.stat.units.v":{g:"sel",def:"{n}u"},
+  "sel.stat.speed.v":{g:"sel",def:"{n} u/s"},
+  "sel.kind.line":{g:"sel",def:"{name} ×{n}"},
+  "sel.kind.civil":{g:"sel",def:"{hp} hp"},
+  "sel.kind.armed":{g:"sel",def:"{hp} hp · {dmg} dmg"},
+
+  // ---- buildings
+  "bld.cat.core":{g:"bld",def:"Base"},
+  "bld.cat.core.note":{g:"bld",def:"What you are protecting, and what pays for the rest."},
+  "bld.cat.guns":{g:"bld",def:"Defences"},
+  "bld.cat.guns.note":{g:"bld",def:"They do the killing. Put them where you want the fighting to happen."},
+  "bld.cat.walls":{g:"bld",def:"Walls"},
+  "bld.cat.walls.note":{g:"bld",def:"They stop nothing. They decide where it happens."},
+  "bld.cat.muster":{g:"bld",def:"Troops"},
+  "bld.cat.muster.note":{g:"bld",def:"People, not buildings. Right-click to send them somewhere."},
+  "bld.hall.name":{g:"bld",def:"Town Hall"},
+  "bld.hall.blurb":{g:"bld",def:"{cap} live here · raise {raise}s"},
+  "bld.cottage.name":{g:"bld",def:"Cottage"},
+  "bld.cottage.blurb":{g:"bld",def:"{cap} more hands · {retrain}s each"},
+  "bld.tower.name":{g:"bld",def:"Watchtower"},
+  "bld.tower.blurb":{g:"bld",def:"{dmg} every {fire}s · close"},
+  "bld.ballista.name":{g:"bld",def:"Ballista"},
+  "bld.ballista.blurb":{g:"bld",def:"{dmg} and splash · slow"},
+  "bld.brazier.name":{g:"bld",def:"Brazier"},
+  "bld.brazier.blurb":{g:"bld",def:"reloads the guns near it"},
+  "bld.wall.name":{g:"bld",def:"Palisade"},
+  "bld.wall.blurb":{g:"bld",def:"{hp} health · drag a run"},
+  "bld.gate.name":{g:"bld",def:"Gate"},
+  "bld.gate.blurb":{g:"bld",def:"{hp} health · they like it"},
+  "bld.barracks.name":{g:"bld",def:"Barracks"},
+  "bld.barracks.blurb":{g:"bld",def:"{cap} soldiers · {retrain}s each"},
+  "bld.archery.name":{g:"bld",def:"Archery Range"},
+  "bld.archery.blurb":{g:"bld",def:"{cap} archers · {retrain}s each"},
+  "bld.free":{g:"bld",def:"free"},
+  "bld.required":{g:"bld",def:"required"},
+  "bld.supply":{g:"bld",def:"{n} supply"},
+
+  // ---- people
+  "unit.commander.name":{g:"unit",def:"Commander"},
+  "unit.commander.ability":{g:"unit",def:"Raises the town hall. Anyone fighting within <em>{rally}u</em> of him swings about <em>{pct}% faster</em>."},
+  "unit.soldier.name":{g:"unit",def:"Soldier"},
+  "unit.soldier.ability":{g:"unit",def:"Stands in the way with his body — attackers stop to fight him instead of walking past."},
+  "unit.archer.name":{g:"unit",def:"Archer"},
+  "unit.archer.ability":{g:"unit",def:"Kills from <em>{range}u</em> and will not close the distance. Keep something between it and them."},
+  "unit.worker.name":{g:"unit",def:"Worker"},
+  "unit.worker.ability":{g:"unit",def:"Hauls salvage by day, mends walls by night at <em>{repair} hp/s</em>. Runs from anything that fights back."},
+
+  // ---- pause & controls
+  "pause.tag":{g:"pause",def:"Paused"},
+  "pause.tag.live":{g:"pause",def:"Menu"},
+  "pause.title":{g:"pause",def:"Nightward"},
+  "pause.resume":{g:"pause",def:"Resume"},
+  "pause.resume.sub":{g:"pause",def:"esc"},
+  "pause.controls":{g:"pause",def:"Controls"},
+  "pause.controls.sub":{g:"pause",def:"keys · mouse"},
+  "pause.settings":{g:"pause",def:"Settings"},
+  "pause.settings.sub":{g:"pause",def:"render · audio"},
+  "pause.quit":{g:"pause",def:"Abandon the town"},
+  "pause.quit.sub":{g:"pause",def:"back to the menu"},
+  "pause.note.live":{g:"pause",def:"Nothing out there is waiting for you — the other town is still under attack."},
+  "pause.note.frozen":{g:"pause",def:"Everything is holding still while this is open."},
+  "pause.h.build":{g:"pause",def:"Building — day and night"},
+  "pause.h.people":{g:"pause",def:"Your people"},
+  "pause.h.view":{g:"pause",def:"The view"},
+  "pause.b1.k":{g:"pause",def:"town hall"},
+  "pause.b1.v":{g:"pause",def:"your commander walks over and raises it"},
+  "pause.b2.k":{g:"pause",def:"click"},
+  "pause.b2.v":{g:"pause",def:"place the building you picked"},
+  "pause.b3.k":{g:"pause",def:"drag"},
+  "pause.b3.v":{g:"pause",def:"run a line of palisade"},
+  "pause.b4.k":{g:"pause",def:"click a building"},
+  "pause.b4.v":{g:"pause",def:"select it, then tear it down from the bar below"},
+  "pause.b5.k":{g:"pause",def:"ctrl+D"},
+  "pause.b5.v":{g:"pause",def:"let go of everything"},
+  "pause.b6.k":{g:"pause",def:"R · shift+R"},
+  "pause.b6.v":{g:"pause",def:"turn it · turn it automatically"},
+  "pause.b7.k":{g:"pause",def:"tab · 1–3"},
+  "pause.b7.v":{g:"pause",def:"switch tab · pick a building"},
+  "pause.p1.k":{g:"pause",def:"click · drag"},
+  "pause.p1.v":{g:"pause",def:"select one · select a group"},
+  "pause.p2.k":{g:"pause",def:"right-click"},
+  "pause.p2.v":{g:"pause",def:"send them there, or onto a salvage pile"},
+  "pause.p3.k":{g:"pause",def:"right-click a wall"},
+  "pause.p3.v":{g:"pause",def:"workers mend it, even under attack"},
+  "pause.p4.k":{g:"pause",def:"select the hall"},
+  "pause.p4.v":{g:"pause",def:"call everyone inside, or turn them out"},
+  "pause.p5.k":{g:"pause",def:"ctrl+A"},
+  "pause.p5.v":{g:"pause",def:"select everyone"},
+  "pause.p6.k":{g:"pause",def:"H"},
+  "pause.p6.v":{g:"pause",def:"hold the ground, or go after them"},
+  "pause.v1.k":{g:"pause",def:"W A S D"},
+  "pause.v1.v":{g:"pause",def:"move the view · hold shift to go faster"},
+  "pause.v2.k":{g:"pause",def:"middle-drag"},
+  "pause.v2.v":{g:"pause",def:"turn the view (or shift-drag)"},
+  "pause.v3.k":{g:"pause",def:"Q · E"},
+  "pause.v3.v":{g:"pause",def:"turn it a step at a time"},
+  "pause.v4.k":{g:"pause",def:"wheel"},
+  "pause.v4.v":{g:"pause",def:"zoom in and out"},
+
+  // ---- end of round
+  "end.eyebrow":{g:"end",def:"How it ended"},
+  "end.win.title":{g:"end",def:"The last nest is cold"},
+  "end.win.ally.title":{g:"end",def:"They finished it without you"},
+  "end.lose.title":{g:"end",def:"There is no town left"},
+  "end.lose.multi.title":{g:"end",def:"Both towns fell"},
+  "end.win.solo":{g:"end",def:"Every nest is cold after {nights}. Nothing out there is left to send anything, and the dark is only dark again."},
+  "end.win.both":{g:"end",def:"Every nest is cold after {nights}, and both towns are still standing to see it."},
+  "end.win.alone":{g:"end",def:"Every nest is cold after {nights}. The other town did not live to see it. Yours did."},
+  "end.win.ally":{g:"end",def:"Your hall went down before the end. The other town carried it the rest of the way and put out the last nest."},
+  "end.lose.solo":{g:"end",def:"The hall is gone, and with it the reason to hold this ground. Walls only buy minutes; watchtowers do the killing; a ballista is what stops a brute; soldiers plug the gap the fast ones find. And holding is not winning — every night you leave a nest alone out there, the next one comes harder."},
+  "end.lose.multi":{g:"end",def:"Neither hall lasted the night. Walls only buy minutes; watchtowers do the killing; a ballista is what stops a brute. And every night a nest is left standing out there, the next one comes harder."},
+  "end.nights":{g:"end",def:"{n} nights"},
+  "end.nights.one":{g:"end",def:"{n} night"},
+  "end.stat.kills":{g:"end",def:"put down"},
+  "end.stat.nights":{g:"end",def:"nights held"},
+  "end.stat.nights.one":{g:"end",def:"night held"},
+  "end.stat.nests":{g:"end",def:"still out there"},
+  "end.again":{g:"end",def:"Go again"},
+  "end.menu":{g:"end",def:"Main menu"},
+
+  // ---- two players
+  "net.eyebrow":{g:"net",def:"Two players"},
+  "net.title":{g:"net",def:"Two towns, one dark"},
+  "net.lead":{g:"net",def:"The same ground, a side each, and one night falling on both of you. There is no server: you swap two codes once, and after that the game talks straight between your two computers."},
+  "net.host":{g:"net",def:"I'll host"},
+  "net.join":{g:"net",def:"I'm joining"},
+  "net.h1.lbl":{g:"net",def:"Your invite code"},
+  "net.h1.desc":{g:"net",def:"Press Create, then send this whole block to the other player however you like — chat, email, a text."},
+  "net.h1.ph":{g:"net",def:"press Create"},
+  "net.create":{g:"net",def:"Create invite"},
+  "net.copy":{g:"net",def:"Copy"},
+  "net.h2.lbl":{g:"net",def:"Their reply code"},
+  "net.h2.desc":{g:"net",def:"Paste what they send back, then start. You both wake up on the same ground at the same moment."},
+  "net.h2.ph":{g:"net",def:"paste their reply here"},
+  "net.connect":{g:"net",def:"Connect"},
+  "net.start":{g:"net",def:"Set out together"},
+  "net.g1.lbl":{g:"net",def:"Their invite code"},
+  "net.g1.desc":{g:"net",def:"Paste the block the host sent you."},
+  "net.g1.ph":{g:"net",def:"paste the invite here"},
+  "net.reply":{g:"net",def:"Make my reply"},
+  "net.g2.lbl":{g:"net",def:"Your reply code"},
+  "net.g2.desc":{g:"net",def:"Send this back to the host. When they set out, so do you."},
+  "net.status.none":{g:"net",def:"Not connected."},
+  "net.note.custom":{g:"net",def:"You will both wake up on your map “{map}”"},
+  "net.note.random":{g:"net",def:"You will both wake up on ground neither of you has walked"},
+  "net.note.tail":{g:"net",def:", on {difficulty} — {nests} nests out there. Change it on the Play screen."},
+  "net.back":{g:"net",def:"← Menu"}
+};
+
+// Asset ids whose display name IS a text key. The Library's asset panel and the
+// Text tab therefore edit the same string rather than two that drift apart.
+var TEXT_ASSET_NAME={
+  hall:"bld.hall.name", cottage:"bld.cottage.name", tower:"bld.tower.name",
+  ballista:"bld.ballista.name", brazier:"bld.brazier.name",
+  wall:"bld.wall.name", gate:"bld.gate.name",
+  barracks:"bld.barracks.name", archery:"bld.archery.name",
+  commander:"unit.commander.name", soldier:"unit.soldier.name",
+  archer:"unit.archer.name", worker:"unit.worker.name"
+};
+
+var TEXT_OVER={};
+var PLACEHOLDER=/\{(\w+)\}/g;
+function textDef(key){ return TEXT_DEFS[key]||null; }
+function textRaw(key){
+  var d=TEXT_DEFS[key];
+  if(!d) return null;
+  return (TEXT_OVER[key]!==undefined)?TEXT_OVER[key]:d.def;
+}
+// Missing keys return the key itself rather than an empty string: a blank label
+// looks like a layout bug and sends you hunting in the CSS, where "hud.massing"
+// on screen names the thing that is actually wrong.
+function t(key,vars){
+  var s=textRaw(key);
+  if(s===null) return key;
+  if(!vars) return s;
+  return s.replace(PLACEHOLDER,function(m,k){
+    return (vars[k]===undefined||vars[k]===null)?m:String(vars[k]);
+  });
+}
+// The placeholders a def declares, so an edit that drops one can be flagged
+// rather than quietly shipping a sentence with a hole where the number was.
+function textVars(key){
+  var d=TEXT_DEFS[key];
+  if(!d) return [];
+  var out=[], m;
+  PLACEHOLDER.lastIndex=0;
+  while((m=PLACEHOLDER.exec(d.def))!==null) if(out.indexOf(m[1])<0) out.push(m[1]);
+  return out;
+}
+function setText(key,v){
+  if(!TEXT_DEFS[key]) return;
+  if(v===undefined||v===null) return;
+  v=String(v);
+  if(v===TEXT_DEFS[key].def) delete TEXT_OVER[key];
+  else TEXT_OVER[key]=v;
+}
+function textEdited(key){ return TEXT_OVER[key]!==undefined; }
+function resetText(key){ delete TEXT_OVER[key]; }
+function resetAllText(){ TEXT_OVER={}; }
+function textKeys(){ return Object.keys(TEXT_DEFS); }
+function textGroups(){ return TEXT_GROUPS; }
+function getTextOverrides(){ return TEXT_OVER; }
+function setTextOverrides(o){
+  TEXT_OVER={};
+  if(!o) return;
+  for(var k in o) setText(k,o[k]);   // unknown keys dropped on load
+}
+function textNameKey(id){ return TEXT_ASSET_NAME[id]||null; }
+
 // ---- user assets + metadata ----------------------------------------------
 // Shipped assets stay immutable; anything you change about one is a metadata
 // override, and anything you invent is a user asset. Both persist, both export.
@@ -1524,22 +1847,32 @@ function assetMeta(id){
   if(!b) return null;
   var m=META[id]||{}, out={id:id};
   for(var k in META_KEYS) out[k]=(m[k]!==undefined)?m[k]:b[k];
+  // A building's name is one string, not two. For the ids the player actually
+  // reads, the Library's name field and the Text tab are the same store, so
+  // renaming a Watchtower in either place renames it everywhere.
+  var nk=TEXT_ASSET_NAME[id];
+  if(nk) out.name=t(nk);
   out.slots=b.slots||[];
   return out;
 }
 function setMeta(id,k,v){
   if(!META_KEYS[k]||!baseById(id)) return;
+  if(k==="name"&&TEXT_ASSET_NAME[id]){ setText(TEXT_ASSET_NAME[id],v); return; }
   if(isUser(id)){ baseById(id)[k]=v; return; }
   if(!META[id]) META[id]={};
   META[id][k]=v;
 }
 function metaEdited(id){
+  if(TEXT_ASSET_NAME[id]&&textEdited(TEXT_ASSET_NAME[id])) return true;
   var m=META[id];
   if(!m) return false;
   for(var k in m) return true;
   return false;
 }
-function resetMeta(id){ delete META[id]; }
+function resetMeta(id){
+  if(TEXT_ASSET_NAME[id]) resetText(TEXT_ASSET_NAME[id]);
+  delete META[id];
+}
 function getMeta(){ return META; }
 function setMetaAll(o){ META={}; if(o) for(var id in o) if(baseById(id)) META[id]=o[id]; }
 function getUserAssets(){ return USER; }
@@ -1749,6 +2082,10 @@ return {
   STAT_DEFS:STAT_DEFS, statDefs:statDefs, hasStats:hasStats, statsOf:statsOf,
   statField:statField, setStat:setStat, statsEdited:statsEdited, resetStats:resetStats,
   getStatOverrides:getStatOverrides, setStatOverrides:setStatOverrides,
+  t:t, textDef:textDef, textRaw:textRaw, textVars:textVars, setText:setText,
+  textEdited:textEdited, resetText:resetText, resetAllText:resetAllText,
+  textKeys:textKeys, textGroups:textGroups, textNameKey:textNameKey,
+  getTextOverrides:getTextOverrides, setTextOverrides:setTextOverrides,
   expandRep:expandRep, resolveParts:resolveParts, anchoredY:anchoredY, partRot:partRot,
   wedge:wedge, xform:xform,
   buildBone:buildBone, jointTop:jointTop, partBase:partBase,

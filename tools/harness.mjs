@@ -151,7 +151,15 @@ export async function open({ url, width = 1300, height = 820 } = {}) {
   await page.waitForFunction(() => window.__hf && window.__hf.game, null, { timeout: 30000 });
   await page.evaluate(pageHelpers);
   return {
-    browser, page, errors,
+    browser, page, errors, url: target,
+    // `url` is here for the one thing a single page load cannot test: whether
+    // an edit survives a reload. Anything that reloads loses window.__nw and
+    // must re-inject it — reopen() does both.
+    reopen: async () => {
+      await page.goto(target);
+      await page.waitForFunction(() => window.__hf && window.__hf.game, null, { timeout: 30000 });
+      await page.evaluate(pageHelpers);
+    },
     close: async () => { await browser.close(); if (srv) srv.close(); },
   };
 }

@@ -116,6 +116,7 @@ function init(renderer, cv, editCb){
   pickBatch=R.makeBatch(M.buildAsset("hall",{idColors:true}),false);
   buildList();
   wireInput();
+  wireText();
   E("libGuides").addEventListener("click",function(){
     showGuides=!showGuides; this.setAttribute("aria-pressed",showGuides?"true":"false");
   });
@@ -1020,6 +1021,10 @@ function wireInput(){
 }
 function keydown(ev){
   if(!active) return false;
+  // W/E/R are tool shortcuts, and every one of them is also a letter somebody
+  // is trying to type into a text field. The field wins.
+  var tg=ev.target&&ev.target.tagName;
+  if(txMode==="text"||tg==="TEXTAREA"||tg==="INPUT") return false;
   var meta=ev.ctrlKey||ev.metaKey;
   if(meta&&(ev.key==="z"||ev.key==="Z")){
     ev.preventDefault();
@@ -1040,9 +1045,165 @@ function keydown(ev){
   return false;
 }
 
+// ===========================================================================
+// The text tab
+// ===========================================================================
+// The model editor and this one share the screen and nothing else: this one has
+// no asset, no history and no 3D, because a string is not a thing you can undo
+// a drag on. What it does share is `onEdit` — the same persist-and-refresh hook
+// the balance sliders use — so a word typed here reaches the running game by
+// exactly the route a number does.
+var txMode="models", txFind="", txGroup="all";
+function setLibMode(m){
+  txMode=(m==="text")?"text":"models";
+  document.body.dataset.libmode=txMode;
+  E("libModeModels").setAttribute("aria-pressed",txMode==="models"?"true":"false");
+  E("libModeText").setAttribute("aria-pressed",txMode==="text"?"true":"false");
+  E("libEyebrow").textContent = txMode==="text"
+    ? "edit any word in the game" : "edit any model in the game";
+  // Undo/redo belong to the model editor's history, which text edits are not in.
+  E("libUndo").hidden=E("libRedo").hidden=(txMode==="text");
+  if(txMode==="text") renderText();
+}
+// A def's placeholders are the one thing an edit can break that the eye will
+// not catch: a line that loses its {n} still reads fine and just has no number
+// in it. So they are listed beside the key and checked on every keystroke.
+function missingVars(key,val){
+  var want=M.textVars(key), out=[];
+  for(var i=0;i<want.length;i++)
+    if(val.indexOf("{"+want[i]+"}")<0) out.push(want[i]);
+  return out;
+}
+function txMatch(key){
+  if(txGroup!=="all" && M.textDef(key).g!==txGroup) return false;
+  if(!txFind) return true;
+  var q=txFind.toLowerCase();
+  return key.toLowerCase().indexOf(q)>=0 ||
+         String(M.textRaw(key)).toLowerCase().indexOf(q)>=0;
+}
+function renderText(){
+  var groups=M.textGroups(), keys=M.textKeys();
+  var gb=E("libTextGroups");
+  if(!gb.childElementCount){
+    var gh='<button type="button" data-g="all" aria-pressed="true">All</button>';
+    groups.forEach(function(g){
+      gh+='<button type="button" data-g="'+g.id+'" aria-pressed="false">'+g.name+'</button>';
+    });
+    gb.innerHTML=gh;
+    gb.querySelectorAll("[data-g]").forEach(function(b){
+      b.addEventListener("click",function(){
+        txGroup=b.dataset.g;
+        gb.querySelectorAll("[data-g]").forEach(function(o){
+          o.setAttribute("aria-pressed",o.dataset.g===txGroup?"true":"false");
+        });
+        renderText();
+      });
+    });
+  }
+  var shown=keys.filter(txMatch), html="", lastG=null, edits=0;
+  keys.forEach(function(k){ if(M.textEdited(k)) edits++; });
+  groups.forEach(function(g){
+    var mine=shown.filter(function(k){ return M.textDef(k).g===g.id; });
+    if(!mine.length) return;
+    html+='<div class="tGroup">'+g.name+'</div>';
+    mine.forEach(function(k){
+      var v=M.textRaw(k), on=M.textEdited(k), vars=M.textVars(k);
+      html+='<div class="tRow'+(on?' tIsEdit':'')+'" data-row="'+k+'">'+
+            '<div class="tKey'+(on?' tEdit':'')+'">'+k+
+              (vars.length?'<span class="tVars">{'+vars.join("} {")+'}</span>':'')+'</div>'+
+            '<textarea data-key="'+k+'" rows="1" spellcheck="false"></textarea>'+
+            '<button class="tUndo" type="button" data-undo="'+k+'">reset</button></div>';
+    });
+  });
+  E("libTextList").innerHTML=html ||
+    '<p class="libEmpty" style="padding:14px 0">Nothing matches that.</p>';
+  // set values as properties, never as markup: a string with a quote or an
+  // angle bracket in it must not be able to close the field it lives in
+  E("libTextList").querySelectorAll("[data-key]").forEach(function(ta){
+    ta.value=M.textRaw(ta.dataset.key);
+    fitRow(ta);
+    ta.addEventListener("input",function(){ applyTextEdit(ta); });
+  });
+  E("libTextList").querySelectorAll("[data-undo]").forEach(function(b){
+    b.addEventListener("click",function(){
+      M.resetText(b.dataset.undo);
+      commitText();
+      renderText();
+    });
+  });
+  E("libTextCount").textContent=shown.length+" of "+keys.length+
+    (edits?" · "+edits+" edited":"");
+  E("libTextRevert").disabled=!edits;
+  checkTextWarn();
+}
+function fitRow(ta){
+  ta.style.height="auto";
+  ta.style.height=Math.min(150,Math.max(31,ta.scrollHeight+2))+"px";
+}
+function applyTextEdit(ta){
+  var k=ta.dataset.key;
+  M.setText(k,ta.value);
+  commitText();
+  fitRow(ta);
+  var row=ta.closest(".tRow"), on=M.textEdited(k);
+  row.classList.toggle("tIsEdit",on);
+  row.querySelector(".tKey").classList.toggle("tEdit",on);
+  ta.classList.toggle("tBad",missingVars(k,ta.value).length>0);
+  var edits=0;
+  M.textKeys().forEach(function(key){ if(M.textEdited(key)) edits++; });
+  E("libTextRevert").disabled=!edits;
+  checkTextWarn();
+}
+function checkTextWarn(){
+  var bad=[];
+  M.textKeys().forEach(function(k){
+    var miss=missingVars(k,String(M.textRaw(k)));
+    if(miss.length) bad.push(k+" is missing {"+miss.join("} {")+"}");
+  });
+  var w=E("libTextWarn");
+  w.hidden=!bad.length;
+  w.textContent=bad.length
+    ? (bad.length===1?bad[0]:bad.length+" lines have lost a placeholder: "+bad[0]+", …")
+    : "";
+}
+// The same shape the asset export uses: a block you paste back into d_core.js,
+// so an edit made in a browser can become the shipped default.
+function copyTextEdits(){
+  var over=M.getTextOverrides(), keys=Object.keys(over).sort(), out;
+  if(!keys.length) out="// no text edits";
+  else{
+    out="// paste into TEXT_DEFS in d_core.js, replacing each key's def\n";
+    keys.forEach(function(k){
+      out+='"'+k+'":{g:"'+M.textDef(k).g+'",def:'+JSON.stringify(over[k])+'},\n';
+    });
+  }
+  E("libTextOut").value=out;
+  E("libTextOutWrap").hidden=false;
+  E("libTextOut").focus(); E("libTextOut").select();
+  try{ document.execCommand("copy"); }catch(e){}
+}
+function commitText(){ if(onEdit) onEdit(); }
+function wireText(){
+  E("libModeModels").addEventListener("click",function(){ setLibMode("models"); });
+  E("libModeText").addEventListener("click",function(){ setLibMode("text"); });
+  E("libTextFind").addEventListener("input",function(){
+    txFind=this.value.trim(); renderText();
+  });
+  E("libTextCopy").addEventListener("click",copyTextEdits);
+  E("libTextRevert").addEventListener("click",function(){
+    M.resetAllText();
+    E("libTextOutWrap").hidden=true;
+    commitText();
+    renderText();
+  });
+  setLibMode("models");
+}
+
 return { init:init, enter:enter, exit:exit, update:update, draw:draw,
          select:select, refreshCounts:refreshCounts, keydown:keydown,
          refreshStats:renderStats, rebuildList:buildList,
+         mode:function(){ return txMode; }, setMode:setLibMode,
+         renderText:renderText,
          hitAt:function(x,y){ return partUnder(x,y); },
          handleAt:function(x,y){ return handleUnder(x,y); },
          // where each axis handle lands on screen, for verification

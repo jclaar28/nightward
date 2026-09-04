@@ -237,6 +237,65 @@
   #libBalance .fk{min-width:98px}
   #libBalance .fh{color:var(--faint)}
   #libBalNote{margin:0 0 9px;font-size:11.5px;line-height:1.6;color:var(--muted)}
+
+  /* ---- the text tab ----
+     A full-width column rather than the model editor's rail-and-panel: prose is
+     read across, and a 334px inspector would wrap every line into a ribbon. */
+  #libModes{display:flex;gap:1px;margin-left:6px}
+  #libModes button{background:var(--panel);border:1px solid var(--line);
+    padding:6px 13px;font-size:11.5px;font-weight:600;color:var(--muted)}
+  #libModes button[aria-pressed="true"]{border-color:var(--accent);color:var(--accent);
+    background:rgba(217,113,74,.14)}
+  body[data-libmode="text"] #libRail,
+  body[data-libmode="text"] #libPanel,
+  body[data-libmode="text"] #libHint,
+  body[data-libmode="text"] #libTools,
+  body[data-libmode="text"] #libAssetBtns,
+  body[data-libmode="text"] #libXform{display:none}
+  body:not([data-libmode="text"]) #libTextPane{display:none}
+  #libTextPane{position:absolute;left:14px;right:14px;top:60px;bottom:14px;
+    display:flex;flex-direction:column;background:var(--panel);
+    border:1px solid var(--line);border-radius:3px;backdrop-filter:blur(9px)}
+  #libTextBar{display:flex;align-items:center;gap:8px;padding:10px 12px;
+    border-bottom:1px solid var(--line);flex-wrap:wrap}
+  #libTextFind{flex:0 0 240px;background:var(--solid);border:1px solid var(--line);
+    border-radius:2px;color:var(--ink);font-size:12.5px;padding:6px 9px}
+  #libTextFind:focus{border-color:var(--accent);outline:none}
+  #libTextGroups{display:flex;gap:4px;flex-wrap:wrap}
+  #libTextGroups button{background:transparent;border:1px solid var(--line);
+    border-radius:2px;padding:4px 9px;font-family:"IBM Plex Mono",monospace;
+    font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+  #libTextGroups button[aria-pressed="true"]{border-color:var(--accent);color:var(--accent)}
+  #libTextActs{margin-left:auto;display:flex;gap:6px;align-items:center}
+  #libTextCount{font-family:"IBM Plex Mono",monospace;font-size:10px;color:var(--faint)}
+  #libTextActs button{background:transparent;border:1px solid var(--line);
+    border-radius:2px;padding:6px 11px;font-size:11.5px;font-weight:600;color:var(--muted)}
+  #libTextActs button:hover:not(:disabled){border-color:var(--line-hi);color:var(--ink)}
+  #libTextActs button:disabled{opacity:.35;cursor:not-allowed}
+  #libTextList{flex:1 1 auto;overflow:auto;padding:4px 12px 14px}
+  .tGroup{font-family:"IBM Plex Mono",monospace;font-size:9.5px;letter-spacing:.16em;
+    text-transform:uppercase;color:var(--accent);padding:14px 0 6px;
+    border-bottom:1px solid var(--line);margin-bottom:8px}
+  .tRow{display:grid;grid-template-columns:210px 1fr auto;gap:10px;align-items:start;
+    padding:5px 0}
+  .tKey{font-family:"IBM Plex Mono",monospace;font-size:10px;color:var(--muted);
+    line-height:1.5;word-break:break-all;padding-top:6px}
+  .tKey.tEdit{color:var(--accent)}
+  .tVars{display:block;color:var(--faint);font-size:9px;letter-spacing:.08em}
+  .tRow textarea{background:var(--solid);border:1px solid var(--line);border-radius:2px;
+    color:var(--ink);font-family:Archivo,sans-serif;font-size:12.5px;line-height:1.45;
+    padding:6px 8px;width:100%;resize:vertical;min-height:31px}
+  .tRow textarea:focus{border-color:var(--accent);outline:none}
+  .tRow textarea.tBad{border-color:var(--bad)}
+  .tRow .tUndo{background:transparent;border:0;color:var(--accent);padding:6px 2px;
+    font-family:"IBM Plex Mono",monospace;font-size:9.5px;letter-spacing:.12em;
+    visibility:hidden}
+  .tRow.tIsEdit .tUndo{visibility:visible}
+  .tRow .tUndo:hover{text-decoration:underline}
+  #libTextWarn{font-size:11.5px;color:var(--bad);padding:0 12px 8px;margin:0}
+  #libTextOut{display:block;width:100%;height:150px;background:var(--solid);
+    border:1px solid var(--line);border-radius:2px;color:var(--muted);
+    font-family:"IBM Plex Mono",monospace;font-size:10.5px;padding:8px;resize:none}
   #libAssetBtns{display:flex;gap:6px;padding:8px;border-top:1px solid var(--line)}
   #libAssetBtns button{flex:1;background:transparent;border:1px solid var(--line);
     border-radius:2px;padding:6px 4px;font-size:11px;font-weight:600;color:var(--muted);cursor:pointer}
@@ -615,7 +674,7 @@
 <body>
 
 <canvas id="view" aria-label="Nightward"></canvas>
-<div id="fatal" hidden>Nightward needs WebGL2 to draw itself. Try a desktop browser with hardware acceleration switched on.</div>
+<div id="fatal" hidden data-t="sys.fatal"></div>
 
 <!-- ============================ MENU ============================ -->
 <div class="screen" id="screen-menu">
@@ -627,29 +686,29 @@
 
     <nav class="menuNav">
       <button class="navBtn" id="btnPlay" type="button">
-        Play <span class="sub" id="mDiffTag">Normal</span>
+        <span data-t="menu.play"></span> <span class="sub" id="mDiffTag"></span>
       </button>
       <button class="navBtn" id="btnLibrary" type="button">
-        Library <span class="sub" id="mAssets">— assets</span>
+        <span data-t="menu.library"></span> <span class="sub" id="mAssets"></span>
       </button>
       <button class="navBtn" id="btnMaps" type="button">
-        Maps <span class="sub" id="mMapCount">— maps</span>
+        <span data-t="menu.maps"></span> <span class="sub" id="mMapCount"></span>
       </button>
       <button class="navBtn" id="btnSettings" type="button">
-        Settings <span class="sub">render · audio</span>
+        <span data-t="menu.settings"></span> <span class="sub" data-t="menu.settings.sub"></span>
       </button>
       <button class="navBtn" id="btnNet" type="button">
-        Two players <span class="sub">one map · two towns</span>
+        <span data-t="menu.net"></span> <span class="sub" data-t="menu.net.sub"></span>
       </button>
     </nav>
 
     <div>
       <div id="menuStats">
-        <div><b id="mRuns">0</b>rounds</div>
-        <div><b id="mWins">0</b>cleared</div>
-        <div><b id="mBest">—</b>best hall</div>
+        <div><b id="mRuns">0</b><span data-t="menu.stat.rounds"></span></div>
+        <div><b id="mWins">0</b><span data-t="menu.stat.cleared"></span></div>
+        <div><b id="mBest">—</b><span data-t="menu.stat.besthall"></span></div>
       </div>
-      <div id="mLastWrap" style="margin-top:12px">last · <span id="mLast">you have not been out yet</span></div>
+      <div id="mLastWrap" style="margin-top:12px"><span data-t="menu.last.label"></span><span id="mLast"></span></div>
     </div>
   </div>
 </div>
@@ -661,7 +720,11 @@
     <span class="pageTitle">Library</span>
     <button class="histBtn" id="libUndo" type="button" title="undo (Ctrl+Z)" disabled>↶ Undo</button>
     <button class="histBtn" id="libRedo" type="button" title="redo (Ctrl+Shift+Z)" disabled>↷ Redo</button>
-    <span class="eyebrow">edit any model in the game</span>
+    <div id="libModes" role="group" aria-label="What to edit">
+      <button id="libModeModels" type="button" aria-pressed="true">Models</button>
+      <button id="libModeText" type="button" aria-pressed="false">Text</button>
+    </div>
+    <span class="eyebrow" id="libEyebrow">edit any model in the game</span>
   </div>
 
   <div id="libRail">
@@ -735,6 +798,26 @@
     </label>
   </div>
   <div id="libHint">click a part to select · click empty space to deselect · drag a handle to edit · <b>W</b> move · <b>E</b> rotate · <b>R</b> scale · drag anywhere else to orbit</div>
+
+  <!-- Every word the player reads, editable in place. Edits apply as you type
+       and persist in this browser; Export gives you a block to paste into
+       d_core.js so a change can outlive the browser it was made in. -->
+  <div id="libTextPane">
+    <div id="libTextBar">
+      <input id="libTextFind" type="search" placeholder="find a word or a key" spellcheck="false">
+      <div id="libTextGroups"></div>
+      <div id="libTextActs">
+        <span id="libTextCount"></span>
+        <button id="libTextCopy" type="button">Copy text edits</button>
+        <button id="libTextRevert" type="button" disabled>Revert all text</button>
+      </div>
+    </div>
+    <p id="libTextWarn" hidden></p>
+    <div id="libTextList"></div>
+    <div id="libTextOutWrap" hidden style="padding:0 12px 12px">
+      <textarea id="libTextOut" readonly spellcheck="false"></textarea>
+    </div>
+  </div>
 </div>
 
 <!-- ============================== MAPS ============================== -->
@@ -801,25 +884,23 @@
 <div class="screen" id="screen-setup" hidden>
   <div id="newScrim"></div>
   <div class="panel" id="newCard">
-    <div class="eyebrow">New round</div>
-    <h2>Before the first night</h2>
-    <p class="lead">How many nests are out there in the dark, and how many each one
-      sends when the light goes. Decide it now — nothing about it changes once
-      you are on the ground.</p>
+    <div class="eyebrow" data-t="setup.eyebrow"></div>
+    <h2 data-t="setup.title"></h2>
+    <p class="lead" data-t="setup.lead"></p>
 
     <div id="diffPick" role="group" aria-label="Difficulty"></div>
     <div id="diffBlurb"></div>
 
     <div id="newMapRow">
       <div>
-        <div class="lbl" id="newMapName">Unfamiliar ground</div>
-        <div class="desc" id="newMapNote">Land nobody has walked before.</div>
+        <div class="lbl" id="newMapName"></div>
+        <div class="desc" id="newMapNote"></div>
       </div>
-      <button id="newMapPick" type="button">Choose…</button>
+      <button id="newMapPick" type="button"></button>
     </div>
 
-    <button id="newGo" type="button">Set out</button>
-    <button id="newBack" type="button">← Menu</button>
+    <button id="newGo" type="button" data-t="setup.go"></button>
+    <button id="newBack" type="button" data-t="setup.back"></button>
   </div>
 </div>
 
@@ -883,37 +964,33 @@
 <div class="screen" id="screen-net" hidden>
   <div id="netScrim"></div>
   <div class="panel" id="netCard">
-    <div class="eyebrow">Two players</div>
-    <h2>Two towns, one dark</h2>
-    <p id="netLead">The same ground, a side each, and one night falling on both of you.
-      There is no server: you swap two codes once, and after that the game talks
-      straight between your two computers.</p>
+    <div class="eyebrow" data-t="net.eyebrow"></div>
+    <h2 data-t="net.title"></h2>
+    <p id="netLead" data-t="net.lead"></p>
 
     <div id="netPick">
-      <button id="netModeHost" type="button" aria-pressed="true">I'll host</button>
-      <button id="netModeJoin" type="button" aria-pressed="false">I'm joining</button>
+      <button id="netModeHost" type="button" aria-pressed="true" data-t="net.host"></button>
+      <button id="netModeJoin" type="button" aria-pressed="false" data-t="net.join"></button>
     </div>
 
     <!-- host -->
     <div id="netHost">
       <div class="netStep">
-        <div class="lbl"><b>1</b>Your invite code</div>
-        <div class="desc">Press Create, then send this whole block to the other player
-          however you like — chat, email, a text.</div>
-        <textarea id="netOffer" readonly spellcheck="false" placeholder="press Create"></textarea>
+        <div class="lbl"><b>1</b><span data-t="net.h1.lbl"></span></div>
+        <div class="desc" data-t="net.h1.desc"></div>
+        <textarea id="netOffer" readonly spellcheck="false" data-t-ph="net.h1.ph"></textarea>
         <div class="netRow">
-          <button id="netCreate" type="button" class="go">Create invite</button>
-          <button id="netCopyOffer" type="button" disabled>Copy</button>
+          <button id="netCreate" type="button" class="go" data-t="net.create"></button>
+          <button id="netCopyOffer" type="button" disabled data-t="net.copy"></button>
         </div>
       </div>
       <div class="netStep">
-        <div class="lbl"><b>2</b>Their reply code</div>
-        <div class="desc">Paste what they send back, then start. You both wake up on the
-          same ground at the same moment.</div>
-        <textarea id="netAnswerIn" spellcheck="false" placeholder="paste their reply here"></textarea>
+        <div class="lbl"><b>2</b><span data-t="net.h2.lbl"></span></div>
+        <div class="desc" data-t="net.h2.desc"></div>
+        <textarea id="netAnswerIn" spellcheck="false" data-t-ph="net.h2.ph"></textarea>
         <div class="netRow">
-          <button id="netConnect" type="button" disabled>Connect</button>
-          <button id="netStart" type="button" class="go" disabled>Set out together</button>
+          <button id="netConnect" type="button" disabled data-t="net.connect"></button>
+          <button id="netStart" type="button" class="go" disabled data-t="net.start"></button>
         </div>
         <div id="netMapNote"></div>
       </div>
@@ -922,25 +999,25 @@
     <!-- guest -->
     <div id="netJoin" hidden>
       <div class="netStep">
-        <div class="lbl"><b>1</b>Their invite code</div>
-        <div class="desc">Paste the block the host sent you.</div>
-        <textarea id="netOfferIn" spellcheck="false" placeholder="paste the invite here"></textarea>
+        <div class="lbl"><b>1</b><span data-t="net.g1.lbl"></span></div>
+        <div class="desc" data-t="net.g1.desc"></div>
+        <textarea id="netOfferIn" spellcheck="false" data-t-ph="net.g1.ph"></textarea>
         <div class="netRow">
-          <button id="netReply" type="button" class="go">Make my reply</button>
+          <button id="netReply" type="button" class="go" data-t="net.reply"></button>
         </div>
       </div>
       <div class="netStep">
-        <div class="lbl"><b>2</b>Your reply code</div>
-        <div class="desc">Send this back to the host. When they set out, so do you.</div>
+        <div class="lbl"><b>2</b><span data-t="net.g2.lbl"></span></div>
+        <div class="desc" data-t="net.g2.desc"></div>
         <textarea id="netAnswer" readonly spellcheck="false" placeholder="—"></textarea>
         <div class="netRow">
-          <button id="netCopyAnswer" type="button" disabled>Copy</button>
+          <button id="netCopyAnswer" type="button" disabled data-t="net.copy"></button>
         </div>
       </div>
     </div>
 
-    <p id="netStatus">Not connected.</p>
-    <div style="margin-top:16px"><button class="backBtn" type="button" id="netBack">← Menu</button></div>
+    <p id="netStatus" data-t="net.status.none"></p>
+    <div style="margin-top:16px"><button class="backBtn" type="button" id="netBack" data-t="net.back"></button></div>
   </div>
 </div>
 
@@ -949,16 +1026,16 @@
   <div id="worldBars"></div>
 
   <div class="panel" id="supplyBox">
-    <span class="lb">Supply</span><b id="supply">180</b>
+    <span class="lb" data-t="hud.supply"></span><b id="supply">180</b>
   </div>
 
   <div class="panel" id="army" hidden>
     <div id="grpRow">
       <button class="grp" id="grpWorkers" type="button">
-        <span>Workers</span><b id="grpWorkN">0</b><em id="grpWorkIn"></em>
+        <span data-t="hud.workers"></span><b id="grpWorkN">0</b><em id="grpWorkIn"></em>
       </button>
       <button class="grp" id="grpArmy" type="button">
-        <span>Army</span><b id="grpArmyN">0</b><em></em>
+        <span data-t="hud.army"></span><b id="grpArmyN">0</b><em></em>
       </button>
     </div>
   </div>
@@ -967,18 +1044,18 @@
     <canvas id="minimap" width="180" height="180"></canvas>
 
     <div class="panel" id="dayBox" hidden>
-      <div class="lab"><span>Daylight</span><b id="dayLeft">2:35</b></div>
+      <div class="lab"><span data-t="hud.daylight"></span><b id="dayLeft">2:35</b></div>
       <div class="bar"><span id="dayBar" style="width:100%"></span></div>
       <div class="lab" style="margin:10px 0 0"><span id="nightNo">Night 1</span><b id="nestsLeft">5 nests</b></div>
-      <div class="lab" style="margin:4px 0 0"><span>Massing</span><b id="nightSend">520</b></div>
+      <div class="lab" style="margin:4px 0 0"><span data-t="hud.massing"></span><b id="nightSend">520</b></div>
     </div>
 
     <div class="panel" id="waveBox" hidden>
-      <div class="lab"><span>Until dawn</span><b id="nightLeft">2:00</b></div>
+      <div class="lab"><span data-t="hud.untildawn"></span><b id="nightLeft">2:00</b></div>
       <div class="bar"><span id="nightBar" class="dawn" style="width:100%"></span></div>
-      <div class="lab" style="margin:10px 0 0"><span>Town hall</span><b id="hallPct">100%</b></div>
+      <div class="lab" style="margin:10px 0 0"><span data-t="hud.hall"></span><b id="hallPct">100%</b></div>
       <div class="bar"><span id="hallBar" style="width:100%"></span></div>
-      <div class="lab" style="margin:10px 0 0"><span>Still coming</span><b id="wLeft">0</b></div>
+      <div class="lab" style="margin:10px 0 0"><span data-t="hud.stillcoming"></span><b id="wLeft">0</b></div>
       <div class="lab" style="margin:10px 0 0"><span id="nightNo2">Night 1</span><b id="nestsLeft2">2 nests</b></div>
     </div>
 
@@ -1002,16 +1079,16 @@
     <div class="panel" id="dockTroops" hidden>
       <span id="troopWhat">3 soldiers</span>
       <div class="uRow" id="troopMove">
-        <span class="uLab">Orders</span>
+        <span class="uLab" data-t="sel.orders"></span>
         <button id="troopStance" type="button" aria-pressed="true">hold</button>
       </div>
       <div id="troopStats"></div>
     </div>
     <div class="panel" id="dockActs" hidden>
       <span id="dockWhat">Watchtower</span>
-      <button id="dockShelter" type="button" hidden>Take them inside</button>
-      <button id="dockSell" type="button">Sell +24</button>
-      <span class="dkHint">ctrl+D to deselect</span>
+      <button id="dockShelter" type="button" hidden></button>
+      <button id="dockSell" type="button"></button>
+      <span class="dkHint" data-t="sel.deselect"></span>
     </div>
   </div>
 
@@ -1026,40 +1103,40 @@
 <div id="pause" hidden>
   <div id="pauseScrim"></div>
   <div class="panel" id="pauseCard">
-    <div class="eyebrow" id="pauseTag">Paused</div>
-    <h2>Nightward</h2>
+    <div class="eyebrow" id="pauseTag"></div>
+    <h2 data-t="pause.title"></h2>
     <div class="pauseNav">
-      <button class="pauseBtn" id="pResume" type="button">Resume<span class="sub">esc</span></button>
-      <button class="pauseBtn" id="pControls" type="button">Controls<span class="sub">keys · mouse</span></button>
-      <button class="pauseBtn" id="pSettings" type="button">Settings<span class="sub">render · audio</span></button>
-      <button class="pauseBtn" id="pQuit" type="button">Abandon the town<span class="sub">back to the menu</span></button>
+      <button class="pauseBtn" id="pResume" type="button"><span data-t="pause.resume"></span><span class="sub" data-t="pause.resume.sub"></span></button>
+      <button class="pauseBtn" id="pControls" type="button"><span data-t="pause.controls"></span><span class="sub" data-t="pause.controls.sub"></span></button>
+      <button class="pauseBtn" id="pSettings" type="button"><span data-t="pause.settings"></span><span class="sub" data-t="pause.settings.sub"></span></button>
+      <button class="pauseBtn" id="pQuit" type="button"><span data-t="pause.quit"></span><span class="sub" data-t="pause.quit.sub"></span></button>
     </div>
     <div id="pauseKeys" hidden>
-        <div class="hGrp">Building &mdash; day and night</div>
+        <div class="hGrp" data-t="pause.h.build"></div>
         <dl>
-          <dt>town hall</dt><dd>your commander walks over and raises it</dd>
-          <dt>click</dt><dd>place the building you picked</dd>
-          <dt>drag</dt><dd>run a line of palisade</dd>
-          <dt>click a building</dt><dd>select it, then tear it down from the bar below</dd>
-          <dt>ctrl+D</dt><dd>let go of everything</dd>
-          <dt>R &middot; shift+R</dt><dd>turn it &middot; turn it automatically</dd>
-          <dt>tab &middot; 1&ndash;3</dt><dd>switch tab &middot; pick a building</dd>
+          <dt data-t="pause.b1.k"></dt><dd data-t="pause.b1.v"></dd>
+          <dt data-t="pause.b2.k"></dt><dd data-t="pause.b2.v"></dd>
+          <dt data-t="pause.b3.k"></dt><dd data-t="pause.b3.v"></dd>
+          <dt data-t="pause.b4.k"></dt><dd data-t="pause.b4.v"></dd>
+          <dt data-t="pause.b5.k"></dt><dd data-t="pause.b5.v"></dd>
+          <dt data-t="pause.b6.k"></dt><dd data-t="pause.b6.v"></dd>
+          <dt data-t="pause.b7.k"></dt><dd data-t="pause.b7.v"></dd>
         </dl>
-        <div class="hGrp">Your people</div>
+        <div class="hGrp" data-t="pause.h.people"></div>
         <dl>
-          <dt>click &middot; drag</dt><dd>select one &middot; select a group</dd>
-          <dt>right-click</dt><dd>send them there, or onto a salvage pile</dd>
-          <dt>right-click a wall</dt><dd>workers mend it, even under attack</dd>
-          <dt>select the hall</dt><dd>call everyone inside, or turn them out</dd>
-          <dt>ctrl+A</dt><dd>select everyone</dd>
-          <dt>H</dt><dd>hold the ground, or go after them</dd>
+          <dt data-t="pause.p1.k"></dt><dd data-t="pause.p1.v"></dd>
+          <dt data-t="pause.p2.k"></dt><dd data-t="pause.p2.v"></dd>
+          <dt data-t="pause.p3.k"></dt><dd data-t="pause.p3.v"></dd>
+          <dt data-t="pause.p4.k"></dt><dd data-t="pause.p4.v"></dd>
+          <dt data-t="pause.p5.k"></dt><dd data-t="pause.p5.v"></dd>
+          <dt data-t="pause.p6.k"></dt><dd data-t="pause.p6.v"></dd>
         </dl>
-        <div class="hGrp">The view</div>
+        <div class="hGrp" data-t="pause.h.view"></div>
         <dl>
-          <dt>W A S D</dt><dd>move the view &middot; hold shift to go faster</dd>
-          <dt>middle-drag</dt><dd>turn the view (or shift-drag)</dd>
-          <dt>Q &middot; E</dt><dd>turn it a step at a time</dd>
-          <dt>wheel</dt><dd>zoom in and out</dd>
+          <dt data-t="pause.v1.k"></dt><dd data-t="pause.v1.v"></dd>
+          <dt data-t="pause.v2.k"></dt><dd data-t="pause.v2.v"></dd>
+          <dt data-t="pause.v3.k"></dt><dd data-t="pause.v3.v"></dd>
+          <dt data-t="pause.v4.k"></dt><dd data-t="pause.v4.v"></dd>
         </dl>
     </div>
     <p id="pauseNote"></p>
@@ -1068,13 +1145,13 @@
 
 <div id="overlay" hidden>
   <div class="card">
-    <div class="eyebrow">How it ended</div>
-    <h2 id="ovTitle">You held</h2>
+    <div class="eyebrow" data-t="end.eyebrow"></div>
+    <h2 id="ovTitle"></h2>
     <p id="ovBody"></p>
     <div id="ovStats"></div>
     <div class="ovBtns">
-      <button id="ovAgain" type="button">Go again</button>
-      <button id="ovMenu" type="button">Main menu</button>
+      <button id="ovAgain" type="button" data-t="end.again"></button>
+      <button id="ovMenu" type="button" data-t="end.menu"></button>
     </div>
   </div>
 </div>
