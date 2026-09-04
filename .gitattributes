@@ -1,0 +1,12 @@
+# Two git installations share this working tree: Git for Windows on Jarrod's
+# machine and the Linux git this session runs. Windows git checks out CRLF by
+# default, the Linux one does not, so every file showed as modified after a
+# pull and one careless `git add -A` would have committed a whole-repo
+# whitespace diff. Pinning to LF makes both agree; the index is already LF, so
+# this changes nothing that is committed.
+* text=auto eol=lf
+
+*.png  binary
+*.gif  binary
+*.mp3  binary
+*.zip  binary
