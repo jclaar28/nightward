@@ -3250,7 +3250,11 @@ function meshPedestal(rad){
 // few dozen instances per edge buys terrain-following for free: each pad sits
 // at gy() for its own position, so a road up a slope lies on the slope.
 function meshRoadPad(){
-  var M=new Mesh(true), w=CELL*0.40, l=CELL*0.34;
+  // Wider across the road than along it, and drawn at half that spacing, so the
+  // pads overlap heavily and the surface reads as one worn strip rather than a
+  // row of tiles. Squareish pads at their own spacing are what made the first
+  // version look like paving slabs.
+  var M=new Mesh(true), w=CELL*0.46, l=CELL*0.30;
   M.quad([-w,0,-l],[w,0,-l],[w,0,l],[-w,0,l],W,1.0);
   return M;
 }
@@ -4679,7 +4683,7 @@ function init(renderer, cv, settings, endCb){
            debris:MAX_PARTS,
            bolt:400,arrow:300,wall:1400,soldier:120,archer:120,worker:120,
            commander:8,
-           marker:24,salvage:24,cottage:120,nest:24,site:600,road:2600};
+           marker:24,salvage:24,cottage:120,nest:24,site:600,road:5200};
   ["hall","tower","ballista","brazier","barracks","archery","cottage",
    "wall","wpost","gate",
    "soldier","archer","worker","commander","salvage","nest",
@@ -7412,68 +7416,84 @@ function pack(){
     } else n.spark=put(buf.spark,n.spark,pa.x,pa.y,pa.z,0,pc,pa.sc*(0.45+0.55*pf),pc);
   }
   // ---- roads ---------------------------------------------------------------
-  // The line in S.roadE is dead straight, and drawn straight it reads as tiling
-  // rather than as a track somebody wore into the ground. So the centre stays
-  // exactly where the simulation put it — speed and routing use the true
-  // segment — and only the pads wander around it: a slow meander for the shape
-  // of the road, per-pad scatter for its surface, and loose gravel spilling off
-  // both verges so it has no hard edge.
+  // The line in S.roadE is dead straight, and drawn straight it reads as
+  // tiling. So the centre stays exactly where the simulation put it — speed and
+  // routing use the true segment — and only the pads wander around it.
   //
-  // All of it comes out of padHash, never Math.random(). A road redrawn with
-  // fresh noise every frame boils, and it is the kind of wrong that looks
-  // deliberate in a screenshot and awful in motion.
+  // The surface and the edge are drawn by different rules, and that split is
+  // the whole trick. Varying colour, size and angle on every pad makes each one
+  // legible as its own square — splotchy. So the body is near-uniform and
+  // heavily overlapped, and the raggedness is silhouette only: the edge pads
+  // are the SAME colour as the body, which means they can change the shape of
+  // the strip without ever reading as a patch inside it. Only the grit, which
+  // is tiny and sparse, is allowed to differ in colour at all.
+  //
+  // All of it comes out of padHash, never Math.random(). pack() runs every
+  // frame, so random scatter would boil.
   var RDS=ROAD(), pad=(RDS.pad===undefined?0.9:RDS.pad);
   var rough=(RDS.rough===undefined?1:RDS.rough);
-  var DIRT_A=[0.40,0.345,0.265], DIRT_B=[0.285,0.245,0.195],
-      GRIT=[0.455,0.435,0.395];
+  var DIRT=[0.375,0.325,0.250];
   for(i=0;i<S.roadE.length;i++){
     var re=S.roadE[i], ra=nodeById(re.a), rb=nodeById(re.b);
     if(!ra||!rb) continue;
     var rdx=rb.x-ra.x, rdz=rb.z-ra.z, rL=Math.hypot(rdx,rdz);
     if(rL<0.01) continue;
+    var ux=rdx/rL, uz=rdz/rL, nx=-uz, nz=ux;   // along, and across
     var yaw=Math.atan2(rdz,rdx);
-    // unit vector across the road, for offsetting a pad sideways
-    var nx=-rdz/rL, nz=rdx/rL;
     var f=re.done?1:Math.max(0,Math.min(1,re.prog/Math.max(0.001,re.need)));
-    // A finished road is a continuous surface; an unbuilt one is sparse stakes,
-    // kept deliberately tidy so a queued route reads as marked-out intent
-    // rather than as a road that is somehow not helping.
-    var step=re.done?pad:pad*3.0;
-    var cnt=Math.max(1,Math.floor(rL/step));
-    // phase and wavelength per edge, so two roads never meander in step
     var ph=padHash(re.a,re.b,0,7)*6.283, wav=5.0+padHash(re.a,re.b,0,8)*7.0;
-    for(var q=0;q<=cnt;q++){
-      var t=q/cnt, along=t*rL;
-      var laid=re.done||t<=f;
-      if(!laid&&t>f+0.02) continue;
-      if(!re.done){
-        // stakes: on the line, barely varied
-        var sx=ra.x+rdx*t, sz=ra.z+rdz*t;
+
+    if(!re.done){
+      // Stakes: tidy, on the line, sparse. A marked-out route should read as
+      // intent rather than as a badly made road.
+      var scnt=Math.max(1,Math.floor(rL/(pad*3.0)));
+      for(var sq=0;sq<=scnt;sq++){
+        var st2=sq/scnt;
+        if(st2>f+0.02) continue;
+        var sx=ra.x+rdx*st2, sz=ra.z+rdz*st2;
         n.road=put(buf.road,n.road,sx,gy(sx,sz)+0.03,sz,yaw,[0.30,0.30,0.28],
                    0.42,[0.30,0.30,0.28]);
-        continue;
       }
+      continue;
+    }
+
+    // Half-spacing: consecutive pads overlap by more than half their length, so
+    // the strip closes up instead of showing seams.
+    var step=pad*0.5, cnt=Math.max(1,Math.ceil(rL/step));
+    for(var q=0;q<=cnt;q++){
+      var t=q/cnt, along=t*rL;
+      // the meander is a property of the road, so body and verges share it
+      var mean=(Math.sin(ph+along/wav)*0.30 +
+                Math.sin(ph*1.7+along/(wav*0.43))*0.12)*rough;
       var h1=padHash(re.a,re.b,q,1), h2=padHash(re.a,re.b,q,2),
           h3=padHash(re.a,re.b,q,3), h4=padHash(re.a,re.b,q,4);
-      // meander: low frequency, so the road curves rather than looks noisy
-      var mean=Math.sin(ph+along/wav)*0.30 + Math.sin(ph*1.7+along/(wav*0.43))*0.12;
-      var side=(mean+(h1-0.5)*0.34)*rough;
-      var creep=(h2-0.5)*step*0.55*rough;         // uneven spacing along the run
-      var px=ra.x+rdx*t+nx*side+(rdx/rL)*creep;
-      var pz=ra.z+rdz*t+nz*side+(rdz/rL)*creep;
-      var mix=h3, col=[DIRT_A[0]+(DIRT_B[0]-DIRT_A[0])*mix,
-                       DIRT_A[1]+(DIRT_B[1]-DIRT_A[1])*mix,
-                       DIRT_A[2]+(DIRT_B[2]-DIRT_A[2])*mix];
-      n.road=put(buf.road,n.road,px,gy(px,pz)+0.03,pz,
-                 yaw+(h4-0.5)*0.55*rough, col,
-                 0.78+h1*0.5, col);
-      // gravel off the verges: smaller, paler, further out, and only sometimes,
-      // so the road fades into the grass instead of stopping at a line
-      if(rough>0&&h2>0.42){
-        var gs=(h4>0.5?1:-1)*(0.55+h3*0.75)*rough;
-        var gx=px+nx*gs, gz2=pz+nz*gs;
+      // Colour drifts along the run, not per pad, and gently: a short
+      // wavelength here bands the road into visible stripes across its width.
+      var sh=1+Math.sin(ph*2.3+along*0.085)*0.030;
+      var col=[DIRT[0]*sh, DIRT[1]*sh, DIRT[2]*sh];
+      var bx=ra.x+ux*along+nx*mean, bz=ra.z+uz*along+nz*mean;
+      // body: near-uniform, barely turned, so nothing reads as a separate tile
+      n.road=put(buf.road,n.road,bx,gy(bx,bz)+0.03,bz,
+                 yaw+(h1-0.5)*0.10*rough, col, 1.0+(h2-0.5)*0.10, col);
+      if(rough<=0) continue;
+      // Edge bulge: a smaller pad pushed just off one side, in the body's own
+      // colour and at the body's own angle. It widens the strip irregularly and
+      // is invisible as an object — which is the point. Anything bigger, or a
+      // shade off, comes back as a tab stuck to the side of the road.
+      if(h3>0.30){
+        var vs=((h4>0.5)?1:-1)*(0.26+h3*0.26)*rough;
+        var vx=bx+nx*vs, vz=bz+nz*vs;
+        n.road=put(buf.road,n.road,vx,gy(vx,vz)+0.029,vz,
+                   yaw+(h2-0.5)*0.16*rough, col, 0.50+h1*0.28, col);
+      }
+      // Grit: the only thing allowed its own colour, and small enough that a
+      // few specks read as loose stone rather than as a second surface.
+      if(h2>0.80){
+        var gs=((h1>0.5)?1:-1)*(0.62+h4*0.42)*rough;
+        var gx=bx+nx*gs, gz2=bz+nz*gs;
+        var gc=[col[0]*1.10,col[1]*1.11,col[2]*1.14];
         n.road=put(buf.road,n.road,gx,gy(gx,gz2)+0.028,gz2,
-                   yaw+(h3-0.5)*2.2, GRIT, 0.26+h1*0.22, GRIT);
+                   yaw+(h3-0.5)*3.0, gc, 0.13+h4*0.10, gc);
       }
     }
   }

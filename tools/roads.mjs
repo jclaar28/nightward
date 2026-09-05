@@ -211,5 +211,29 @@ check('the pads are scattered rather than laid on a ruler', drawn.spread > 0.1,
 check('...and the scatter is fixed, not redrawn every frame', drawn.stable,
       drawn.stable ? 'identical after three seconds' : 'the road is crawling');
 
+// ---- and a big network still fits the buffer -------------------------------
+// "Miss the cap and it silently truncates" is a documented failure mode in this
+// codebase, and roads are the only thing whose instance count is set by how
+// much the player chooses to build. So the headroom is measured, not assumed.
+const dense = await page.evaluate(() => {
+  const G = __hf.game, S = __nw.state();
+  S.roadN.length = 0; S.roadE.length = 0; S.roadSeq = 0;
+  // a spider's web of full-length spokes with a ring joining them: far more
+  // road than a real player would lay, and every segment finished
+  let laid = 0;
+  for (let k = 0; k < 20; k++) {
+    const a = k / 20 * 6.283, b = (k + 1) / 20 * 6.283;
+    if (G.queueRoad(0, 0, Math.cos(a) * 25, Math.sin(a) * 25)) laid++;
+    if (G.queueRoad(Math.cos(a) * 25, Math.sin(a) * 25,
+                    Math.cos(b) * 25, Math.sin(b) * 25)) laid++;
+  }
+  S.roadE.forEach(e => { e.done = true; e.prog = e.need; });
+  S.roadVer++;
+  return { laid, edges: S.roadE.length, pads: __nw.frame().counts.road || 0 };
+});
+check('a network far bigger than anyone would build still fits',
+      dense.pads > 0 && dense.pads < 5200,
+      `${dense.edges} edges drew ${dense.pads} pads against a 5200 cap`);
+
 await close();
 done(errors);

@@ -65,6 +65,12 @@ does shorten a trip in seconds, that a direct order still crosses a road instead
 of turning down it, and that the flow field is byte-identical with roads
 present.
 
+It also checks the buffer cap against a network far bigger than anyone would
+build — 40 full-length edges in a spoked web draw 2895 pads against a 5200 cap.
+Roads are the only thing whose instance count is set by how much the player
+decides to build, and "miss the cap and it silently truncates" is a documented
+failure mode here, so the headroom is measured rather than assumed.
+
 It also compares two frames three seconds apart: the worn look of a road is
 scatter, and scatter drawn from `Math.random()` inside `pack()` would be redrawn
 every frame and the road would boil. Hashing the noise off position is the fix

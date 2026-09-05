@@ -2091,7 +2091,11 @@ function meshPedestal(rad){
 // few dozen instances per edge buys terrain-following for free: each pad sits
 // at gy() for its own position, so a road up a slope lies on the slope.
 function meshRoadPad(){
-  var M=new Mesh(true), w=CELL*0.40, l=CELL*0.34;
+  // Wider across the road than along it, and drawn at half that spacing, so the
+  // pads overlap heavily and the surface reads as one worn strip rather than a
+  // row of tiles. Squareish pads at their own spacing are what made the first
+  // version look like paving slabs.
+  var M=new Mesh(true), w=CELL*0.46, l=CELL*0.30;
   M.quad([-w,0,-l],[w,0,-l],[w,0,l],[-w,0,l],W,1.0);
   return M;
 }
