@@ -56,6 +56,22 @@ every composed string as unkeyed, and joining an element's text nodes together
 blamed a card built from three keyed fragments for the concatenation of them.
 Both now compare per text node against the template's *shape*.
 
+**`roads.mjs`** — roads are the first graph in a game of cells, the first thing
+workers build with their hands, and the first thing that changes how fast a unit
+moves; each can be wrong while looking fine. Checks that a near-miss endpoint
+joins an existing node rather than twinning it, that an unattended road makes no
+progress where every other site would tick anyway, that a finished road really
+does shorten a trip in seconds, that a direct order still crosses a road instead
+of turning down it, and that the flow field is byte-identical with roads
+present.
+
+Two of its checks were weak first and are worth copying the fix from. The trip
+it measured ran along a dogleg, which only wins ~10% because the extra distance
+eats the bonus — true, but a bonus halved by accident would still have passed,
+so it now also measures a road laid along the route, where the whole 35% is on
+the table. And "the ordered unit strayed 0.00u sideways" is exactly what a unit
+that never moved would report, so it now asserts the trip was actually made.
+
 **`audio.mjs`** — renders every sound offline and measures it. "It did not
 throw" is not a test for a sound: it has a level, a length, a weight and a
 stereo position, and every one is a number you can be wrong about. Checks that

@@ -482,8 +482,12 @@ HFGAME.UI.hotbar=function(){
     n.classList.toggle("locked",!!locked);
     n.setAttribute("aria-pressed",S.sel===t?"true":"false");
     var c=n.querySelector(".c"), b=n.querySelector(".s");
-    if(c) c.textContent=T.cost?M.t("bld.supply",{n:T.cost})
-                              :(M.t("bld.free")+" · "+M.t("bld.required"));
+    // Three different kinds of price, and "free · required" belongs only to the
+    // hall. A road costs no supply but is not free — it costs the workers who
+    // are not gathering while they lay it, and the card should say so.
+    if(c) c.textContent = T.road ? M.t("bld.labour")
+                        : T.cost ? M.t("bld.supply",{n:T.cost})
+                        : (M.t("bld.free")+" · "+M.t("bld.required"));
     if(b) b.textContent=T.blurb?T.blurb(T):"";
   });
 };

@@ -1392,6 +1392,25 @@ var STAT_DEFS={
      hint:"how much harder each nest pushes once its neighbours are gone — 0 is off, 1 cancels the cut entirely"}
   ]},
 
+  // Roads are the one thing the player places that ignores the build grid, so
+  // their numbers are lengths and speeds rather than per-building costs.
+  road:{ note:"Free-angle routes workers build by hand. No supply, no decay.", fields:[
+    {k:"build",  label:"Build",         def:2.6, lo:0.1, hi:30,  step:0.1, unit:"s/u",
+     hint:"worker-seconds to finish one unit of length — the whole cost of a road"},
+    {k:"speed",  label:"Speed on road", def:0.55,lo:0,   hi:3,   step:0.05, unit:"×",
+     hint:"how much faster your own units move along one; the horde never benefits"},
+    {k:"width",  label:"Width",         def:1.1, lo:0.3, hi:4,   step:0.1, unit:"u",
+     hint:"how close a unit has to be to the line to count as on it"},
+    {k:"snap",   label:"Snap",          def:2.4, lo:0,   hi:8,   step:0.1, unit:"u",
+     hint:"an endpoint this close to a node, a building or a pile joins it instead of making a new one"},
+    {k:"pad",    label:"Pad spacing",   def:0.9, lo:0.3, hi:3,   step:0.1, unit:"u",
+     hint:"how far apart the pads that draw a road sit — smaller is smoother and costs more instances"},
+    {k:"minLen", label:"Shortest run",  def:2.0, lo:0.5, hi:10,  step:0.5, unit:"u",
+     hint:"a drag shorter than this is a misclick, not a road"},
+    {k:"maxLen", label:"Longest run",   def:26,  lo:4,   hi:120, step:1,  int:true, unit:"u",
+     hint:"one drag cannot span the map; long routes are several segments"}
+  ]},
+
   // Salvage is a slow drip from a deep well, not a morning's work. A round runs
   // for days now, so a pile has to outlast several of them while paying little
   // enough per trip that it never funds a defence on its own.
@@ -1657,7 +1676,12 @@ var TEXT_DEFS={
   "bld.barracks.blurb":{g:"bld",def:"{cap} soldiers · {retrain}s each"},
   "bld.archery.name":{g:"bld",def:"Archery Range"},
   "bld.archery.blurb":{g:"bld",def:"{cap} archers · {retrain}s each"},
+  "bld.road.name":{g:"bld",def:"Road"},
+  "bld.road.blurb":{g:"bld",def:"drag a run · no supply"},
+  "bld.road.tooshort":{g:"bld",def:"too short to be worth laying"},
+  "bld.road.toolong":{g:"bld",def:"too long — lay it in stages"},
   "bld.free":{g:"bld",def:"free"},
+  "bld.labour":{g:"bld",def:"worker time"},
   "bld.required":{g:"bld",def:"required"},
   "bld.supply":{g:"bld",def:"{n} supply"},
 
@@ -2059,6 +2083,16 @@ function meshPedestal(rad){
   }
   return M;
 }
+// One pad of a road. A road edge is drawn as a run of these along its length
+// rather than one stretched quad, because the instance stride carries a single
+// UNIFORM scale — there is no way to stretch a quad along one axis. Paying a
+// few dozen instances per edge buys terrain-following for free: each pad sits
+// at gy() for its own position, so a road up a slope lies on the slope.
+function meshRoadPad(){
+  var M=new Mesh(true), w=CELL*0.40, l=CELL*0.34;
+  M.quad([-w,0,-l],[w,0,-l],[w,0,l],[-w,0,l],W,1.0);
+  return M;
+}
 function meshTile(){
   var M=new Mesh(true), s=CELL*0.46;
   M.quad([-s,0,-s],[s,0,-s],[s,0,s],[-s,0,s],W,1.0);
@@ -2097,6 +2131,6 @@ return {
   wedge:wedge, xform:xform,
   buildBone:buildBone, jointTop:jointTop, partBase:partBase,
   TEX_MODES:TEX_MODES, MAT_MODES:MAT_MODES,
-  meshPedestal:meshPedestal, meshTile:meshTile
+  meshPedestal:meshPedestal, meshTile:meshTile, meshRoadPad:meshRoadPad
 };
 })();

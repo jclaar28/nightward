@@ -2551,6 +2551,25 @@ var STAT_DEFS={
      hint:"how much harder each nest pushes once its neighbours are gone — 0 is off, 1 cancels the cut entirely"}
   ]},
 
+  // Roads are the one thing the player places that ignores the build grid, so
+  // their numbers are lengths and speeds rather than per-building costs.
+  road:{ note:"Free-angle routes workers build by hand. No supply, no decay.", fields:[
+    {k:"build",  label:"Build",         def:2.6, lo:0.1, hi:30,  step:0.1, unit:"s/u",
+     hint:"worker-seconds to finish one unit of length — the whole cost of a road"},
+    {k:"speed",  label:"Speed on road", def:0.55,lo:0,   hi:3,   step:0.05, unit:"×",
+     hint:"how much faster your own units move along one; the horde never benefits"},
+    {k:"width",  label:"Width",         def:1.1, lo:0.3, hi:4,   step:0.1, unit:"u",
+     hint:"how close a unit has to be to the line to count as on it"},
+    {k:"snap",   label:"Snap",          def:2.4, lo:0,   hi:8,   step:0.1, unit:"u",
+     hint:"an endpoint this close to a node, a building or a pile joins it instead of making a new one"},
+    {k:"pad",    label:"Pad spacing",   def:0.9, lo:0.3, hi:3,   step:0.1, unit:"u",
+     hint:"how far apart the pads that draw a road sit — smaller is smoother and costs more instances"},
+    {k:"minLen", label:"Shortest run",  def:2.0, lo:0.5, hi:10,  step:0.5, unit:"u",
+     hint:"a drag shorter than this is a misclick, not a road"},
+    {k:"maxLen", label:"Longest run",   def:26,  lo:4,   hi:120, step:1,  int:true, unit:"u",
+     hint:"one drag cannot span the map; long routes are several segments"}
+  ]},
+
   // Salvage is a slow drip from a deep well, not a morning's work. A round runs
   // for days now, so a pile has to outlast several of them while paying little
   // enough per trip that it never funds a defence on its own.
@@ -2816,7 +2835,12 @@ var TEXT_DEFS={
   "bld.barracks.blurb":{g:"bld",def:"{cap} soldiers · {retrain}s each"},
   "bld.archery.name":{g:"bld",def:"Archery Range"},
   "bld.archery.blurb":{g:"bld",def:"{cap} archers · {retrain}s each"},
+  "bld.road.name":{g:"bld",def:"Road"},
+  "bld.road.blurb":{g:"bld",def:"drag a run · no supply"},
+  "bld.road.tooshort":{g:"bld",def:"too short to be worth laying"},
+  "bld.road.toolong":{g:"bld",def:"too long — lay it in stages"},
   "bld.free":{g:"bld",def:"free"},
+  "bld.labour":{g:"bld",def:"worker time"},
   "bld.required":{g:"bld",def:"required"},
   "bld.supply":{g:"bld",def:"{n} supply"},
 
@@ -3218,6 +3242,16 @@ function meshPedestal(rad){
   }
   return M;
 }
+// One pad of a road. A road edge is drawn as a run of these along its length
+// rather than one stretched quad, because the instance stride carries a single
+// UNIFORM scale — there is no way to stretch a quad along one axis. Paying a
+// few dozen instances per edge buys terrain-following for free: each pad sits
+// at gy() for its own position, so a road up a slope lies on the slope.
+function meshRoadPad(){
+  var M=new Mesh(true), w=CELL*0.40, l=CELL*0.34;
+  M.quad([-w,0,-l],[w,0,-l],[w,0,l],[-w,0,l],W,1.0);
+  return M;
+}
 function meshTile(){
   var M=new Mesh(true), s=CELL*0.46;
   M.quad([-s,0,-s],[s,0,-s],[s,0,s],[-s,0,s],W,1.0);
@@ -3256,7 +3290,7 @@ return {
   wedge:wedge, xform:xform,
   buildBone:buildBone, jointTop:jointTop, partBase:partBase,
   TEX_MODES:TEX_MODES, MAT_MODES:MAT_MODES,
-  meshPedestal:meshPedestal, meshTile:meshTile
+  meshPedestal:meshPedestal, meshTile:meshTile, meshRoadPad:meshRoadPad
 };
 })();
 
@@ -4391,6 +4425,13 @@ var TYPES={
   hall : {cat:"core", foot:3, scale:1.00, cost:0,
           colA:M.PAL.plaster, colB:M.PAL.slate, spawns:"worker",
           blurb:function(t){ return M.t("bld.hall.blurb",{cap:t.cap, raise:t.raise}); }},
+  // A road is in here so the dock, the tabs and the number keys treat it like
+  // anything else you hold. `road:true` is the flag every piece of cell code
+  // checks: it is never placed into S.cells, has no footprint and no asset, and
+  // input diverts on it before place() is ever reached.
+  road : {cat:"core", road:true, foot:0, scale:1.00, cost:0,
+          colA:M.PAL.stone, colB:M.PAL.timber,
+          blurb:function(t){ return M.t("bld.road.blurb"); }},
   cottage:{cat:"core", foot:1, scale:0.66, spawns:"worker",
           colA:M.PAL.plaster, colB:M.PAL.thatch,
           blurb:function(t){ return M.t("bld.cottage.blurb",{cap:t.cap, retrain:t.retrain}); }},
@@ -4610,11 +4651,12 @@ function init(renderer, cv, settings, endCb){
     spark:R.makeBatch(M.buildAsset("spark"),false),
     ring :R.makeBatch(M.buildAsset("ring"),false), tile:R.makeBatch(M.meshTile(),false),
     grid :R.makeBatch(M.buildAsset("grid"),false),
+    road :R.makeBatch(M.meshRoadPad(),false),
     site :R.makeBatch(M.buildAsset("site"))
   };
   // corpses first so living attackers and effects draw over them; a site is
   // ground clutter, so it sits with the salvage rather than with the buildings
-  BATCHES=[B.corpse,B.salvage,B.site,B.hall,B.tower,B.ballista,B.brazier,
+  BATCHES=[B.road,B.corpse,B.salvage,B.site,B.hall,B.tower,B.ballista,B.brazier,
            B.barracks,B.archery,B.cottage,
            B.wall,B.wpost,B.gate,
            B.nest,B.soldier,B.archer,B.worker,B.commander,
@@ -4635,11 +4677,12 @@ function init(renderer, cv, settings, endCb){
            debris:MAX_PARTS,
            bolt:400,arrow:300,wall:1400,soldier:120,archer:120,worker:120,
            commander:8,
-           marker:24,salvage:24,cottage:120,nest:24,site:600};
+           marker:24,salvage:24,cottage:120,nest:24,site:600,road:2600};
   ["hall","tower","ballista","brazier","barracks","archery","cottage",
    "wall","wpost","gate",
    "soldier","archer","worker","commander","salvage","nest",
-   "corpse","bolt","arrow","spark","debris","ring","marker","tile","grid","site"].forEach(function(k){
+   "corpse","bolt","arrow","spark","debris","ring","marker","tile","grid","site",
+   "road"].forEach(function(k){
     buf[k]=new Float32Array(12*(CAP[k]||700));
   });
   // one buffer per bone: body holds one instance per attacker, arms and legs two
@@ -4702,6 +4745,11 @@ function newGame(seed,map,opt){
     send:RD.send||C.send||104,     // what one nest sends on the first night
     cells:{}, hall:null, enemies:[], bolts:[], parts:[], corpses:[], queue:[],
     units:[], markers:[], stance:"hold", marquee:null,
+    // Roads are a graph in world space, not cells: nodes sit wherever the
+    // player put them and edges run between them at any angle. Deliberately
+    // NOT in S.cells — that is keyed by grid position and would quantise away
+    // the only thing roads have that buildings do not.
+    roadN:[], roadE:[], roadSeq:0, roadVer:0, roadDirty:true,
     nodes:makeNodes(seed,map), gathered:0,
     dayLeft:dayLen, dayLen:dayLen,
     nightLeft:nightLen, nightLen:nightLen,
@@ -4777,6 +4825,7 @@ function footCells(t,gx,gz){
   return out;
 }
 function canPlace(t,gx,gz,p){
+  if(TYPES[t]&&TYPES[t].road) return false;   // roads are not cells; see queueRoad
   p=p||me();
   if(p.out) return false;
   if(t==="hall" && (p.hall||p.site)) return false;
@@ -5211,6 +5260,11 @@ function updateWorker(u,U,dt){
     return;
   }
   if(u.fix){ u.fix=null; u.fixOrder=false; }
+  // Road work outranks salvage, and a worker without a pile takes it too. It is
+  // the one job in the game that only advances while somebody is standing on
+  // it — every other site is a timer that runs whether anyone came or not — so
+  // the whole cost of a road is the workers who are not gathering meanwhile.
+  if(updateRoadwork(u,U,dt,op)) return;
   if(!u.job || u.job.amt<=0){
     u.job=null; u.mode="idle";
     stepToward(u,U,u.px,u.pz,0.18);
@@ -5218,7 +5272,7 @@ function updateWorker(u,U,dt){
   }
   var U2=U;
   if(u.mode==="toNode"||u.mode==="idle"){
-    if(stepToward(u,U2,u.job.x,u.job.z,1.15)) u.mode="gather";
+    if(stepVia(u,U2,u.job.x,u.job.z,1.15)) u.mode="gather";
     return;
   }
   if(u.job) u.job.worked=true;
@@ -5234,6 +5288,12 @@ function updateWorker(u,U,dt){
   }
   if(u.mode==="toHall"){
     if(!op||!op.hall){ u.mode="idle"; return; }
+    // The loaded leg routes too — it is the same job, and a road that only
+    // helped the empty half would be half a road.
+    var hx2=M.gx2w(op.hall.gx), hz2=M.gx2w(op.hall.gz);
+    if(S.roadE.length&&Math.hypot(hx2-u.x,hz2-u.z)>standOff(op.hall)+1.2){
+      if(!stepVia(u,U2,hx2,hz2,standOff(op.hall))) return;
+    }
     if(stepToBuilding(u,U2,op.hall)){
       op.supply+=Math.round(u.carry);
       S.gathered+=Math.round(u.carry);
@@ -5260,6 +5320,155 @@ function boxDist(x,z,b){
   return Math.hypot(dx,dz);
 }
 var TOUCH=0.95;
+// ---- routing over the graph ------------------------------------------------
+// The rule the whole feature turns on: the game routes JOBS, the player's
+// orders stay literal. A worker told to work a pile is being told what to do,
+// not which way to walk, so choosing the walk is ours. A right-click on ground
+// is a route in itself and goes straight there — which matters most at night,
+// when you point at a gap in the wall and want people at the gap.
+//
+// It is also what makes a network worth building: without it, a trunk road
+// serving three piles is worthless and you would need one straight road each.
+function roadDist(fromId,speedK){
+  // Dijkstra over built edges. Tens of nodes, so the simple O(n^2) scan is
+  // cheaper than the heap it would take to avoid it.
+  var dist={}, seen={}, i, j;
+  for(i=0;i<S.roadN.length;i++) dist[S.roadN[i].id]=Infinity;
+  dist[fromId]=0;
+  for(i=0;i<S.roadN.length;i++){
+    var bestId=null, bd=Infinity;
+    for(j=0;j<S.roadN.length;j++){
+      var id=S.roadN[j].id;
+      if(seen[id]||dist[id]>=bd) continue;
+      bd=dist[id]; bestId=id;
+    }
+    if(bestId===null) break;
+    seen[bestId]=1;
+    for(j=0;j<S.roadE.length;j++){
+      var e=S.roadE[j];
+      if(!e.done) continue;
+      var other=(e.a===bestId)?e.b:((e.b===bestId)?e.a:null);
+      if(other===null) continue;
+      var w=edgeLen(e)/speedK;
+      if(dist[bestId]+w<dist[other]) dist[other]=dist[bestId]+w;
+    }
+  }
+  return dist;
+}
+// A route as a list of points, or null when walking straight is no slower.
+function routeOver(sx,sz,tx,tz){
+  if(!S.roadE.length) return null;
+  var R=ROAD(), k=1+(R.speed===undefined?0.55:R.speed);
+  var straight=Math.hypot(tx-sx,tz-sz);
+  var i, best=null, bestCost=straight;
+  // entry: every node, priced by the walk to it plus the graph from it
+  for(i=0;i<S.roadN.length;i++){
+    var en=S.roadN[i];
+    var toEntry=Math.hypot(en.x-sx,en.z-sz);
+    if(toEntry>=bestCost) continue;             // cannot win even for free
+    var d=roadDist(en.id,k);
+    for(var j=0;j<S.roadN.length;j++){
+      var ex=S.roadN[j];
+      if(d[ex.id]===Infinity) continue;
+      var cost=toEntry+d[ex.id]+Math.hypot(tx-ex.x,tz-ex.z);
+      if(cost<bestCost-0.01){ bestCost=cost; best={a:en,b:ex}; }
+    }
+  }
+  if(!best) return null;
+  // The waypoints are the two ends; between them the unit is on the road and
+  // picks up the bonus from roadSpeed(), so it does not need the middle nodes
+  // spelled out unless the graph bends. Walking a bent route via its ends only
+  // would cut the corner and lose the bonus, so the path is rebuilt properly.
+  return roadPath(best.a,best.b,k,{x:tx,z:tz});
+}
+// The actual node sequence, recovered by walking the distance field downhill.
+function roadPath(a,b,k,dest){
+  var d=roadDist(a.id,k);
+  if(d[b.id]===Infinity) return null;
+  var pts=[], cur=b, guard=0;
+  while(cur&&cur.id!==a.id&&guard++<200){
+    pts.unshift({x:cur.x,z:cur.z});
+    var nxt=null;
+    for(var j=0;j<S.roadE.length;j++){
+      var e=S.roadE[j];
+      if(!e.done) continue;
+      var other=(e.a===cur.id)?e.b:((e.b===cur.id)?e.a:null);
+      if(other===null) continue;
+      var w=edgeLen(e)/k;
+      if(Math.abs(d[other]+w-d[cur.id])<1e-6){ nxt=nodeById(other); break; }
+    }
+    if(!nxt) return null;
+    cur=nxt;
+  }
+  pts.unshift({x:a.x,z:a.z});
+  pts.push({x:dest.x,z:dest.z});
+  return pts;
+}
+// Walk a cached route toward (tx,tz), recomputing when the target or the graph
+// moves. Returns true on arrival, exactly like stepToward, so the callers keep
+// the same shape.
+function stepVia(u,U,tx,tz,stop){
+  var ver=S.roadVer|0;
+  var r=u.route;
+  if(!r||r.ver!==ver||Math.abs(r.tx-tx)>0.5||Math.abs(r.tz-tz)>0.5){
+    var pts=routeOver(u.x,u.z,tx,tz);
+    u.route=r={ver:ver,tx:tx,tz:tz,pts:pts,i:0};
+  }
+  if(!r.pts) return stepToward(u,U,tx,tz,stop);
+  while(r.i<r.pts.length-1){
+    var w=r.pts[r.i];
+    if(Math.hypot(w.x-u.x,w.z-u.z)<=0.55){ r.i++; continue; }
+    stepToward(u,U,w.x,w.z,0);
+    return false;
+  }
+  return stepToward(u,U,tx,tz,stop);
+}
+
+// ---- road work ------------------------------------------------------------
+// Returns true when the worker is busy laying road and nothing else should run.
+//
+// A worker claims the nearest unbuilt edge belonging to its own player, walks
+// to the point on that edge nearest itself — not to an end, so a crew spreads
+// along a long run instead of queueing at one stake — and only then does the
+// progress move. Several workers on one edge finish it proportionally faster,
+// which is the whole reason to pull a crew off salvage.
+function nearestRoadwork(u,pid){
+  var best=null, bd=1e9;
+  for(var i=0;i<S.roadE.length;i++){
+    var e=S.roadE[i];
+    if(e.done||(e.own|0)!==(pid|0)) continue;
+    var a=nodeById(e.a), b=nodeById(e.b);
+    if(!a||!b) continue;
+    var q=segNear(u.x,u.z,a.x,a.z,b.x,b.z);
+    if(q.d<bd){ bd=q.d; best={e:e,x:q.x,z:q.z,d:q.d}; }
+  }
+  return best;
+}
+function updateRoadwork(u,U,dt,op){
+  if(!S.roadE.length) return false;
+  var job=nearestRoadwork(u,u.own|0);
+  if(!job){ if(u.mode==="road") u.mode="idle"; return false; }
+  // Carrying a load? Finish the delivery first. Dropping salvage on the ground
+  // to go and dig is the kind of "helpful" reshuffle that loses a player's
+  // afternoon of hauling.
+  if(u.carry>0) return false;
+  u.job=null;
+  u.mode="road";
+  if(!stepToward(u,U,job.x,job.z,0.35)) return true;
+  u.rot=Math.atan2(job.z-u.z,job.x-u.x);
+  if(u.atk<0) u.atk=0;
+  job.e.prog+=dt;
+  if(Math.random()<dt*1.6)
+    spark(job.x,PLAT+0.25,job.z,1,[0.72,0.66,0.54],0.6,1.1,0.22,0.4);
+  if(job.e.prog>=job.e.need){
+    job.e.prog=job.e.need;
+    job.e.done=true;
+    S.roadDirty=true; S.roadVer++;   // a finished edge changes every cached route
+    if(SND&&(u.own|0)===S.me) SND.place(job.x,job.z);
+  }
+  return true;
+}
+
 // Walk at a building until you are standing against it. Collision keeps the
 // unit out of the walls, so aiming straight at the middle is safe.
 function stepToBuilding(u,U,b,margin){
@@ -5267,7 +5476,7 @@ function stepToBuilding(u,U,b,margin){
   if(boxDist(u.x,u.z,b)<=margin) return true;
   var bx=M.gx2w(b.gx), bz=M.gx2w(b.gz);
   var dx=bx-u.x, dz=bz-u.z, L=Math.hypot(dx,dz)||1;
-  var sp=U.speed*dt_;
+  var sp=U.speed*roadSpeed(u.x,u.z)*dt_;
   moveUnit(u,u.x+dx/L*sp,u.z+dz/L*sp);
   u.rot=Math.atan2(dz,dx);
   return false;
@@ -5404,7 +5613,11 @@ function moveUnit(u,nx,nz){
 function stepToward(u,U,tx,tz,stop){
   var dx=tx-u.x, dz=tz-u.z, L=Math.hypot(dx,dz);
   if(L<=stop+0.02) return true;
-  var sp=U.speed*dt_, k=Math.min(sp,L-stop);
+  // The road bonus lives here and in stepToBuilding, and nowhere else. Both are
+  // reached only from the player's own unit code — the horde walks in its own
+  // loop off m.spd and never consults this, which is the whole of "the speed
+  // is yours alone".
+  var sp=U.speed*roadSpeed(u.x,u.z)*dt_, k=Math.min(sp,L-stop);
   moveUnit(u, u.x+dx/L*k, u.z+dz/L*k);
   u.rot=Math.atan2(dz,dx);
   return false;
@@ -5815,6 +6028,120 @@ function spawnGuard(nest){
   m.home=nest; m.guard=true;
   nest.guards++;
   return m;
+}
+// ===========================================================================
+// Roads
+// ===========================================================================
+// A node-and-edge graph in world space. Nodes are free positions; an edge is
+// two node ids plus how much of it has been built. Nothing here touches
+// S.cells, the flow field, or S.distDirty — a road changes how fast your own
+// units cross ground, never where anything decides to go.
+function ROAD(){ return M.statsOf("road")||{}; }
+function roadNode(x,z){
+  var R=ROAD(), snap=(R.snap===undefined?2.4:R.snap);
+  // Snap first: an endpoint a fraction of a unit from an existing node looks
+  // joined and is not, and a route that looks connected but is not will not
+  // route. Reusing the node IS the network.
+  var best=null, bd=snap*snap;
+  for(var i=0;i<S.roadN.length;i++){
+    var n=S.roadN[i], d=(n.x-x)*(n.x-x)+(n.z-z)*(n.z-z);
+    if(d<=bd){ bd=d; best=n; }
+  }
+  if(best) return best;
+  var mk={id:++S.roadSeq, x:x, z:z};
+  S.roadN.push(mk);
+  return mk;
+}
+function nodeById(id){
+  for(var i=0;i<S.roadN.length;i++) if(S.roadN[i].id===id) return S.roadN[i];
+  return null;
+}
+// Where a drag endpoint really lands: an existing node wins, then a building's
+// centre, then a salvage pile. Those three are the things worth connecting, so
+// they are what a road reaches for rather than the bare cursor position.
+function roadAnchor(x,z){
+  var R=ROAD(), snap=(R.snap===undefined?2.4:R.snap), s2=snap*snap;
+  var best=null, bd=s2, i;
+  for(i=0;i<S.roadN.length;i++){
+    var n=S.roadN[i], d=(n.x-x)*(n.x-x)+(n.z-z)*(n.z-z);
+    if(d<=bd){ bd=d; best={x:n.x,z:n.z,kind:"node"}; }
+  }
+  if(best) return best;
+  for(var k in S.cells){
+    var c=S.cells[k];
+    if(c.ref) continue;
+    var bx=M.gx2w(c.gx), bz=M.gx2w(c.gz), db=(bx-x)*(bx-x)+(bz-z)*(bz-z);
+    if(db<=bd){ bd=db; best={x:bx,z:bz,kind:"building"}; }
+  }
+  for(i=0;i<S.nodes.length;i++){
+    var p=S.nodes[i];
+    if(p.amt<=1) continue;
+    var dp=(p.x-x)*(p.x-x)+(p.z-z)*(p.z-z);
+    if(dp<=bd){ bd=dp; best={x:p.x,z:p.z,kind:"pile"}; }
+  }
+  return best||{x:x,z:z,kind:"open"};
+}
+function edgeLen(e){
+  var a=nodeById(e.a), b=nodeById(e.b);
+  if(!a||!b) return 0;
+  return Math.hypot(b.x-a.x,b.z-a.z);
+}
+// Why a drag is refused, in words the caller can show. Null means it is fine.
+function roadRefusal(ax,az,bx,bz){
+  var R=ROAD(), L=Math.hypot(bx-ax,bz-az);
+  if(L<(R.minLen===undefined?2:R.minLen)) return "bld.road.tooshort";
+  if(L>(R.maxLen===undefined?26:R.maxLen)) return "bld.road.toolong";
+  return null;
+}
+// The player-facing entry point, and the only one input calls. Same shape as
+// place(): a guest asks and the host answers with the next snapshot.
+function queueRoad(ax,az,bx,bz,pid){
+  if((pid===undefined||pid===null)&&guest())
+    return intent({m:"rd",ax:r2(ax),az:r2(az),bx:r2(bx),bz:r2(bz)});
+  var p=(pid===undefined||pid===null)?me():S.players[pid];
+  if(!p||p.out||!p.hall) return false;
+  var e=addRoad(ax,az,bx,bz,p.id);
+  if(e&&SND&&p.id===S.me) SND.place(ax,az);
+  return !!e;
+}
+function addRoad(ax,az,bx,bz,own){
+  if(roadRefusal(ax,az,bx,bz)) return null;
+  var a=roadNode(ax,az), b=roadNode(bx,bz);
+  if(a===b) return null;
+  for(var i=0;i<S.roadE.length;i++){
+    var e=S.roadE[i];
+    if((e.a===a.id&&e.b===b.id)||(e.a===b.id&&e.b===a.id)) return e;  // already there
+  }
+  var R=ROAD(), len=Math.hypot(b.x-a.x,b.z-a.z);
+  var mk={a:a.id, b:b.id, prog:0, need:len*(R.build===undefined?2.6:R.build),
+          done:false, own:own|0};
+  S.roadE.push(mk);
+  S.roadDirty=true; S.roadVer++;
+  return mk;
+}
+// Distance from a point to a segment, and how far along it that lands. Used
+// both for "am I on a road" and for finding the nearest point to walk to.
+function segNear(px,pz,ax,az,bx,bz){
+  var dx=bx-ax, dz=bz-az, L2=dx*dx+dz*dz;
+  var t=L2>0?((px-ax)*dx+(pz-az)*dz)/L2:0;
+  t=t<0?0:(t>1?1:t);
+  var qx=ax+dx*t, qz=az+dz*t;
+  return {d:Math.hypot(px-qx,pz-qz), t:t, x:qx, z:qz};
+}
+// The speed multiplier at a point: 1 off-road, 1+speed on a finished one.
+// Only ever called for the player's own units — the attacker loop does not
+// consult it, which is the whole of "the horde gets nothing".
+function roadSpeed(x,z){
+  if(!S.roadE.length) return 1;
+  var R=ROAD(), w=(R.width===undefined?1.1:R.width);
+  for(var i=0;i<S.roadE.length;i++){
+    var e=S.roadE[i];
+    if(!e.done) continue;
+    var a=nodeById(e.a), b=nodeById(e.b);
+    if(!a||!b) continue;
+    if(segNear(x,z,a.x,a.z,b.x,b.z).d<=w) return 1+(R.speed===undefined?0.55:R.speed);
+  }
+  return 1;
 }
 // What one nest sends tonight: its share of the night, ramping as the nights
 // go on, and pushed harder still by every sibling you have already pulled down.
@@ -6526,6 +6853,10 @@ function applyIntent(msg,pid){
   switch(msg.m){
     case "pl": place(msg.t,msg.gx|0,msg.gz|0,pid,msg.r||0); break;
     case "rm": removeAt(msg.gx|0,msg.gz|0,pid); break;
+    // The host re-snaps the guest's endpoints against its own graph rather than
+    // trusting the ones sent: the two sides can disagree about what existed
+    // when the drag started, and only one of them is authoritative.
+    case "rd": queueRoad(msg.ax,msg.az,msg.bx,msg.bz,pid); break;
     case "or": orderTo(byUid(msg.u||[],pid),msg.x,msg.z,true); break;
     case "jb":
       var nd=S.nodes[msg.n|0];
@@ -6566,6 +6897,9 @@ function snapshot(full){
               p.stance==="pursue"?1:0, p.site?r2(p.site.prog):-1];
     }),
     ne:S.nests.map(function(n){ return [Math.round(n.hp), n.dead?1:0]; }),
+    rn:S.roadN.map(function(n){ return [n.id, r2(n.x), r2(n.z)]; }),
+    re:S.roadE.map(function(e){ return [e.a, e.b, r2(e.prog), r2(e.need),
+                                        e.done?1:0, e.own|0]; }),
     nd:S.nodes.map(function(n){ return Math.round(n.amt); }),
     en:[], un:[]
   };
@@ -6616,6 +6950,17 @@ function applySnapshot(sn){
     S.nests[i].dead=!!sn.ne[i][1];
   }
   for(i=0;i<sn.nd.length&&i<S.nodes.length;i++) S.nodes[i].amt=sn.nd[i];
+
+  // Roads are rebuilt wholesale rather than diffed. The lists are tens of
+  // entries and only change when somebody places or finishes one, so the
+  // simple thing is also the cheap thing — and it cannot drift, which a diff
+  // against a graph the guest never authored certainly could.
+  if(sn.rn&&sn.re){
+    S.roadN=sn.rn.map(function(a){ return {id:a[0], x:a[1], z:a[2]}; });
+    S.roadE=sn.re.map(function(a){ return {a:a[0], b:a[1], prog:a[2], need:a[3],
+                                           done:!!a[4], own:a[5]|0}; });
+    S.roadVer++;
+  }
 
   if(sn.cl){
     S.cells={};
@@ -6911,7 +7256,8 @@ function pack(){
   var n={hall:0,tower:0,ballista:0,brazier:0,barracks:0,archery:0,cottage:0,
          wall:0,wpost:0,gate:0,salvage:0,
          soldier:0,archer:0,worker:0,commander:0,nest:0,
-         corpse:0,bolt:0,arrow:0,spark:0,debris:0,ring:0,marker:0,tile:0,grid:0,site:0};
+         corpse:0,bolt:0,arrow:0,spark:0,debris:0,ring:0,marker:0,tile:0,grid:0,site:0,
+         road:0};
   for(var rk0 in RIGDEF){
     n[rk0+"Body"]=0; n[rk0+"Arm"]=0; n[rk0+"Leg"]=0;
     if(RIGDEF[rk0].armL) n[rk0+"ArmL"]=0;
@@ -7053,6 +7399,43 @@ function pack(){
                     pa.sc*(0.5+0.5*pf),pcc,pa.life*5.0);
     } else n.spark=put(buf.spark,n.spark,pa.x,pa.y,pa.z,0,pc,pa.sc*(0.45+0.55*pf),pc);
   }
+  // ---- roads ---------------------------------------------------------------
+  // Pads along every edge. A finished road is continuous and earth-coloured; an
+  // unbuilt one is sparse pale stakes, so a route you have queued reads as
+  // intent rather than as a road that is somehow not helping.
+  var RDS=ROAD(), pad=(RDS.pad===undefined?0.9:RDS.pad);
+  for(i=0;i<S.roadE.length;i++){
+    var re=S.roadE[i], ra=nodeById(re.a), rb=nodeById(re.b);
+    if(!ra||!rb) continue;
+    var rdx=rb.x-ra.x, rdz=rb.z-ra.z, rL=Math.hypot(rdx,rdz);
+    if(rL<0.01) continue;
+    var yaw=Math.atan2(rdz,rdx);
+    var f=re.done?1:Math.max(0,Math.min(1,re.prog/Math.max(0.001,re.need)));
+    // Built length grows from the first node outward, so a half-built road is
+    // visibly half a road rather than a uniformly faint one.
+    var step=re.done?pad:pad*3.0;
+    var cnt=Math.max(1,Math.floor(rL/step));
+    for(var q=0;q<=cnt;q++){
+      var t=q/cnt, px=ra.x+rdx*t, pz=ra.z+rdz*t;
+      var laid=re.done||t<=f;
+      var col=laid?[0.36,0.32,0.26]:[0.30,0.30,0.28];
+      n.road=put(buf.road,n.road,px,gy(px,pz)+0.03,pz,yaw,col,
+                 laid?1:0.42,col);
+    }
+  }
+  // The drag preview: the run you would get, in the colour of whether you can
+  // have it. Drawn from the snapped anchors, not the cursor, so what you see
+  // is exactly what releasing would build.
+  if(S.roadDrag){
+    var dg=S.roadDrag, ddx=dg.bx-dg.ax, ddz=dg.bz-dg.az;
+    var dL=Math.hypot(ddx,ddz), dcol=dg.bad?[0.66,0.13,0.11]:[0.30,0.62,0.44];
+    var dyaw=Math.atan2(ddz,ddx), dn=Math.max(1,Math.floor(dL/pad));
+    for(var w2=0;w2<=dn;w2++){
+      var dt2=w2/dn, dpx=dg.ax+ddx*dt2, dpz=dg.az+ddz*dt2;
+      n.road=put(buf.road,n.road,dpx,gy(dpx,dpz)+0.05,dpz,dyaw,dcol,0.8,dcol);
+    }
+  }
+
   if(playable()){
     // The grid is a placement aid, so it only exists while you are placing. The
     // patch follows the cursor — there is no build ring any more, so a grid
@@ -7060,13 +7443,13 @@ function pack(){
     // its lines are the world's cell edges, not the cursor's. Snapping the
     // instance to a whole cell is what makes it read as ground you are moving
     // over rather than a mat dragged along under the building.
-    if(S.sel&&S.hover){
+    if(S.sel&&S.hover&&!TYPES[S.sel].road){
       var grx=Math.round(S.hover.x/M.CELL)*M.CELL;
       var grz=Math.round(S.hover.z/M.CELL)*M.CELL;
       n.grid=put(buf.grid,n.grid,grx,gy(grx,grz)+0.02,grz,0,
                  [0.40,0.46,0.44],1,[0.40,0.46,0.44]);
     }
-    if(S.hover&&S.sel){
+    if(S.hover&&S.sel&&!TYPES[S.sel].road){
       var ok=canPlace(S.sel,S.hover.gx,S.hover.gz);
       var tint=ok?[0.24,0.58,0.40]:[0.62,0.20,0.16];
       footCells(S.sel,S.hover.gx,S.hover.gz).forEach(function(cc){
@@ -7350,6 +7733,18 @@ function wireInput(){
       mode="none";
       return;
     }
+    // A road is drawn, not painted: press anchors one end, release lands the
+    // other. Both ends snap, so the anchor is taken through roadAnchor rather
+    // than from the raw cursor.
+    if(playable()&&S.sel==="road"){
+      var pr=pick(ev.clientX,ev.clientY);
+      if(!pr){ mode="none"; return; }
+      mode="road";
+      var an=roadAnchor(pr.x,pr.z);
+      S.roadDrag={ax:an.x, az:an.z, aKind:an.kind, bx:an.x, bz:an.z,
+                  bKind:an.kind, bad:"bld.road.tooshort"};
+      return;
+    }
     // holding a wall or gate means a drag is a paint stroke; anything else and
     // a drag is a selection box
     if(playable()&&(S.sel==="wall"||S.sel==="gate")){
@@ -7373,6 +7768,14 @@ function wireInput(){
     }
     var p=pick(ev.clientX,ev.clientY);
     S.hover=p;
+    if(mode==="road"){
+      if(p&&S.roadDrag){
+        var bn=roadAnchor(p.x,p.z);
+        S.roadDrag.bx=bn.x; S.roadDrag.bz=bn.z; S.roadDrag.bKind=bn.kind;
+        S.roadDrag.bad=roadRefusal(S.roadDrag.ax,S.roadDrag.az,bn.x,bn.z);
+      }
+      return;
+    }
     if(mode==="paint"){
       if(p&&(S.sel==="wall"||S.sel==="gate")) place(S.sel,p.gx,p.gz);
       return;
@@ -7388,7 +7791,14 @@ function wireInput(){
   function up(ev){
     if(active&&S&&ev){
       var moved=Math.abs(ev.clientX-downX)+Math.abs(ev.clientY-downY);
-      if(mode==="marquee"){
+      if(mode==="road"){
+        var rd=S.roadDrag;
+        // A refused drag leaves nothing behind. The preview has been showing
+        // why in red the whole time it was refused, so releasing on a bad
+        // stroke is a no-op rather than a surprise.
+        if(rd&&!rd.bad) queueRoad(rd.ax,rd.az,rd.bx,rd.bz);
+        S.roadDrag=null;
+      } else if(mode==="marquee"){
         var hit=unitsInBox(downX,downY,ev.clientX,ev.clientY);
         if(addSel) addToSelection(hit); else selectOnly(hit);
       } else if(mode==="maybe"&&moved<=DRAG_PX){
@@ -7397,7 +7807,9 @@ function wireInput(){
         if(playable()){
           var p=pick(ev.clientX,ev.clientY);
           var hit=p?rootOf(cellAt(p.gx,p.gz)):null;
-          if(p&&S.sel&&!hit){
+          if(p&&S.sel&&TYPES[S.sel].road){
+            /* a road takes a drag, not a click: one point is not a route */
+          } else if(p&&S.sel&&!hit){
             place(S.sel,p.gx,p.gz);
           } else if(hit&&(hit.own|0)===S.me&&!hit.site){
             selectBuilding(hit);
@@ -7510,6 +7922,12 @@ return {
   // exposed so a test can land credited damage on a nest without pretending to
   // be a soldier; the game itself only ever reaches it through hurtTarget
   hurtNest:function(n,amt,pid){ hurtTarget(n,amt,pid); },
+  // Roads, for the tools: queueRoad is the same door the player's drag uses,
+  // so a test exercises the real snapping rather than a back channel.
+  queueRoad:queueRoad, roadSpeed:roadSpeed, roadAnchor:roadAnchor,
+  roadRefusal:roadRefusal, stepVia:stepVia, routeOver:routeOver,
+  // the same call a right-click makes, so a test measures the real order path
+  orderTo:function(list,x,z){ orderTo(list,x,z); },
   // The four ground corners of what the camera can currently see, so the
   // minimap can draw the same box you are looking through.
   viewQuad:function(){
@@ -10118,8 +10536,12 @@ HFGAME.UI.hotbar=function(){
     n.classList.toggle("locked",!!locked);
     n.setAttribute("aria-pressed",S.sel===t?"true":"false");
     var c=n.querySelector(".c"), b=n.querySelector(".s");
-    if(c) c.textContent=T.cost?M.t("bld.supply",{n:T.cost})
-                              :(M.t("bld.free")+" · "+M.t("bld.required"));
+    // Three different kinds of price, and "free · required" belongs only to the
+    // hall. A road costs no supply but is not free — it costs the workers who
+    // are not gathering while they lay it, and the card should say so.
+    if(c) c.textContent = T.road ? M.t("bld.labour")
+                        : T.cost ? M.t("bld.supply",{n:T.cost})
+                        : (M.t("bld.free")+" · "+M.t("bld.required"));
     if(b) b.textContent=T.blurb?T.blurb(T):"";
   });
 };

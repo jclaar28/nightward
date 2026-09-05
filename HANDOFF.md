@@ -70,7 +70,7 @@ step and the routine that turns the world into instance buffers.
 
 ---
 
-## Four ideas that explain most of the codebase
+## Five ideas that explain most of the codebase
 
 **Assets are data, not meshes.** Every building, unit and prop is a list of
 primitives with positions, sizes and a shade. Nothing is modelled in an external
@@ -89,6 +89,19 @@ reload, range, build time, gather rate — is defined once in `STAT_DEFS`, edite
 live from the library, and read from that table by both the simulation and the
 HUD. There is deliberately no second copy anywhere. If you add a stat, add it
 there and let it flow.
+
+**Roads are a graph, and the only thing that ignores the grid.** Everything
+else you place snaps to a 1.5-unit cell; a road is nodes at free positions with
+edges between them at any angle, kept in `S.roadN` / `S.roadE` and never in
+`S.cells`. Pick Road from the dock and drag: both endpoints snap to a nearby
+node, building or salvage pile, which is what keeps the network connected
+rather than a pile of near-miss endpoints. They cost no supply — workers walk
+out and build them, and progress only moves while somebody is standing on the
+line, which makes roads the one construction in the game that is not a timer.
+Your own units move faster on a finished road and the horde never does, and a
+worker on a hauling loop will route over the network when that is quicker while
+a direct right-click order still walks straight at what you pointed at.
+`tools/roads.mjs` measures all of it.
 
 **So is the text table.** Every word the player reads is a key in `TEXT_DEFS`,
 and the Library has a **Text** tab beside **Models** that edits all of them
@@ -122,7 +135,9 @@ day/night cycles and both endings. `tools/instances.mjs` captures every
 instance the renderer is handed for one frame and asserts against it.
 `tools/balance.mjs` plays a full day and holds a night across seeds, with an
 `--ab` mode for comparing one stat against stock. `tools/text.mjs` walks every
-screen and fails on a word that no text key owns. `tools/README.md` covers
+screen and fails on a word that no text key owns. `tools/roads.mjs` proves
+snapping joins rather than duplicates, that a road only builds with a worker on
+it, and that the flow field cannot see one. `tools/README.md` covers
 writing new ones and the traps worth knowing.
 
 A worked example. "The nests are floating" could have been fixed by nudging a

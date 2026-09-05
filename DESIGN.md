@@ -8,7 +8,7 @@ here assumes them.
 It is a plan, not a specification. Where a decision has been made it is
 stated as a decision and given its reason, because a reason is what lets the
 next person disagree usefully. Where something is genuinely undecided it is
-in [§8](#8-what-is-still-open) and nowhere else — a doc that hedges in every
+in [§7](#7-what-is-still-open) and nowhere else — a doc that hedges in every
 paragraph is a doc nobody can build from.
 
 ---
@@ -29,8 +29,8 @@ night. Pulling one down is therefore a permanent cut to every night after —
 the only decision in the game that compounds.
 
 **So the whole design points outward.** Everything below exists to make
-leaving your walls possible, informed, and worth it: roads make the trip
-cheap, territory makes the ground you took stay taken, exploration tells you
+leaving your walls possible, informed, and worth it: roads (shipped) make the
+trip cheap, territory makes the ground you took stay taken, exploration tells you
 which nest to hit, and the tech tree is what you spend the proceeds on. If a
 proposed system does not serve that, it is probably not a Nightward system.
 
@@ -87,17 +87,15 @@ game about leaving your walls.
 
 ## 2. Order of work
 
-All four systems below are next, but they are not simultaneous, and the
+The three systems below are next, and they are not simultaneous — the
 dependencies between them are real:
 
-1. **Roads.** No prerequisites, and the economic premise it needs already
-   holds. Smallest change that makes the map feel bigger.
-2. **Territory and outposts.** Independent of exploration. Gives ground taken
-   a way to stay taken, which is what makes step 3 worth doing.
-3. **Fog of war and the scout.** The largest engineering item here. Do it
-   after roads and territory exist, so that the information it reveals is
-   information about something.
-4. **Tech tree.** Last, because it drags in status effects, and because it is
+1. **Territory and outposts.** Independent of exploration. Gives ground taken
+   a way to stay taken, which is what makes step 2 worth doing.
+2. **Fog of war and the scout.** The largest engineering item here. Do it
+   after territory exists, so the information it reveals is information about
+   something.
+3. **Tech tree.** Last, because it drags in status effects, and because it is
    the one system that is more fun to design once there is a longer game to
    spend across.
 
@@ -105,118 +103,13 @@ Doing them in this order means each one ships into a game that already wants
 it. Doing fog of war first means building a system whose payoff — knowing
 where to go — has nothing to act on yet.
 
----
-
-## 3. Roads
-
-**A road is a graph, not a grid.** Nodes at free positions, edges between them
-at any angle. Everything else the player places snaps to the 1.5-unit build
-grid, and a road network built that way would be all right angles and
-staircases — the opposite of what a road looks like. Roads are the one thing
-in the game that ignores the grid, and that is deliberate: it is what makes
-them read as *routes* rather than as more construction.
-
-**Workers build them, and that is the whole cost.** No supply. You draw a
-route, it appears as a line of stakes, and workers walk out and make it. The
-decision the player is making is "do I pull three workers off salvage for a
-minute", which is a real cost early — when workers are scarce and every load
-matters — and a cheap one late.
-
-> **This is new machinery, not a reuse.** Today a construction site is a
-> timer: `prog += dt`, and the building finishes whether anyone is near it or
-> not. The only thing in the game that waits on labour is the town hall, which
-> waits on the commander's hands. Roads generalise that to workers, which
-> means a job type, a way for idle workers to find the nearest unbuilt
-> segment, and progress that only advances while somebody is standing on it.
-> Worth costing honestly — it is the largest single piece of this feature.
-
-**You draw one by dragging, from the dock.** Pick Road, drag from a point to a
-point, release. Same gesture as the wall drag, so there is nothing new to
-learn, and the dock stays the one place building happens.
-
-**Endpoints snap.** On release, an endpoint within a short radius of an
-existing node, a building's edge, or a salvage pile becomes *that* node rather
-than a new one nearby. This is what keeps the network a network — without it a
-player ends up with a dozen endpoints a third of a unit apart that look joined
-and are not, and a route that visibly connects two piles does not route
-between them. Snapping is the feature; free angles are just what it allows.
-
-**The game routes jobs. The player's orders stay literal.** A worker sent to
-work a pile takes the fastest route it can find, road or not — the player said
-"work that pile", not "walk that line", so choosing the walk is the game's
-business. A right-click on bare ground is still a move order and still goes
-straight there. That line matters most during a night: you point at a gap in
-the wall and your soldiers go to the gap, not off down a road that happens to
-be pointing the same way.
-
-That distinction is also what makes a *network* worth building rather than one
-straight road per pile — a trunk out to a cluster serves everything on it,
-because the router will find its way onto the trunk from any job that starts
-or ends near it.
-
-**Speed is for your units only, and never fades.** The horde gets nothing:
-attackers arrive on a broad front so only a fraction would ever touch a road,
-and the risk would read as a tax nobody notices rather than a tension.
-Removing it also halves the tuning surface. And a built road stays built —
-there is no decay, because you paid workers for it and infrastructure you
-bought should not need re-buying.
-
-**The flow field must not know roads exist.** Not a lower path cost, not a
-tiebreak, nothing. A road that lowers path cost is a highway to your hall, and
-path cost is the entire tactical language of the wall system — the two would
-fight. Roads change how fast *your* units cross ground; they never change
-where anything decides to go.
-
-### What this costs
-
-**Free-at-the-margin means a fully paved map.** Worker time is a real
-constraint on night two and close to none on night nine, when you have workers
-to spare and nothing better for them to do. The end state is every pile
-connected and no decision left. Three ways out, none picked yet: a supply
-price per unit length after all; a cap on total road length; or a build time
-that scales with distance from the hall, so the far routes that matter most
-stay expensive. This is the first thing to watch in play, and it is in
-[§8](#8-what-is-still-open).
-
-**Roads make the map run dry sooner.** Faster round trips extract faster, so
-the day the piles empty moves earlier and their amounts probably have to rise.
-`tools/economy.mjs` already reports income per day and the day it ends, so
-this is measurable the moment roads exist — and a road that raises income
-without shortening the map means the speed bonus is too generous.
-
-### Build notes
-
-- **Two arrays, not a grid.** Nodes carry a position; edges carry two node ids,
-  a build progress and a length. Both are small enough to sit in the snapshot
-  whole, and neither is touched by the cell code — a road is not a building and
-  must never land in `S.cells`, which is keyed by grid position and would
-  quantise the thing away.
-- **An edge draws as a run of pads, not one stretched quad.** The instance
-  stride carries a single uniform scale, so a quad cannot be stretched along
-  one axis. Emitting a pad every fixed step along the edge, each at the edge's
-  yaw and at `gy()` for its own position, costs a few dozen instances per edge
-  and gets terrain-following for free. Uphill roads sit on the hill instead of
-  cutting through it.
-- **The batch is five edits.** An entry in `B`, a slot at the front of
-  `BATCHES` (it is a ground decal and draws under everything), a name in the
-  `buf` list, a `CAP` entry, and a zero in the per-frame counter reset. Miss
-  the counter and it silently draws nothing; miss the cap and it silently
-  truncates.
-- **Netcode is an intent, not a stream.** Unlike a worn path, a placed road
-  changes only when the player places one: a `rd` intent carrying the two
-  endpoints, validated and applied host-side exactly as `pl` is, plus the node
-  and edge lists in the snapshot. No per-tick traffic at all.
-
-Every number — build time per unit length, the speed bonus, the snap radius,
-the pad spacing — belongs in a `road` block in `STAT_DEFS`, tunable from the
-Library while a round runs.
-
-**Vision:** an upgraded logistics tier — trains or similar — once roads are
-proven. Not designed, just the obvious next rung.
+**Roads have shipped and have left this document.** That is the rule in
+[§8](#8-keeping-this-doc-honest) working: once a thing exists, describing it
+here is how this file goes stale. `HANDOFF.md` has it now.
 
 ---
 
-## 4. Territory & control
+## 3. Territory & control
 
 **Halls and outposts project a control radius; roads do not.** Logistics and
 territory stay separate concerns. Roads are how you move; control is what you
@@ -240,7 +133,7 @@ got for free.
 
 ---
 
-## 5. Exploration
+## 4. Exploration
 
 **Fog of war does not exist and is not free.** It needs its own pass: per-tile
 visibility, a persistent explored-but-not-currently-visible state, and a
@@ -259,7 +152,7 @@ on the map, and a player who does not should be guessing.
 
 ---
 
-## 6. Resources
+## 5. Resources
 
 **Salvage plus the nest cache is the whole economy for now, deliberately.**
 Salvage is already tuned for a long game — piles give up their contents
@@ -286,7 +179,7 @@ depot or inventory system.
 
 ---
 
-## 7. Tech tree & upgrades
+## 6. Tech tree & upgrades
 
 Two layers, deliberately connected:
 
@@ -315,19 +208,21 @@ after that has proven out.
 
 ---
 
-## 8. What is still open
+## 7. What is still open
 
-- **What stops the map being fully paved by night nine.** Worker time is a
-  real cost early and nearly none late. A supply price per length, a cap on
-  total length, or a build time that scales with distance from the hall would
-  each fix it differently. Watch it in play before picking.
+- **What stops the map being fully paved by night nine.** Roads cost worker
+  time, which is a real constraint early and nearly none late. A supply price
+  per length, a cap on total length, or a build time that scales with distance
+  from the hall would each fix it differently. Now shipped and unfixed — watch
+  it in play before picking.
 - **What roads do to the economy's shape.** Faster trips extract faster, so
-  pile amounts likely have to rise. Unmeasured until roads exist.
-- **Whether workers should build anything else.** Roads introduce
+  the day the piles empty should move earlier and their amounts probably have
+  to rise. `tools/economy.mjs` reports both numbers and roads now exist, so
+  this is measurable and simply has not been measured.
+- **Whether workers should build anything else.** Roads introduced
   worker-driven construction to a game where every other site is a timer. If
   it feels good, the question is whether buildings should work that way too —
-  which would be a large change to how a day is spent, and should not be made
-  by accident.
+  a large change to how a day is spent, and not one to make by accident.
 - **Whether `spite` is at the right value.** 0.5 was measured across eight
   seeds over twelve nights and satisfies both constraints in §1: clearing two
   of five still reaches 11.4 nights against 9.8 for clearing none, while the
@@ -360,7 +255,7 @@ after that has proven out.
 
 ---
 
-## 9. Keeping this doc honest
+## 8. Keeping this doc honest
 
 The previous version of this file went stale in under a week. It is worth
 saying why, because the failure was structural rather than careless.

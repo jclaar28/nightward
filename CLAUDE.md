@@ -83,6 +83,26 @@ dull it with distance; and everything shares one reverb and one soft ceiling.
 A new sound that is one oscillator, at one pitch, dry and centred will sound
 exactly like the thing this pass was undoing. `tools/audio.mjs` measures them.
 
+**A road is not a building and must never reach `S.cells`.** Roads are the one
+thing the player places off the grid: nodes at free positions in `S.roadN`,
+edges in `S.roadE`. `TYPES.road.road` is `true` and every piece of cell code
+checks it — `canPlace` refuses it outright, the ghost and grid skip it, and a
+click does nothing because a road needs two ends. Putting one through the cell
+path would quantise away the only thing it has that a building does not.
+
+**Roads must stay invisible to the flow field.** Not a lower path cost, not a
+tiebreak. `roadSpeed()` is called from `stepToward` and `stepToBuilding` only,
+both of which are reached solely from the player's own unit code; the attacker
+loop moves off `m.spd` and never consults it. A road that reaches the field is
+a highway to your hall, and it would read as a pathing bug rather than a design
+mistake. `tools/roads.mjs` diffs the field with and without roads present.
+
+**Road work is the only construction that needs a worker.** Every other site is
+`prog += dt` and finishes whether anyone came; a road edge advances only while
+a worker stands on it. That asymmetry is the feature — it is what makes the
+cost of a road the workers who are not gathering — so do not "fix" it into a
+timer for consistency.
+
 **Every player-facing string lives in one table too.** `TEXT_DEFS` in
 `d_core.js` defines it; `M.t(key, vars)` resolves it through the live overrides.
 Static markup carries `data-t="key"` (or `data-t-ph` for a placeholder) and gets
@@ -109,7 +129,8 @@ only on those flags.
 **The guest never mutates the world.** In multiplayer, a guest action calls
 `intent()` and returns; the host receives it in `applyIntent()` and runs the
 *same* function a local click would. Current intents: `pl` place, `rm` remove,
-`or` order, `jb` job, `fx` repair, `sh` shelter, `og` send out, `st` stance. A
+`or` order, `jb` job, `fx` repair, `sh` shelter, `og` send out, `st` stance,
+`rd` road. A
 new player action that changes the world needs an intent, a case in
 `applyIntent`, and an ownership check — every case there re-verifies that the
 target belongs to the sending player.
@@ -152,7 +173,8 @@ bug found here was found by reading numbers out of the running game.
 
 **Run `node tools/smoke.mjs`, `node tools/instances.mjs` and
 `node tools/campaign.mjs` after any change**, plus `node tools/text.mjs` for
-anything that puts words on screen, `node tools/economy.mjs` for
+anything that puts words on screen, `node tools/roads.mjs` for anything
+touching roads, movement or worker jobs, `node tools/economy.mjs` for
 anything touching salvage, workers or the map,
 and `node tools/balance.mjs --ab id.key=value` for anything touching difficulty.
 `tools/README.md` explains them; read it before writing a new one.
@@ -244,6 +266,12 @@ without talking to Jarrod first.
 - **Selling is only ever a hotbar button** with a structure selected. It is
   never a click on the world, because a misclick that deletes a tower mid-wave
   is unforgivable.
+- **The game routes jobs; the player's orders are literal.** A worker sent to
+  a pile takes the fastest route it can find, roads included — the player said
+  which pile, not which line to walk. A right-click on ground is a move order
+  and goes straight there, even if a road points the same way. Breaking that
+  during a night, when someone points at a gap in the wall, is the failure the
+  rule exists to prevent.
 - **Attackers path, defenders steer.** The horde runs a Dijkstra flow field, so
   a wall's high path cost pushes them elsewhere and a gate's low cost invites
   them in — that is the whole tactical language of the wall system. Your own
