@@ -1382,7 +1382,14 @@ var STAT_DEFS={
     {k:"ramp",    label:"Sends · per night",def:1.20,lo:1,  hi:3,    step:0.01,
      hint:"multiplies what one nest sends, every night it is left standing"},
     {k:"ehpK",    label:"Attacker health ×",def:1.05,lo:1,  hi:2,    step:0.01,
-     hint:"multiplies attacker health each night"}
+     hint:"multiplies attacker health each night"},
+    // Without this, clearing nests flattens the curve: pull two of five and
+    // every night after is 60% of what it was, forever, so a winning run gets
+    // quieter the closer it comes to winning. This claws part of that back by
+    // making the survivors push harder. 1.0 would cancel the cut exactly and
+    // remove any reason to clear at all, so the useful range is well under it.
+    {k:"spite",   label:"Spite",          def:0.5, lo:0,   hi:1,    step:0.05,
+     hint:"how much harder each nest pushes once its neighbours are gone — 0 is off, 1 cancels the cut entirely"}
   ]},
 
   // Salvage is a slow drip from a deep well, not a morning's work. A round runs

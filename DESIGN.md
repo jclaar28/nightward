@@ -48,17 +48,40 @@ shape for a climax.
 
 We are keeping it anyway, because the alternative fixes — a trickle from the
 map edge, or nests that grow back — both work by making your progress matter
-less, and progress mattering is the entire point. Instead this becomes a
-**tuning constraint on everything that follows**:
+less, and progress mattering is the entire point. Instead the survivors get
+angrier: **`spite`** scales what each remaining nest sends by how few of them
+are left. Clearing two of five now caps later nights at about 77% of what they
+would have been rather than 60%, so the cut is real and the curve does not
+flatten.
 
-> The nests you have not killed must escalate faster than the ones you have
-> killed subtract. A player who clears half the map should be holding a
-> harder night than one who cleared none.
+`spite` sits between 0 and 1 and the endpoints are both failures. At 0 the
+curve flattens, which is the problem it exists to solve. At 1 the wave size
+stops depending on nest count altogether, which removes any reason to clear.
+It ships at 0.5.
 
-That is a property of the ramp, the nightly garrison growth, and where nests
-sit, and it is measurable — `tools/balance.mjs` runs a defence across seeds
-and reports how deep it gets. Any change in this doc that touches wave size
-has to be checked against it rather than assumed.
+**Two constraints, and they pull against each other. Any change to wave size
+has to be checked against both:**
+
+> **Clearing must pay.** A player who clears nests reaches a later night than
+> one who does not, measurably, across seeds.
+>
+> **A cleared map must still escalate.** Every night is bigger than the last
+> at every nest count, and the run does not go quiet because it is being won.
+
+What is *not* a constraint — and was stated as one in an earlier draft of this
+doc — is that a player who clears half the map should face a harder night than
+one who cleared none. That is arithmetically the same as saying clearing
+should hurt you: the two are equal exactly at `spite` 1, so anything stronger
+means marching out makes your nights worse. The felt difficulty of an endgame
+comes from the assault, not from the night at home, and that is what the next
+paragraph is for.
+
+**The last nest is the hardest fight, and that is already true.** A nest's
+garrison grows every night it is left alone, to a cap — three defenders on
+night one, sixteen by night ten. Hitting the final nest late means hitting the
+most defended thing on the map, so the climax is the attack you choose to
+make rather than the wave you wait for. That is the right place for it in a
+game about leaving your walls.
 
 ---
 
@@ -211,9 +234,11 @@ after that has proven out.
 
 ## 8. What is still open
 
-- **How steep the escalation has to be** to satisfy the tuning constraint in
-  §1 — that a player who has cleared half the map holds a harder night than
-  one who cleared none. Currently unmeasured against a partially-cleared map.
+- **Whether `spite` is at the right value.** 0.5 was measured across eight
+  seeds over twelve nights and satisfies both constraints in §1: clearing two
+  of five still reaches 11.4 nights against 9.8 for clearing none, while the
+  night-twelve wave a cleared player faces rises from 2318 to 2994. That is
+  one sample of one build profile, though, and the useful range is wide.
 - **Where nests sit relative to difficulty.** If the nearest nest is always
   the first one killed, the curve flattens predictably. Distance, garrison
   size and cache value should probably not be uniform across a map.
@@ -232,6 +257,10 @@ after that has proven out.
   `tools/instances.mjs` captures every instance for a frame and the harness
   drives a headless round at any wave size — so this should be a measurement
   before it is a target.
+- **The two-player path has no automated cover at all**, and every string on
+  that screen moved into the text table recently. `tools/text.mjs` proves the
+  words resolve; nothing proves a peer still connects. Worth one real
+  two-machine test before either of us builds on top of it.
 - **Cross-map meta-progression.** Explicitly out of scope until one
   persistent map is proven.
 

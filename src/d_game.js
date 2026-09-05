@@ -1448,13 +1448,31 @@ function spawnGuard(nest){
   nest.guards++;
   return m;
 }
-// What the nests will send tonight: each living one contributes its share,
-// ramping with the night. Kill a nest and its share is gone for good — that is
-// the payoff for marching out, and the reason the total accelerates only while
-// you leave them alone.
+// What one nest sends tonight: its share of the night, ramping as the nights
+// go on, and pushed harder still by every sibling you have already pulled down.
+//
+// That last term is the difference between a campaign and a victory lap. Kill a
+// nest and its share is gone for good — that is the payoff for marching out —
+// but with nothing else in play, clearing two of five caps every night after at
+// 60% of what it was, and a run gets quieter the closer it comes to winning.
+// `spite` claws part of that back: at 0.5 a two-nest clear leaves the survivors
+// sending about 77% rather than 60%, so the cut is real but the curve does not
+// flatten. At 1.0 it would cancel the cut exactly and clearing would stop
+// mattering, which is the opposite failure.
 function nestSend(night){
   var ramp=(NEST.ramp===undefined?1.28:NEST.ramp);
-  return Math.max(1,Math.round((S.send||104)*Math.pow(ramp,Math.max(0,(night||1)-1))));
+  var base=(S.send||104)*Math.pow(ramp,Math.max(0,(night||1)-1));
+  return Math.max(1,Math.round(base*spiteK()));
+}
+// Nests are seeded once and never added to, so the roster is the denominator.
+// Guarded rather than assumed: waveSize() is read by the HUD before a round has
+// a map, and pow(0/0) would put NaN on screen rather than a number.
+function spiteK(){
+  var k=(NEST.spite===undefined?0.5:NEST.spite);
+  if(!k||!S.nests||!S.nests.length) return 1;
+  var live=liveNests().length;
+  if(live<1||live>=S.nests.length) return 1;
+  return Math.pow(S.nests.length/live,k);
 }
 function waveSize(){ return liveNests().length*nestSend(S.night); }
 // A nest starts with a few of them loitering and fills up as the nights go on,

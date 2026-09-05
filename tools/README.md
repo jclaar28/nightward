@@ -85,7 +85,15 @@ node tools/economy.mjs --days 10 --seeds 3 --diff normal,hard
 
 **`balance.mjs`** — plays a full day and holds a night, across seeds and
 difficulty sizes. `--nights N` plays out that many, which is the meaningful
-measure now that surviving one only buys you the next.
+measure now that surviving one only buys you the next, and `--kill N` stands
+in for a player who actually mounts assaults.
+
+`--waves` was inert for a while and worth knowing about: it set `S.wave`, which
+stopped being read the moment the wave became `liveNests() * send * ramp^n`.
+Three "wave sizes" ran the identical config and the spread between them was
+seed noise — a test that appeared to vary something and did not. It now sets
+the per-nest send so the first night really is the size you asked for. If you
+add an axis here, check it moves the number before you trust a ladder.
 
 ```sh
 node tools/balance.mjs                          # the current ladder, mid build

@@ -50,7 +50,14 @@ function playRound({ seed, wave, build, stat, nights, kill }) {
   }
   __nw.start(seed);
   const S = __nw.state();
-  S.wave = wave;
+  // `wave` is the size of the FIRST night, and it has to be applied as what
+  // each nest sends, because that is the only thing waveSize() reads:
+  //   waveSize() = liveNests() * send * ramp^(night-1)
+  // Setting S.wave — which this tool did until the round became a campaign —
+  // changed nothing at all. Three "wave sizes" then ran the identical config
+  // and the spread between them was pure seed noise, which is exactly the kind
+  // of test that passes while measuring nothing.
+  S.send = Math.max(1, Math.round(wave / Math.max(1, S.nests.length)));
   S.players[0].supply = 40;
 
   __nw.hall(0, 0);
