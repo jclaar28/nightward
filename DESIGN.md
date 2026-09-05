@@ -109,24 +109,82 @@ where to go — has nothing to act on yet.
 
 ## 3. Roads
 
-**Roads harden from use.** A path workers walk repeatedly becomes a road over
-time. No placement UI and no road-building mode: the player invests by
-choosing where their people go, and the map draws the consequence. This is
-the "everything reads on the map" rule doing real work — a worn road tells
-you what this settlement has been doing for the last ten minutes without a
-single label.
+**Roads harden from use.** There is no placement UI and no road-building mode.
+The player invests by choosing where their people go, and the map draws the
+consequence — a worn track says what this settlement has been doing for the
+last ten minutes without a single label.
 
-**Player units get the speed; the horde does not seek roads out.** An
-attacker whose route happens to cross a road gets a smaller bonus, but the
-flow field must not treat a road as cheaper ground. A road that lowers path
-cost is a highway to your hall, and the wall system's whole tactical language
-is path cost — the two would fight.
+**Everyone who walks paves.** Workers wear a route fastest, because they make
+the trip constantly and a supply line should be the brightest thing on the
+map. But soldiers marching out pave too, and that is the point: if only
+workers paved, the road network would grow toward salvage and never toward a
+nest, because you send soldiers to nests. Roads would then help the economy
+and do nothing for the one thing §1 says the whole design points at. With
+everyone paving, the second assault on a nest is cheaper than the first, and a
+failed push still leaves you the road.
 
-**What makes it pay:** salvage further out is worth substantially more than
-salvage near home, and there is more of it. The walk is already the cost, so
-a road has something real to be measured against from the first commit.
-`tools/economy.mjs` reports supply per day and how deep into a run the map
-runs dry; a road that does not move those numbers is not earning its cost.
+**Wear is per unit of distance walked, not per second.** This is not a
+detail. Workers stand still for long stretches — at a pile gathering, at the
+hall depositing — and time-based wear would burn two blazing craters into the
+map at either end of every supply line while the route between them stayed
+faint. Distance-based wear is both the physically sensible model and immune to
+that, and it makes a unit that paces in place cost nothing.
+
+**A road decays to a track, never to nothing.** Unused wear fades, so the
+bright part of the network is always what you are doing now. But once a cell
+has ever reached full wear it never falls below a floor: the route you hauled
+along on night three is still legible on night ten as something you used to
+use. The map becomes a history of the run without paving over.
+
+**The speed is yours alone. The horde gets nothing.** This overrules an
+earlier plan in which attackers got a smaller share. Two reasons. The horde
+arrives on a broad front, so only a fraction of a wave ever touches a road —
+the risk would have been too diffuse to read as a risk, and would have
+functioned as a small tax nobody notices paying rather than a tension. And it
+halves the tuning surface: one number, and the player never has to wonder
+whether paving helped the enemy more than it helped them. "They come across
+country in a mass" covers it in fiction.
+
+**The flow field must not know roads exist.** Not a lower path cost, not a
+tiebreak, nothing. A road that lowers path cost is a highway to your hall, and
+path cost is the entire tactical language of the wall system — the two would
+fight. Roads change how fast your units cross ground they have already chosen
+to cross; they never change where anything decides to go.
+
+### What it costs
+
+**Roads make the map run dry sooner.** Faster round trips mean faster
+extraction, so the current "runs dry around day six or seven" moves earlier,
+and the pile amounts probably have to rise to compensate. This is the first
+thing to measure, not the last: `tools/economy.mjs` already reports supply per
+day and the day the piles empty, so the honest test is to run it with wear off
+and on and look at both numbers. A road that raises income without shortening
+the map is free, which would mean the rate is too generous.
+
+### Build notes
+
+Nothing here is exotic, but three things in this codebase bite:
+
+- **Wear lives in its own sparse map**, keyed `"gx,gz"` like `S.cells`, on the
+  same 1.5-unit build grid. Most of the map is never walked, so a dense array
+  would be mostly zeroes, and sharing the grid means `w2gx`/`gx2w` already do
+  the conversion.
+- **A new instanced batch is five edits, not one.** An entry in `B`, a slot in
+  `BATCHES` (first — it is a ground decal and draws under everything), a name
+  in the `buf` list, a `CAP` entry, and a zero in the per-frame counter reset.
+  Miss the counter and it silently draws nothing; miss the cap and it silently
+  truncates. And it draws at `gy(x,z)`, never at `PLAT` — that is how the
+  nests ended up floating.
+- **The guest has to see roads, and they change every tick.** Sending the whole
+  map every snapshot is too chatty. `snapshot(full)` already distinguishes a
+  full sync from an incremental one: full sends the map, incremental sends only
+  cells whose wear changed by more than a quantisation step since the last
+  send. Wear moves slowly, so those deltas stay small.
+
+Every number — wear rate, the non-worker multiplier, fade, floor, the speed
+bonus and the wear at which a track starts drawing — belongs in a `road` block
+in `STAT_DEFS`, so the whole feel is tunable from the Library while a round
+runs rather than by rebuilding.
 
 **Vision:** an upgraded logistics tier — trains or similar — once roads are
 proven. Not designed, just the obvious next rung.
@@ -234,6 +292,12 @@ after that has proven out.
 
 ## 8. What is still open
 
+- **How wide a road should read.** Units converge on near-identical paths, so
+  wear lands in a one-cell thread rather than a road. Bleeding a fraction of
+  each step's wear into the neighbouring cells would widen it, at the cost of
+  softening the picture. Not decided; try it without first.
+- **What roads do to the economy's shape.** Faster trips extract faster, so
+  pile amounts likely have to rise. Unmeasured until wear exists.
 - **Whether `spite` is at the right value.** 0.5 was measured across eight
   seeds over twelve nights and satisfies both constraints in §1: clearing two
   of five still reaches 11.4 nights against 9.8 for clearing none, while the
