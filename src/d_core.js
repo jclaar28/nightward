@@ -1405,6 +1405,8 @@ var STAT_DEFS={
      hint:"an endpoint this close to a node, a building or a pile joins it instead of making a new one"},
     {k:"pad",    label:"Pad spacing",   def:0.9, lo:0.3, hi:3,   step:0.1, unit:"u",
      hint:"how far apart the pads that draw a road sit — smaller is smoother and costs more instances"},
+    {k:"rough",  label:"Roughness",     def:1.0, lo:0,   hi:3,   step:0.05, unit:"×",
+     hint:"how much the track wanders and scatters — 0 draws the bare straight line"},
     {k:"minLen", label:"Shortest run",  def:2.0, lo:0.5, hi:10,  step:0.5, unit:"u",
      hint:"a drag shorter than this is a misclick, not a road"},
     {k:"maxLen", label:"Longest run",   def:26,  lo:4,   hi:120, step:1,  int:true, unit:"u",

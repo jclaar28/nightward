@@ -65,6 +65,11 @@ does shorten a trip in seconds, that a direct order still crosses a road instead
 of turning down it, and that the flow field is byte-identical with roads
 present.
 
+It also compares two frames three seconds apart: the worn look of a road is
+scatter, and scatter drawn from `Math.random()` inside `pack()` would be redrawn
+every frame and the road would boil. Hashing the noise off position is the fix
+and this is the check that keeps it.
+
 Two of its checks were weak first and are worth copying the fix from. The trip
 it measured ran along a dogleg, which only wins ~10% because the extra distance
 eats the bonus — true, but a bonus halved by accident would still have passed,

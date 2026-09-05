@@ -97,6 +97,13 @@ loop moves off `m.spd` and never consults it. A road that reaches the field is
 a highway to your hall, and it would read as a pathing bug rather than a design
 mistake. `tools/roads.mjs` diffs the field with and without roads present.
 
+**A road's worn look is hashed, never random.** The meander, the pad scatter
+and the verge gravel all come out of `padHash(a,b,i,salt)`. `pack()` runs every
+frame, so `Math.random()` there would redraw the noise 60 times a second and
+the whole network would boil — which looks deliberate in a screenshot and awful
+in motion. The same rule holds for anything else decorative drawn per frame.
+`tools/roads.mjs` compares two frames three seconds apart.
+
 **Road work is the only construction that needs a worker.** Every other site is
 `prog += dt` and finishes whether anyone came; a road edge advances only while
 a worker stands on it. That asymmetry is the feature — it is what makes the

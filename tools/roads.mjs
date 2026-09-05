@@ -187,13 +187,29 @@ check('...and crossed the road rather than turning down it',
 check('the flow field cannot see roads', rules.fieldLen > 0 && rules.diff === 0,
       `${rules.diff} of ${rules.fieldLen} cells differ`);
 
-// ---- and it draws ----------------------------------------------------------
-const drawn = await page.evaluate(() => {
-  const f = __nw.frame();
-  return { road: f.counts.road || 0, batches: Object.keys(f.counts).length };
+// ---- and it draws, without crawling ----------------------------------------
+// The worn look comes from scatter, and scatter drawn from Math.random() would
+// be redrawn every frame — a road that boils. It reads as deliberate in a
+// screenshot and as a bug in motion, so the noise has to be a hash of position
+// and this is the check that says so.
+const drawn = await page.evaluate(async () => {
+  const road = () => __nw.frame().rows.filter(r => r.b === 'road');
+  const sig = rs => rs.map(r => [r.x, r.z, r.yaw].map(v => Math.round(v * 1000)).join(':')).join(',');
+  const first = road();
+  const a = sig(first);
+  await new Promise(r => setTimeout(r, 400));
+  __nw.run(3);                        // time passes, the world moves on
+  const second = road();
+  return { road: first.length, batches: Object.keys(__nw.frame().counts).length,
+           stable: a === sig(second),
+           spread: Math.max(...first.map(r => r.yaw)) - Math.min(...first.map(r => r.yaw)) };
 });
 check('the road reaches the renderer', drawn.road > 20,
       `${drawn.road} pads across ${drawn.batches} batches`);
+check('the pads are scattered rather than laid on a ruler', drawn.spread > 0.1,
+      `${drawn.spread.toFixed(2)} rad of yaw across the run`);
+check('...and the scatter is fixed, not redrawn every frame', drawn.stable,
+      drawn.stable ? 'identical after three seconds' : 'the road is crawling');
 
 await close();
 done(errors);
