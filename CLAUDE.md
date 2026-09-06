@@ -135,6 +135,15 @@ loop moves off `m.spd` and never consults it. A road that reaches the field is
 a highway to your hall, and it would read as a pathing bug rather than a design
 mistake. `tools/roads.mjs` diffs the field with and without roads present.
 
+**A gait is two rates off one phase.** `u.ph` advances with distance walked.
+The legs swing once per stride — `sin(ph)` — and the body rises once per foot
+planted, which is twice per stride, which is `abs(sin(ph))`. The sway is the
+weight going side to side, once per stride, so it is `sin(ph)` too. `cos(2*ph)`
+already runs at twice the stride and `abs(cos(2*ph))` runs at four times: that
+shipped, and it read as a rapid jitter with no relationship to the feet. It is
+invisible in a screenshot and unmistakable in motion, so `tools/instances.mjs`
+counts peaks per stride rather than anyone looking at it.
+
 **A road's worn look is hashed, never random.** The meander, the pad scatter
 and the verge gravel all come out of `padHash(a,b,i,salt)`. `pack()` runs every
 frame, so `Math.random()` there would redraw the noise 60 times a second and

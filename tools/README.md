@@ -38,6 +38,16 @@ stands on, the nests sit on their own ground rather than the plateau, the build
 grid locks to exact cell multiples instead of sliding with the cursor, and a
 blocked ghost answers in hue rather than brightness.
 
+It also counts the gait: legs once per stride, body twice — one rise per foot
+planted. That ratio is invisible in a screenshot and unmistakable in motion, and
+it shipped wrong (four bounces per stride, from `abs(cos(2*ph))` doubling an
+already-doubled rate). Two setup mistakes are worth copying the fix from: the
+first version measured on this file's busy scene, where a wave has the units
+walking and swinging on their own, and read 1.49 leg cycles per stride from
+three sources of movement at once; and it counted raw body Y, which includes the
+terrain under the unit, so a 0.055 bob was lost against a hillside. It runs its
+own quiet round now and measures height above the ground.
+
 **`campaign.mjs`** — the round loop. A night is not the end of anything, so
 these drive several full day/night cycles: dawn hands you the next day, the
 night counter advances, each wave is bigger than the last by a widening margin,

@@ -153,5 +153,56 @@ check('a blocked ghost shifts hue', ghost.noRed > ghost.okRed * 2,
 check('and is not merely dimmed', ghost.noLum > ghost.okLum * 0.6,
       `brightness ${ghost.okLum} → ${ghost.noLum}`);
 
+// ---- the walk is locked to the feet ----------------------------------------
+// A gait is two claims about one phase: the legs swing once per stride, and the
+// body rises once per foot planted — so twice per stride. Getting the ratio
+// wrong is invisible in a screenshot and unmistakable in motion, which is
+// exactly the kind of bug this file exists for.
+//
+// It shipped wrong: bob was abs(cos(2*ph)). cos(2*ph) already runs at twice the
+// stride and the abs doubled it again, giving four bounces per leg cycle — a
+// rapid jitter with no relationship to the feet. Measured, not eyeballed.
+//
+// It needs its own round. The busy scene above has a wave on the field, so the
+// units walk and swing on their own and the phase picks up distance from three
+// sources at once — the first version of this measured 1.49 leg cycles per
+// stride, which is what "isolate the thing you are measuring" looks like when
+// you skip it.
+const gait = await page.evaluate(seed => {
+  __nw.start(seed);
+  const S = __nw.state();
+  __nw.hall(0, 0);
+  __nw.run(26);
+  S.enemies.length = 0;                       // nothing to fight, nothing to chase
+  const u = S.units.filter(x => x.t === 'worker')[0];
+  u.job = null; u.mode = 'idle'; u.atk = -1; u.target = null; u.shelter = false;
+  u.x = -30; u.z = 26;                        // open ground, clear of the town
+  const ys = [], legs = [];
+  // It walks under its own power. Nudging u.x by hand does not work: gaitStep
+  // measures the distance the simulation moved the unit, so a position written
+  // before update() is already the new one and the phase never advances.
+  HFGAME.orderTo([u], 30, 26);
+  const ph0 = u.ph;
+  for (let i = 0; i < 240; i++) {
+    HFGAME.update(1 / 60);
+    const rows = __nw.frame().rows;
+    const body = rows.filter(q => q.b === u.t + ':body')[0];
+    const leg = rows.filter(q => q.b === u.t + ':leg')[0];
+    // Body Y includes the terrain under it, and a 0.055 bob is nothing against
+    // a hillside — measure the height above the ground it is standing on, or
+    // you count the landscape instead of the walk.
+    if (body && leg) { ys.push(body.y - __nw.ground(u.x, u.z)); legs.push(leg.pitch); }
+  }
+  const peaks = a => { let n = 0; for (let i = 1; i < a.length - 1; i++)
+                         if (a[i] > a[i - 1] && a[i] >= a[i + 1]) n++; return n; };
+  const strides = (u.ph - ph0) / (2 * Math.PI);
+  return { bob: peaks(ys) / strides, leg: peaks(legs) / strides, strides };
+}, SEED);
+check('the legs swing once per stride', Math.abs(gait.leg - 1) < 0.25,
+      `${gait.leg.toFixed(2)} leg cycles per stride over ${gait.strides.toFixed(1)} strides`);
+check('...and the body rises once per footfall, not four times',
+      Math.abs(gait.bob - 2) < 0.35,
+      `${gait.bob.toFixed(2)} bounces per stride (2 is one per foot; it was 4)`);
+
 await close();
 done(errors);
