@@ -392,6 +392,16 @@ without talking to Jarrod first.
 - **Selling is only ever a hotbar button** with a structure selected. It is
   never a click on the world, because a misclick that deletes a tower mid-wave
   is unforgivable.
+- **Every button that can mean "never mind" does.** A right-click is an order
+  when troops are selected and a dismissal when they are not, so the same reflex
+  works whether or not you happen to have an army in hand. Escape lets go before
+  it opens anything — what you are holding, then the building or road you picked,
+  then the troops — and only reaches the menu with an empty cursor and an empty
+  selection. Order matters in both: `up()` checks the deselect branch last, so a
+  house that just turned its people out keeps its panel rather than closing under
+  the press that used it. `tools/select.mjs` drives real pointer and key events
+  for exactly this reason — calling `deselectAll()` by hand skips the branch that
+  can be wrong.
 - **The destination is literal; the route is not.** A right-click names a place,
   and the unit goes to that place — not to somewhere near it, not to whatever
   the game thinks you meant. How it gets there is the game's problem: it rounds

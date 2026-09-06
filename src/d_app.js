@@ -1200,7 +1200,14 @@ window.addEventListener("keydown",function(ev){
     }
     if(screen==="library"||screen==="settings"||screen==="setup") show("menu");
     else if(screen==="play"&&el("overlay").hidden){
-      if(paused) resumePlay(); else setPause(true);
+      // Escape lets go before it opens anything. A player reaching for it
+      // mid-round usually means "never mind, I did not want that" rather than
+      // "stop the game", and having to press ctrl+D first to get out of a
+      // held building is one keystroke of friction in the exact moment there
+      // is no time for it. Only an empty cursor and an empty selection get
+      // the menu.
+      if(paused) resumePlay();
+      else if(!HFGAME.deselectAll()) setPause(true);
     }
     return;
   }

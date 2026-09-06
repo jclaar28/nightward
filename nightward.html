@@ -8727,17 +8727,15 @@ function setStance(v,pid){
   if(pid===S.me) S.stance=v;
   if(UI.units) UI.units();
 }
-// Put the held building back. Nothing is armed by default, so this is how the
-// player gets back to a cursor that only inspects and selects.
-function clearSel(){
-  if(!S) return false;
-  if(S.sel){ S.sel=null; if(UI.hotbar) UI.hotbar(); return true; }
-  if(S.bsel){ selectBuilding(null); return true; }
-  if(S.rsel){ selectRoad(null); return true; }
-  return false;
-}
-// Ctrl+D lets go of everything at once — what you are holding, the building
-// you picked, and whoever is selected. Escape belongs to the pause menu now.
+// Letting go of everything at once — what you are holding, the building or road
+// you picked, and whoever is selected. Bound to ctrl+D, and to Escape, which
+// tries this first and only opens the pause menu when there was nothing to drop.
+// Returns whether it actually let go of anything, which is what lets Escape
+// tell those two cases apart.
+//
+// There used to be a stepwise clearSel() beside this that dropped one thing per
+// press. It had no callers — Escape was the obvious home for it and Escape went
+// to the pause menu — so it has gone rather than sitting here looking wired.
 function deselectAll(){
   if(!S) return false;
   var had=!!(S.sel||S.bsel||S.rsel||selectedUnits().length);
@@ -8890,7 +8888,8 @@ function wireInput(){
         // meant an order given on the move simply vanished.
         var g=pick(ev.clientX,ev.clientY), list=selectedUnits();
         // a selected house turns its own people out to wherever you clicked
-        if(g&&S.bsel&&housedBy(S.bsel).length&&!cellAt(g.gx,g.gz)) sendOut(S.bsel,g.x,g.z);
+        var sent=0;
+        if(g&&S.bsel&&housedBy(S.bsel).length&&!cellAt(g.gx,g.gz)) sent=sendOut(S.bsel,g.x,g.z);
         // A right-click on your own turret with ranged troops selected puts
         // them on it. It comes before the order below because "go and stand
         // there" and "go and stand on that" are the same gesture, and the
@@ -8912,6 +8911,13 @@ function wireInput(){
           var rest=claimed?list.filter(function(u){ return !UNITS[u.t].civil; }):list;
           if(rest.length) orderTo(rest,g.x,g.z);
         }
+        // With no troops selected there is no order to give, so the right
+        // button goes back to meaning "never mind" and puts down whatever is
+        // picked. It is checked last on purpose: a building with people in it
+        // has already turned them out above, and dropping the selection in the
+        // same click would take the panel away from under the player just as
+        // they used it.
+        else if(!sent&&(S.bsel||S.rsel)){ selectBuilding(null); selectRoad(null); }
       }
     }
     mode=null;
@@ -8988,7 +8994,7 @@ return {
   init:init, start:start, stop:stop, resume:resume, update:update, draw:draw,
   keydown:keydown, keyup:keyup, clearPan:clearPan, panSpeeding:panSpeeding,
   deselectAll:deselectAll,
-  startWave:startWave, clearSel:clearSel, RIG:RIG, RIGDEF:RIGDEF,
+  startWave:startWave, RIG:RIG, RIGDEF:RIGDEF,
   liveNests:liveNests, cam:function(){ return cam; }, camera:camera,
   // how big tonight will be, from what is still standing out there
   waveSize:function(){ return S?waveSize():0; },
@@ -12342,7 +12348,14 @@ window.addEventListener("keydown",function(ev){
     }
     if(screen==="library"||screen==="settings"||screen==="setup") show("menu");
     else if(screen==="play"&&el("overlay").hidden){
-      if(paused) resumePlay(); else setPause(true);
+      // Escape lets go before it opens anything. A player reaching for it
+      // mid-round usually means "never mind, I did not want that" rather than
+      // "stop the game", and having to press ctrl+D first to get out of a
+      // held building is one keystroke of friction in the exact moment there
+      // is no time for it. Only an empty cursor and an empty selection get
+      // the menu.
+      if(paused) resumePlay();
+      else if(!HFGAME.deselectAll()) setPause(true);
     }
     return;
   }

@@ -198,6 +198,31 @@ at it from the platform and from the same spot on the ground. 18 arrows against
 0. Measuring "it shot something" from up top alone would pass with the bonus set
 to zero.
 
+**`select.mjs`** — what picks things up and what puts them down. Selection is
+touched on every click of a round and almost all of its rules live in an input
+handler, where which button means what depends on what is held, picked and
+selected at that moment. So this dispatches real `PointerEvent`s and
+`KeyboardEvent`s at the canvas rather than calling the handlers: the branch
+order in `up()` is the thing under test, and calling `deselectAll()` by hand
+would skip exactly the part that can be wrong.
+
+The two rules it holds down are that a right-click is a dismissal only when
+there are no troops to give an order to — a building and a worker selected
+together means the click is an order and the panel stays — and that Escape lets
+go before it opens the menu. The awkward case is a house full of people: the
+right-click turns them out *and* keeps the panel, which is why the deselect
+branch is checked last. It also keeps the opposite failure honest, that "escape
+deselects" must not become "escape does nothing": with an empty cursor and an
+empty selection the menu still opens.
+
+Its one piece of setup worth copying: the open ground it right-clicks on is
+found, not assumed. The camera is wherever the round left it, so it sweeps
+screen points with `pointermove` and reads `S.hover` — asking the game what is
+under the cursor rather than redoing the projection by hand.
+
+Confirmed falsifiable by reverting each half in the built file: without the
+right-click branch, 1 failure; without the Escape branch, 4.
+
 **`net.mjs`** — the two-player path, which had no cover at all and is the
 riskiest thing to leave that way: a regression here is silent. Nothing throws,
 no frame looks wrong, and it is only discoverable by two people at two machines
