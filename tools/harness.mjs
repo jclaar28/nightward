@@ -47,11 +47,15 @@ function pageHelpers() {
   const nw = window.__nw = {};
 
   // Grab the batch list off a real render call rather than guessing an index.
+  // Decals are drawn in their own blended pass and so arrive in a separate
+  // argument, but they are still instances the renderer was handed and every
+  // check here wants them counted — a wrapper that dropped them would have made
+  // "no ring segment is below the ground" pass by finding no ring segments.
   let LIST = null;
   const origRender = R.render.bind(R);
-  R.render = function (cam, batches, flash) {
-    if (!LIST && batches) LIST = batches;
-    return origRender(cam, batches, flash);
+  R.render = function (cam, batches, flash, overlay, decals) {
+    if (!LIST && batches) LIST = batches.concat(decals || []);
+    return origRender(cam, batches, flash, overlay, decals);
   };
 
   // name -> batch, for both the plain batches and the rig bones

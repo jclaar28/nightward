@@ -263,11 +263,12 @@ function create(canvas){
 
   // ---- instanced batches --------------------------------------------------
   var IS=48;   // instance stride, bytes (12 floats)
-  function makeBatch(mesh,castShadow){
+  function makeBatch(mesh,castShadow,blend){
     var S=44;
     var b={vbo:gl.createBuffer(),ibo:gl.createBuffer(),
            vao:gl.createVertexArray(),vaoS:gl.createVertexArray(),
-           n:mesh.count(),count:0,shadow:castShadow!==false};
+           n:mesh.count(),count:0,shadow:castShadow!==false,
+           blend:blend||null};
     gl.bindBuffer(gl.ARRAY_BUFFER,b.vbo);
     gl.bufferData(gl.ARRAY_BUFFER,mesh.data(),gl.STATIC_DRAW);
 
@@ -423,7 +424,7 @@ function create(canvas){
 
   function u(p,n){ return gl.getUniformLocation(p,n); }
 
-  function render(cam,batches,flash,overlay){
+  function render(cam,batches,flash,overlay,decals){
     resize();
     // shadow pass
     gl.bindFramebuffer(gl.FRAMEBUFFER,smFbo);
@@ -484,6 +485,43 @@ function create(canvas){
       gl.bindVertexArray(b2.vao);
       gl.drawArraysInstanced(gl.TRIANGLES,0,b2.n,b2.count);
     }
+    // Decals: marks on the ground — selection, range, orders. Three things make
+    // them read as light lying on the field rather than as painted plastic.
+    //
+    // They are blended, so their colour is their strength and they never
+    // silhouette against what they cross. They do not write depth, so a ring
+    // laid over a slope cannot z-fight with it. And attachment 1 is switched
+    // off for the whole pass, which is the one that matters: the ink pass finds
+    // its outlines by comparing depth and normals, and with the overlay writing
+    // neither, the pixels under a decal still carry the terrain's. Before this
+    // every chip of every ring came back with a crisp black outline drawn
+    // around it, which is what made a ring look like a chain of beads.
+    //
+    // "mul" batches darken instead of brighten — dst*(1-src) — because a
+    // contact shade cannot be made by adding light.
+    if(decals&&decals.length){
+      gl.enable(gl.BLEND);
+      gl.depthMask(false);
+      gl.disable(gl.CULL_FACE);           // a decal is one flat face, seen from either side
+      gl.drawBuffers([gl.COLOR_ATTACHMENT0,gl.NONE]);
+      var bmode=null;
+      for(i=0;i<decals.length;i++){
+        var db=decals[i];
+        if(!db.count) continue;
+        if(db.blend!==bmode){
+          bmode=db.blend;
+          if(bmode==="mul") gl.blendFunc(gl.ZERO,gl.ONE_MINUS_SRC_COLOR);
+          else              gl.blendFunc(gl.SRC_ALPHA,gl.ONE);
+        }
+        gl.bindVertexArray(db.vao);
+        gl.drawArraysInstanced(gl.TRIANGLES,0,db.n,db.count);
+      }
+      gl.drawBuffers([gl.COLOR_ATTACHMENT0,gl.COLOR_ATTACHMENT1]);
+      gl.enable(gl.CULL_FACE);
+      gl.depthMask(true);
+      gl.disable(gl.BLEND);
+    }
+
     // Overlay batches are squeezed into the nearest slice of the depth range, so
     // editor handles sit in front of everything while still sorting against each
     // other. Clearing depth instead would make the post pass read the whole

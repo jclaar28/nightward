@@ -57,6 +57,29 @@ only path that reaches it is the Library rebuilding, which nothing but
 `tools/text.mjs` walks. Removing a batch means removing all six; a stale line
 there shipped a crash that seven other tools ran straight past.
 
+**A mark on the ground goes in `DECALS`, never in `BATCHES`.** The two lists
+are both instance batches and both handed to `R.render`, but they are drawn by
+different passes. `BATCHES` is the opaque pass: depth, normals, and — this is
+the part that bites — the ink pass, which finds its outlines by comparing depth
+and normals between neighbouring pixels and cannot tell a building from a
+selection ring. Every ring in the game used to be opaque, so every chip of every
+ring came back with a crisp black outline drawn around it and a ring read as a
+chain of beads. Nothing about that is visible in an instance count.
+
+The decal pass blends instead, writes no depth and switches colour attachment 1
+off entirely, so the pixels under a mark still carry the terrain's normal and
+the ink pass never sees it. Two consequences to keep in mind when adding one:
+
+- **The colour is the strength.** These are composited, so a decal painted black
+  contributes nothing and needs no alpha channel to disappear. That is what lets
+  the soft edge live in vertex colour (`Mesh.triV`, `prim:"glow"`, `prim:"gdisc"`)
+  and cost the shader nothing — and it is why every value in `IND` is a low
+  number. The old rings were written as 2.10 and 2.20, which clamped, which is
+  how a rally, a range and a selection all came out the same blown cyan.
+- **`blend:"mul"` darkens** — `dst*(1-src)` — because a contact shade cannot be
+  made by adding light. It is the only one, and it is drawn first so the light
+  that follows lands on top of it.
+
 **`BATCHES` has a seam.** Rig bones are spliced in at `BATCHES.indexOf(B.nest)`
 so they draw between the buildings and the effects. It used to be a hard-coded
 index and drifted twice. Do not put an index back.
@@ -256,7 +279,16 @@ road happened to slide into that slot.
 
 Every building, unit and prop is a list of primitives in `d_core.js` — no
 external models. Primitives: `box`, `wedge`, `gable`, `cone`, `cyl`, `ring`,
-`quad`, `grid`.
+`quad`, `grid`, `glow`, `gdisc`.
+
+`glow` and `gdisc` are the decal primitives and the only two that shade
+themselves: they fade to black at their edges through per-vertex colour, which
+in the blended pass means fading to nothing. `glow`'s length taper is not
+decoration — a ring is a run of these laid end to overlapping end, and two
+linear ramps crossing sum to exactly what either one carries alone, so the run
+adds up to an even line. `groundRing` scales each chip to twice the gap it
+actually has to bridge for the same reason; leave the scale at 1 and a tight
+ring piles four chips on one spot.
 
 A part is `{id, name, prim, p:[x,y,z], s:[…], shade, tint, ...}` where:
 
@@ -392,6 +424,14 @@ without talking to Jarrod first.
 - **Selling is only ever a hotbar button** with a structure selected. It is
   never a click on the world, because a misclick that deletes a tower mid-wave
   is unforgivable.
+- **An indicator is light on the ground, not paint on it.** Selection, range,
+  rally, the move marker: all of them are marks the world could plausibly carry,
+  laid on the terrain, following it over a slope, fading out instead of ending.
+  They are dim on purpose — a range ring is something you consult, not something
+  that should compete with the fight happening inside it — and they answer in
+  hue rather than brightness, so a warm mark is firelight and a cool one is
+  yours. A selected unit gets a pool of shade under its glow, because a ring on
+  its own is a hoop the unit stands in the middle of.
 - **Every button that can mean "never mind" does.** A right-click is an order
   when troops are selected and a dismissal when they are not, so the same reflex
   works whether or not you happen to have an army in hand. Escape lets go before

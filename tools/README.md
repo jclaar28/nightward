@@ -198,6 +198,39 @@ at it from the platform and from the same spot on the ground. 18 arrows against
 0. Measuring "it shot something" from up top alone would pass with the bonus set
 to zero.
 
+**`decals.mjs`** — the marks on the ground, and the one bug in them that no
+instance count could ever have caught. Every ring in the game was geometrically
+perfect and looked wrong anyway: the chips were opaque, so the ink pass found a
+depth and normal discontinuity at each one and drew a crisp black outline around
+it, and a ring came out as a chain of beads. `instances.mjs` had been measuring
+those same chips for weeks and had nothing to say about it, because what was
+wrong happened after the instances were handed over.
+
+So this reads pixels. It renders the frame twice, once with a mark and once
+without, and compares: a mark that adds light must only ever make the picture
+brighter, and an outline is a darker pixel. There is no other way to see one.
+Its counterpart is the contact shade under a selected unit, which must make
+pixels darker — that is what stops "nothing got darker" from passing by drawing
+nothing at all.
+
+It also measures the invariant that makes a run of chips a line rather than a
+row of dots: each one fades to nothing at both ends, so consecutive chips
+cross-fade and sum to what either carries alone, but only while the ramp is as
+long as the gap. Chip length against neighbour spacing is that number, it is one
+multiply in `groundRing`, and nothing on screen names it. Left at a fixed scale
+it reads 24.9% out.
+
+Read the note above the pixel checks before adding one. The first version
+selected the hall and then a unit standing next to it — a hall is a 3x3 footprint
+spanning 2.4 units either way, so both marks were inside the building and every
+pixel of them was occluded. It reported no darker pixels, which is exactly what
+a working decal pass reports.
+
+Checked by breaking the change four ways: put the ring batch back in the opaque
+list (4 failures, one of them "5193 pixels went darker, worst by 116/255" —
+which is the outline, measured), make the contact shade additive (2), drop the
+chip scaling (1), and put an indicator colour back over 1.0 (1).
+
 **`select.mjs`** — what picks things up and what puts them down. Selection is
 touched on every click of a round and almost all of its rules live in an input
 handler, where which button means what depends on what is held, picked and

@@ -80,6 +80,24 @@ Mesh.prototype.tri=function(a,b,c,col,emit){
     V.push(e);
   }
 };
+// Same triangle with a colour per corner. Everything else in this file paints
+// a face at a time, which is right for cel-shaded solids and useless for a
+// decal: a mark on the ground has to fade out at its edges or it is a bright
+// block with a hard rim, and the only place that fade can live — with no
+// textures and no alpha attribute — is the vertex colour. See glowStrip().
+// `flat` still wins, so the ID-colour pick pass reads one colour per part.
+Mesh.prototype.triV=function(a,b,c,ca,cb,cc,emit){
+  if(this.flat){ ca=cb=cc=this.flat; }
+  if(this.emitAll!==null&&this.emitAll!==undefined) emit=this.emitAll;
+  var n=nz(crs(sub(c,a),sub(b,a))), e=emit||0, V=this.v;
+  var pts=[a,c,b], cols=[ca,cc,cb];
+  for(var i=0;i<3;i++){
+    V.push(pts[i][0],pts[i][1],pts[i][2], n[0],n[1],n[2],
+           cols[i][0],cols[i][1],cols[i][2]);
+    if(this.inst) V.push(this.tint);
+    V.push(e);
+  }
+};
 // Deterministic 0..1 from a point, so a surface looks the same every rebuild
 // and never crawls when the camera moves.
 function hash3(x,y,z){
@@ -548,20 +566,89 @@ function ringMesh(M,cx,cy,cz,r1,weight,seg,col){
            [cx+Math.cos(b)*r1,cy,cz+Math.sin(b)*r1],[cx+Math.cos(b)*r0,cy,cz+Math.sin(b)*r0],col,1.0);
   }
 }
+// ---- decals ---------------------------------------------------------------
+// A mark on the ground, drawn in the blended pass rather than with the solids.
+// The rule both of these follow: the colour IS the strength. They are composited
+// additively (or subtractively for a shade), so a vertex painted black adds
+// nothing and needs no alpha channel to disappear — which is the whole reason
+// the fade can be baked into vertex colour and cost the shader nothing.
+//
+// glowStrip is one link of a line of light. Across its width it fades from the
+// centre out, so it has no edge to catch the eye. Along its length it fades
+// linearly to nothing at BOTH ends, and that is not decoration: a ring is a run
+// of these laid end to overlapping end, and two linear ramps crossing sum to
+// exactly the value they started at. Any other profile — a hard end, a curve —
+// leaves a bead at every joint, which is precisely what the old opaque chips
+// looked like.
+var GLOW_W=[0,0.55,1,0.55,0];             // across the width
+function glowStrip(M,cx,cy,cz,len,wid,rot,col){
+  var hx=len/2, hz=wid/2, co=Math.cos(rot||0), si=Math.sin(rot||0);
+  var rows=GLOW_W.length-1;
+  function P(x,z){ return [cx+x*co-z*si, cy, cz+x*si+z*co]; }
+  function C(k){ return [col[0]*k,col[1]*k,col[2]*k]; }
+  for(var i=0;i<2;i++){                       // two spans: the length tent
+    var x0=(i-1)*hx, x1=i*hx, k0=i, k1=1-i;   // 0→1 then 1→0
+    for(var j=0;j<rows;j++){
+      var z0=(j/rows*2-1)*hz, z1=((j+1)/rows*2-1)*hz;
+      var w0=GLOW_W[j], w1=GLOW_W[j+1];
+      var a=P(x0,z0), b=P(x1,z0), c=P(x1,z1), d=P(x0,z1);
+      var ca=C(k0*w0), cb=C(k1*w0), cc=C(k1*w1), cd=C(k0*w1);
+      M.triV(a,b,c,ca,cb,cc,1.0);
+      M.triV(a,c,d,ca,cc,cd,1.0);
+    }
+  }
+}
+// A pool of light with no edge: full strength at the middle, nothing at the
+// rim. Two rings rather than one fan because a single fan fades linearly and
+// reads as a cone; the extra ring buys a shoulder for almost nothing.
+function glowDisc(M,cx,cy,cz,r,seg,col){
+  seg=Math.max(6,Math.round(seg||24));
+  var mid=0.52, midK=0.62;
+  function P(a,rr){ return [cx+Math.cos(a)*rr, cy, cz+Math.sin(a)*rr]; }
+  function C(k){ return [col[0]*k,col[1]*k,col[2]*k]; }
+  var c0=C(1), cm=C(midK), c1=C(0), ctr=[cx,cy,cz];
+  for(var i=0;i<seg;i++){
+    var a=i/seg*6.2831853, b=(i+1)/seg*6.2831853;
+    M.triV(ctr,P(a,r*mid),P(b,r*mid),c0,cm,cm,1.0);
+    M.triV(P(a,r*mid),P(a,r),P(b,r),cm,c1,c1,1.0);
+    M.triV(P(a,r*mid),P(b,r),P(b,r*mid),cm,c1,cm,1.0);
+  }
+}
 function quadMesh(M,cx,cy,cz,sx,sz,rot,col,emit){
   var hx=sx/2,hz=sz/2,co=Math.cos(rot||0),si=Math.sin(rot||0);
   function P(x,z){ return [cx+x*co-z*si, cy, cz+x*si+z*co]; }
   M.quad(P(-hx,-hz),P(hx,-hz),P(hx,hz),P(-hx,hz),col,emit);
 }
+// The placement grid: the world's cell edges, lit up around the cursor.
+//
+// It is one flat instance, which is the whole reason it is small and fades out.
+// Stretched to the buildable radius it was a plate 23 units across held at the
+// height of one cell — over a rise it floated above the trees, over a dip it
+// sank, and either way it had a hard rim where it stopped. At this size the
+// ground under it barely moves, and the edge is gone before the error shows.
+// The fade is per-vertex because the decal pass composites additively: a vertex
+// painted black adds nothing, so the patch ends without an edge to end at.
+var GRID_R=6.8;
 function gridMesh(M,col){
-  var t=0.034, n=GN;
+  var t=0.030, n=GN, R=Math.min(BUILD_R,GRID_R), seg=CELL*0.5;
+  function C(d){
+    var u=1-Math.min(1,d/R); u=u*u*(3-2*u);
+    return [col[0]*u,col[1]*u,col[2]*u];
+  }
   for(var i=0;i<=n;i++){
     var p=(i-n/2)*CELL;
-    if(Math.abs(p)>BUILD_R+CELL) continue;
-    var ext=Math.sqrt(Math.max(0,(BUILD_R+0.4)*(BUILD_R+0.4)-p*p));
-    if(ext<0.4) continue;
-    M.quad([p-t,0,-ext],[p+t,0,-ext],[p+t,0,ext],[p-t,0,ext],col,1.0);
-    M.quad([-ext,0,p-t],[ext,0,p-t],[ext,0,p+t],[-ext,0,p+t],col,1.0);
+    if(Math.abs(p)>R) continue;
+    var ext=Math.sqrt(Math.max(0,R*R-p*p));
+    if(ext<0.3) continue;
+    var steps=Math.max(2,Math.ceil(2*ext/seg));
+    for(var j=0;j<steps;j++){
+      var s0=-ext+2*ext*j/steps, s1=-ext+2*ext*(j+1)/steps;
+      var c0=C(Math.sqrt(p*p+s0*s0)), c1=C(Math.sqrt(p*p+s1*s1));
+      M.triV([p-t,0,s0],[p+t,0,s0],[p+t,0,s1],c0,c0,c1,1.0);
+      M.triV([p-t,0,s0],[p+t,0,s1],[p-t,0,s1],c0,c1,c1,1.0);
+      M.triV([s0,0,p-t],[s0,0,p+t],[s1,0,p+t],c0,c0,c1,1.0);
+      M.triV([s0,0,p-t],[s1,0,p+t],[s1,0,p-t],c0,c1,c1,1.0);
+    }
   }
 }
 
@@ -637,6 +724,8 @@ function emitPart(M,pt,override,forceEmit){
       case "cyl":   cyl(M,t.p[0],t.p[1],t.p[2],sx,sy,Math.max(3,Math.round(pt.seg||6)),col,pt.cap!==false,t.r); break;
       case "ring":  ringMesh(M,t.p[0],t.p[1],t.p[2],sx,(pt.weight===undefined?0.015:pt.weight),Math.max(8,Math.round(pt.seg||96)),col); break;
       case "quad":  quadMesh(M,t.p[0],t.p[1],t.p[2],sx,sz,(t.r&&t.r[1])||0,col,1.0); break;
+      case "glow":  glowStrip(M,t.p[0],t.p[1],t.p[2],sx,sz,(t.r&&t.r[1])||0,col); break;
+      case "gdisc": glowDisc(M,t.p[0],t.p[1],t.p[2],sx,Math.round(pt.seg||24),col); break;
       case "grid":  gridMesh(M,col); break;
     }
     M.flat=null; M.emitAll=null; M.tess=1; M.tex=0; M.texAmt=0;
@@ -1304,20 +1393,27 @@ var ASSETS=[
   ]},
 
 { id:"marker", name:"Move Marker", group:"Overlays",
-  colA:[0.42,1.55,1.62], colB:[0.42,1.55,1.62], scale:1.0,
-  note:"Drops where you right-click and fades. Scaled per instance so it can pulse without a second mesh.",
-  slots:["A — emissive teal"],
+  colA:[0.14,0.46,0.48], colB:[0.14,0.46,0.48], scale:1.0,
+  note:"Drops where you right-click and fades. A pool of light rather than a ring and a pip: the expanding ripple around it is made of ringchips, so this only has to be the bloom at the centre. Scaled per instance so it can pulse without a second mesh.",
+  slots:["A — decal, additive"],
   parts:[
-    {id:"ring", name:"Ring", prim:"ring", p:[0,0,0], s:[0.42], weight:0.055, seg:28, emit:true},
-    {id:"pip",  name:"Pip",  prim:"box",  p:[0,0.02,0], s:[0.09,0.02,0.09], emit:true}
+    {id:"pool", name:"Pool", prim:"gdisc", p:[0,0,0], s:[1.0], seg:22, emit:true}
   ]},
 
 { id:"ringchip", name:"Ring Segment", group:"Overlays",
-  colA:[0.30,0.56,0.47], colB:[0.30,0.56,0.47], scale:1.0,
-  note:"One short arc of a range ring. A ring used to be a single flat annulus placed at the height of its own centre, which on any slope buried the uphill half and floated the downhill half. Instancing gives one transform per instance, so a ring that follows the ground has to BE many instances — this is one of them, laid tangentially and grounded where it lands. Length is well over the spacing on purpose: a chip is a straight chord and its neighbours angle away from it on the curve, so an overlap that looks generous on paper still reads as a dashed line on a tight ring.",
-  slots:["A — emissive"],
+  colA:[0.10,0.26,0.24], colB:[0.10,0.26,0.24], scale:1.0,
+  note:"One link of a line of light on the ground — every ring in the game is a run of these. A ring used to be a single flat annulus placed at the height of its own centre, which on any slope buried the uphill half and floated the downhill half; instancing gives one transform per instance, so a ring that follows the ground has to BE many instances, laid tangentially and grounded where it lands. It used to be an opaque box, which cost it twice: the ink pass drew a black outline around every single chip, so a ring read as a chain of beads, and the emissive colour clamped to a flat slab. It is a glow strip now, drawn in the decal pass. Its length is exactly twice groundRing's spacing and it fades linearly to nothing at both ends, so consecutive chips cross-fade and sum to an even line instead of pooling at the joints.",
+  slots:["A — decal, additive"],
   parts:[
-    {id:"chip", name:"Segment", prim:"box", p:[0,0,0], s:[1.35,0.02,0.085], emit:true}
+    {id:"chip", name:"Segment", prim:"glow", p:[0,0,0], s:[1.60,0,0.30], emit:true}
+  ]},
+
+{ id:"shadepatch", name:"Contact Shade", group:"Overlays",
+  colA:[0.20,0.19,0.15], colB:[0.20,0.19,0.15], scale:1.0,
+  note:"The soft darkening under a selected unit, drawn with the same strip as a ring so it follows the ground the same way — a flat disc would be the honest shape and would sink into the first slope it met. This one is composited the other way round: it is subtracted from what is behind it rather than added, so its colour reads as how much light to take away and black means leave the ground alone. Without it a selection ring is a hoop the unit stands in the middle of; with it the unit is planted. It is absurdly wide against its length because a ring chip is scaled to the gap it has to bridge, and the gap around a 0.4-unit circle is very small — at the scale it is actually drawn at this is a band about two thirds of a unit across.",
+  slots:["A — decal, subtractive"],
+  parts:[
+    {id:"chip", name:"Segment", prim:"glow", p:[0,0,0], s:[1.60,0,4.20], emit:true}
   ]},
 
 { id:"ring", name:"Range Ring", group:"Overlays",

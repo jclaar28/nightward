@@ -14,6 +14,7 @@
     "fog": "node tools/fog.mjs",
     "turret": "node tools/turret.mjs",
     "select": "node tools/select.mjs",
+    "decals": "node tools/decals.mjs",
     "check": "python3 src/build.py && node tools/smoke.mjs && node tools/instances.mjs"
   },
   "devDependencies": {

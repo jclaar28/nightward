@@ -476,7 +476,7 @@ function renderInspector(){
 
   h+='<div class="iHead"><input class="iName" value="'+String(pt.name).replace(/"/g,"&quot;")+
      '" data-path="name"><select class="iPrim" data-path="prim">';
-  ["box","wedge","gable","cone","cyl","ring","quad"].forEach(function(k){
+  ["box","wedge","gable","cone","cyl","ring","quad","glow","gdisc"].forEach(function(k){
     h+='<option value="'+k+'"'+(pt.prim===k?" selected":"")+'>'+k+'</option>';
   });
   h+='</select></div>';
@@ -847,7 +847,13 @@ function draw(){
   var s=cur.scale||1;
   setInst(inst,cur.colA,cur.colB,s);
   R.setInstances(batch,inst,1);
-  var list=[batch], over=[];
+  // An overlay asset is previewed the way the game draws it: in the blended
+  // decal pass, so a ring segment shows as the soft mark it becomes on the
+  // field rather than as an opaque quad with a black rim around it. The
+  // contact shade is the one that subtracts rather than adds.
+  var deco=(cur&&cur.group==="Overlays")?
+             [Object.assign(batch,{blend:cur.id==="shadepatch"?"mul":"add"})]:null;
+  var list=deco?[]:[batch], over=[];
   if(sel&&showGuides&&hiOK&&!hidden[sel]){
     setInst(hiInst,[1.55,0.82,0.36],[1.55,0.82,0.36],s);
     R.setInstances(hiBatch,hiInst,1);
@@ -861,7 +867,7 @@ function draw(){
     R.setInstances(gizBatch,gizInst,1);
     over.push(gizBatch);
   }
-  R.render(camera(),list,null,over);
+  R.render(camera(),list,null,over,deco);
 }
 
 // ---- input ----------------------------------------------------------------
