@@ -392,6 +392,17 @@ function newGame(seed,map,opt){
   cam.az=38; cam.el=36; cam.zoom=17;
   var mySeat=S.players[S.me];
   cam.tx=mySeat.cx; cam.tz=mySeat.cz;
+  // A dark map with one lit man in it is correct and, on the first frame of a
+  // round, unreadable — the player has not been given anything to decide with
+  // yet. `grace` lights a patch around where he is standing; it ships at 0
+  // because the answer chosen was "nothing but what you can see", and it is a
+  // stat rather than a constant so that answer stays cheap to revisit.
+  fogInit();
+  var gr=+FOG().grace||0;
+  if(gr>0){
+    for(var gz=0;gz<M.GN;gz++) for(var gx=0;gx<M.GN;gx++)
+      if(Math.hypot(M.gx2w(gx)-mySeat.cx,M.gx2w(gz)-mySeat.cz)<=gr) S.fog[gz*M.GN+gx]=1;
+  }
   if(UI.phase) UI.phase();
   return S;
 }
@@ -1579,6 +1590,39 @@ function dropGib(x,z,rot,sc,col){
 // ~800 attackers against ~40 watchers, and 32,000 hypots several times a second
 // to draw a 150-pixel canvas is not a trade worth making. Stamping discs into a
 // byte grid is ~4,000 writes and the lookup is one index.
+// What you have ever seen, one byte per cell, for the seat sitting at this
+// screen. Deliberately NOT in the snapshot: each side accumulates its own from
+// the units and buildings it already receives, so fog costs the network nothing
+// and a guest's memory is genuinely its own rather than a copy of the host's.
+// It is also why this is keyed to S.me and not to a player id — it is what this
+// screen has been shown, which is a property of the screen.
+function fogInit(){
+  S.fog=new Uint8Array(M.GN*M.GN);
+  S.fogTex=new Uint8Array(M.GN*M.GN);
+  S.fogT=0;
+}
+function FOG(){ return M.statsOf("fog")||{}; }
+// Fold this instant's sight into the memory, and build the byte the renderer
+// samples: 0 never seen, 128 seen before, 255 in sight now.
+function fogStep(){
+  if(!S.fog) fogInit();
+  var mask=visionMask(S.me|0), i, n=S.fog.length;
+  for(i=0;i<n;i++){
+    if(mask[i]) S.fog[i]=1;
+    S.fogTex[i]=mask[i] ? 255 : (S.fog[i] ? 128 : 0);
+  }
+  return S.fogTex;
+}
+// 0 never seen, 1 seen before, 2 in sight now — by world position, for the
+// draw code. Reads the same byte the shader is handed, so what is culled and
+// what is dimmed can never disagree.
+function lookingAt(x,z){
+  if(!S.fogTex) return 2;
+  var gx=M.w2gx(x), gz=M.w2gx(z);
+  if(gx<0||gz<0||gx>=M.GN||gz>=M.GN) return 0;
+  var v=S.fogTex[gz*M.GN+gx];
+  return v===255?2:(v?1:0);
+}
 var seeMask=null, seeOwn=-1;
 function visionMask(pid){
   pid=pid|0;
@@ -3205,8 +3249,15 @@ function pack(){
   var ghostCell=null;
   if(playable() && S.hover && (S.sel==="wall"||S.sel==="gate")
      && canPlace(S.sel,S.hover.gx,S.hover.gz)) ghostCell=S.hover;
+  // fogOn is read once here and reused by every cull below it
+  var fogOn=!!FOG().on;
   for(var k in S.cells){
     var c=S.cells[k]; if(c.ref) continue;
+    // A building is a place, so it is remembered: seen once, it keeps standing
+    // in your picture of the map whether or not anybody is looking at it. That
+    // is the whole difference between explored and visible, and it is why the
+    // other town's walls stay on your map after you have walked past them.
+    if(fogOn&&lookingAt(M.gx2w(c.gx),M.gx2w(c.gz))<1) continue;
     var ty=TYPES[c.type], f=c.hp/c.max;
     var x=M.gx2w(c.gx), z=M.gx2w(c.gz);
     var pc=(S.multi&&(c.own||0)!==S.me)?S.players[c.own||0].col:null;
@@ -3264,6 +3315,7 @@ function pack(){
   for(var si=0;si<S.nodes.length;si++){
     var nd=S.nodes[si], nf=Math.max(0,nd.amt/nd.max);
     if(nf<=0.001) continue;
+    if(fogOn&&lookingAt(nd.x,nd.z)<1) continue;   // a pile you have found stays found
     var na=dim([0.348,0.276,0.190],0.45+0.55*nf), nb=dim([0.300,0.325,0.360],0.45+0.55*nf);
     n.salvage=put(buf.salvage,n.salvage,nd.x,gy(nd.x,nd.z),nd.z,nd.rot,na,0.62+0.62*nf,nb);
     if(nd.worked) n.ring=put(buf.ring,n.ring,nd.x,gy(nd.x,nd.z)+0.03,nd.z,0,
@@ -3271,6 +3323,7 @@ function pack(){
   }
   for(var i=0;i<S.corpses.length;i++){
     var cp=S.corpses[i], cf=Math.min(1,cp.life/cp.max);
+    if(fogOn&&lookingAt(cp.x,cp.z)<2) continue;   // a body is not a landmark
     var cA=dim([0.150,0.156,0.135],0.35+0.65*cf), cB=dim([0.196,0.196,0.168],0.35+0.65*cf);
     n.corpse=putP(buf.corpse,n.corpse,cp.x,
                   cp.y===undefined?((cp.gnd===undefined?PLAT:cp.gnd)+0.02):cp.y,cp.z,cp.rot,
@@ -3280,16 +3333,31 @@ function pack(){
   for(i=0;i<S.nests.length;i++){
     var nn=S.nests[i];
     if(nn.dead) continue;
+    if(fogOn&&lookingAt(nn.x,nn.z)<1) continue;   // the objective, once you find it
     var nf=Math.max(0,nn.hp/nn.max);
     var na=nn.hit>0.01?[1.35,0.55,0.42]:hurt(nestMeta.colA,nf);
     var nb=nn.hit>0.01?[1.55,0.70,0.55]:hurt(nestMeta.colB,nf);
     // no boundary ring: the tainted ground already says where it reaches
     n.nest=put(buf.nest,n.nest,nn.x,gy(nn.x,nn.z),nn.z,0,na,(nestMeta.scale||1)*1.5,nb);
   }
-  for(i=0;i<S.enemies.length;i++) drawEnemy(S.enemies[i],n);
+  // Anything alive in ground you are not looking at is not drawn at all.
+  // Dimming is right for terrain and for a building you remember; it is wrong
+  // for something that moves, because a dark silhouette crossing a dark field
+  // is still a silhouette, and at a gentler fog setting it is plainly readable.
+  // Memory is for places. A horde is not a place.
+  for(i=0;i<S.enemies.length;i++){
+    var em=S.enemies[i];
+    if(fogOn&&lookingAt(em.x,em.z)<2) continue;
+    drawEnemy(em,n);
+  }
   for(i=0;i<S.units.length;i++){
     var u=S.units[i], UK=UNITS[u.t], uf=Math.max(0,u.hp/u.max);
     if(u.inside) continue;                  // indoors: nothing to draw
+    // Your own people are always drawn — they are the eyes, so they cannot be
+    // in the dark by definition, and a unit that vanished because it walked
+    // out of its own sight would be a bug rather than a rule. The other
+    // player's are subject to the same fog as anything else that moves.
+    if(fogOn&&(u.own|0)!==(S.me|0)&&lookingAt(u.x,u.z)<2) continue;
     if(u.sel) n.ring=put(buf.ring,n.ring,u.x,gy(u.x,u.z)+0.03,u.z,0,
                          [0.55,2.10,2.20],0.62,[0.55,2.10,2.20]);
     // the rally is only a decision if you can see where it reaches
@@ -3588,6 +3656,15 @@ function draw(){
     if(SND.ambience && (S.phase!==ambT||!ambOn)){
       ambOn=SND.ambience(S.phase,S.dayP); ambT=S.phase;
     }
+  }
+  // Fog is rebuilt per frame rather than cached: everything that changes it is
+  // a unit walking, which is every frame anyway. It is ~10k byte writes over a
+  // 6400-cell grid and the upload is 6.4KB — cheaper than the bookkeeping that
+  // would tell us whether it needed doing.
+  if(R.setFog){
+    var FG=FOG();
+    if(FG.on) R.setFog(fogStep(),M.GN,(M.GN*M.CELL)/2,M.CELL,FG.dark,FG.dim);
+    else R.setFog(null);
   }
   pack();
   R.render(camera(),BATCHES,[S.flash*1.5,0,0]);
@@ -3968,8 +4045,14 @@ return {
   // so a test exercises the real snapping rather than a back channel.
   queueRoad:queueRoad, roadSpeed:roadSpeed, roadAnchor:roadAnchor,
   roadRefusal:roadRefusal, stepVia:stepVia,
-  // vision, for the minimap and the tools
-  visionMask:visionMask, seenAt:seenAt,
+  // vision and fog, for the minimap and the tools
+  visionMask:visionMask, seenAt:seenAt, fogStep:fogStep,
+  // 0 never seen, 1 seen before, 2 in sight now
+  fogAt:function(gx,gz){
+    if(!S||!S.fog||gx<0||gz<0||gx>=M.GN||gz>=M.GN) return 2;
+    var i=gz*M.GN+gx;
+    return (S.fogTex&&S.fogTex[i]===255)?2:(S.fog[i]?1:0);
+  },
   cancelRoad:cancelRoad, roadAt:roadAt, selectRoad:selectRoad,
   rsel:selRoad, roadCrew:roadCrew, edgeLen:edgeLen,
   // pathfinding, for the tools: findPath is the search, stepPath the follower

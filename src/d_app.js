@@ -635,9 +635,15 @@ function minimap(dt){
   MM.clearRect(0,0,W,H);
   MM.fillStyle="#141a15"; MM.fillRect(0,0,W,H);
 
+  // Everything below asks the fog first. A round now opens on a black map and
+  // the nests are found by walking, so a nest drawn before anybody has been
+  // near it would give away the one thing the whole design asks you to go and
+  // learn.
+  var seen=function(x,z){ return HFGAME.fogAt(HF.w2gx(x),HF.w2gx(z))>0; };
   // tainted ground: one soft red pool per nest, exactly the radius it claims
   for(var i=0;i<S.nests.length;i++){
     var nn=S.nests[i];
+    if(!seen(nn.x,nn.z)) continue;
     var p=px(nn.x,nn.z), rr=nn.r*k;
     var g=MM.createRadialGradient(p[0],p[1],0,p[0],p[1],rr);
     var dead=nn.dead;
@@ -658,6 +664,7 @@ function minimap(dt){
   MM.fillStyle="rgba(214,196,140,.9)";
   for(i=0;i<S.nodes.length;i++){
     if(S.nodes[i].amt<=0) continue;
+    if(!seen(S.nodes[i].x,S.nodes[i].z)) continue;
     var q=px(S.nodes[i].x,S.nodes[i].z);
     MM.fillRect(q[0]-1.5,q[1]-1.5,3,3);
   }
@@ -665,6 +672,7 @@ function minimap(dt){
   for(var kk in S.cells){
     var c=S.cells[kk];
     if(c.ref) continue;
+    if(HFGAME.fogAt(c.gx,c.gz)<1) continue;      // including the other town's
     var b=px(HF.gx2w(c.gx),HF.gx2w(c.gz));
     MM.fillStyle=(c.type==="hall")?"rgba(240,236,228,.95)":"rgba(150,166,158,.85)";
     var sz=(c.type==="hall")?4:2;
@@ -674,6 +682,10 @@ function minimap(dt){
   // over them, so it reads as ground you are watching rather than a filter laid
   // on top. Without this the horde simply vanishes at the edge of your sight
   // and that reads as a bug, not as a rule — the lit patch is the explanation.
+  // Three states, drawn as two washes: a light one over what you are looking at
+  // now, and nothing over what you merely remember. Unexplored ground gets no
+  // mark of any kind, which is what makes the shape of what you have walked
+  // legible at a glance.
   var mask=HFGAME.visionMask(S.me), gn=HF.GN, cell=HF.CELL*k;
   MM.fillStyle="rgba(150,190,180,.085)";
   for(var mz=0;mz<gn;mz++){

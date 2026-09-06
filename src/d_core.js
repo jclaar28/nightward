@@ -1528,6 +1528,21 @@ var STAT_DEFS={
      hint:"how far it puts attackers on your minimap"}
   ]},
 
+  // Fog is presentation, not simulation: these change what the player is shown
+  // and nothing about what the world does. `dark` and `dim` are the two levels
+  // the shader lerps between, so they are also the two numbers to drag in the
+  // Library when deciding how black "never seen" should be.
+  fog:{ note:"What the map looks like where you have not been, and where you are no longer.", fields:[
+    {k:"on",    label:"Fog of war",    def:1,   lo:0, hi:1,  step:1, int:true,
+     hint:"0 shows the whole map, as it was before"},
+    {k:"dark",  label:"Never seen",    def:0.06,lo:0, hi:1,  step:0.01,
+     hint:"how much light unexplored ground keeps — 0 is black"},
+    {k:"dim",   label:"Seen before",   def:0.42,lo:0, hi:1,  step:0.01,
+     hint:"explored but not in sight now: terrain and buildings you remember"},
+    {k:"grace", label:"Opening reveal",def:0,   lo:0, hi:40, step:1,
+     hint:"units of map lit around your commander at the start, beyond his own sight"}
+  ]},
+
   // Speed is the whole unit. 2.90 is a deliberate hair over the runner's 2.85,
   // which makes the scout the only thing you own that cannot be run down —
   // and the reason it is worth sending somewhere you would not send anything

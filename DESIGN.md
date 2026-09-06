@@ -92,11 +92,13 @@ dependencies between them are real:
 
 1. **Territory and outposts.** Independent of exploration. Gives ground taken
    a way to stay taken, which is what makes step 2 worth doing.
-2. **Full fog of war.** The scout has shipped and so has the narrow version of
-   sight — see §4 — so what is left here is the expensive part: hiding the 3D
-   view rather than the minimap, and storing explored-but-not-currently-visible.
-   Still do it after territory exists, so the information it reveals is
-   information about something.
+2. ~~**Fog of war and the scout.**~~ Shipped. Both of them, and out of order —
+   fog landed before territory, which was the sequencing this document argued
+   against. Worth watching for the failure it predicted: exploration now has a
+   payoff (knowing which nest is cheapest) but still nothing to *hold*, so the
+   ground you scout goes dark again behind you. If that reads as tedious rather
+   than tense in play, territory is the fix and this was the reason to do it
+   first.
 3. **Tech tree.** Last, because it drags in status effects, and because it is
    the one system that is more fun to design once there is a longer game to
    spend across.
@@ -137,25 +139,24 @@ got for free.
 
 ## 4. Exploration
 
-**The scout has shipped, and with it the narrow half of sight.** Everything you
-own has a vision radius and the minimap marks only the attackers something of
-yours can see. `HANDOFF.md` and `ROSTER.md` describe the unit; what belongs here
-is what is still missing.
+**Both the scout and fog of war have shipped, and have left this section.**
+`HANDOFF.md` and `ROSTER.md` describe them; `CLAUDE.md` holds the rules. A round
+now opens on a black map, ground stays known once walked, and anything alive in
+ground nobody is watching is not drawn at all.
 
-**Full fog of war is not free and is not what shipped.** What exists hides the
-horde on the minimap and nothing else — the map itself stays known, terrain and
-nests included, and the 3D view hides nothing at all. Real fog needs per-tile
-visibility, a persistent explored-but-not-currently-visible state, and a pass
-over the renderer rather than the minimap. It would replace the narrow version
-rather than extend it. Flagged here so it is never costed as already half done.
+**What exploration still does not tell you is what is waiting.** You can find a
+nest; you cannot see its garrison, and garrison size is the number that decides
+which nest is actually the cheapest to take. So scouting currently answers
+"where" and "which way is the wave coming", and does not yet answer the question
+§1 says the whole design points at. That is the cheapest remaining piece of
+intel and probably the next one worth building.
 
-**The open question is whether the narrow version is enough**, because it
-already buys the thing §1 wants: which way a night's wave came from is now
-something you can know by having somebody out there, at a fraction of the cost.
-What it does not yet answer is which nest to hit next — a nest's garrison is
-visible to nobody, so choosing a target is still a guess. That gap is the
-cheapest remaining piece of intel and probably the next one to close, with or
-without full fog.
+**The thing to watch in play is the walk back.** Fog shipped before territory,
+which is the order this document argued against, and the specific cost it
+predicted is now live: ground you scouted goes dark again behind you and there
+is nothing yet that makes it stay yours. If re-scouting the same corridor every
+few nights reads as tedious rather than tense, that is not a fog problem — it is
+§3 arriving late.
 
 ---
 

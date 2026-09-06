@@ -15,7 +15,16 @@ const SEED = 4242;
 const { page, errors, close } = await open();
 
 // A busy frame: a town, a wave, corpses, particles, both nests on the map.
+//
+// Fog is off for the whole tool, deliberately. Everything asserted here is
+// geometry — where an instance sits relative to the ground under it — and fog
+// answers a different question, which is whether it should be in the buffer at
+// all. Leaving it on does not make these checks stricter, it empties them: the
+// nest-grounding checks failed with "drawn []" the moment fog shipped, because
+// an undiscovered nest is correctly not drawn and there was nothing left to
+// measure. A check with no subject is worse than no check.
 const scene = await page.evaluate(seed => {
+  HF.setStat('fog', 'on', 0);
   __nw.start(seed);
   __nw.hall(0, 0);
   __nw.run(22);

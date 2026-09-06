@@ -18,8 +18,29 @@ var FS_COMMON=
 "uniform vec4 uLampC[NL];\n"+
 "uniform int uLampN;\n"+
 "uniform vec2 uShadowTexel;\n"+
+// War fog. One 80x80 R8 texture for the whole scene, sampled by world XZ:
+// 0 never seen, ~0.5 seen before, 1 in sight now. Doing it here rather than
+// per instance is what makes the boundary a smooth curve instead of a staircase
+// of 1.5-unit cells — the texture is filtered, so the edge falls between texels.
+// It also means terrain, props, buildings and units all obey it without a
+// single call site knowing about fog, because every one of them ends up here.
+"uniform sampler2D uWarTex;\n"+
+"uniform vec3 uWarK;\n"+      // x on/off, y unexplored level, z explored level
+"uniform vec2 uWarSO;\n"+     // world XZ -> uv: scale, offset
 "layout(location=0) out vec4 oColor;\n"+
 "layout(location=1) out vec4 oNormal;\n"+
+"float warLevel(){\n"+
+"  if(uWarK.x<0.5) return 1.0;\n"+
+"  float v=texture(uWarTex, vW.xz*uWarSO.x+uWarSO.y).r;\n"+
+"  return (v<0.5) ? mix(uWarK.y,uWarK.z,v*2.0) : mix(uWarK.z,1.0,(v-0.5)*2.0);\n"+
+"}\n"+
+// Colour drains before brightness does: what you remember is grey, what you are
+// looking at is not. Dimming alone reads as night rather than as memory.
+"vec3 warApply(vec3 col,float f){\n"+
+"  if(uWarK.x<0.5) return col;\n"+
+"  float g=dot(col,vec3(0.299,0.587,0.114));\n"+
+"  return mix(vec3(g),col,clamp((f-uWarK.y)/max(0.001,1.0-uWarK.y)*1.25,0.0,1.0))*f;\n"+
+"}\n"+
 "float shadowAt(){\n"+
 "  vec3 N=normalize(vN);\n"+
 "  float ndl=clamp(dot(N,uLightDir),0.0,1.0);\n"+
@@ -40,7 +61,11 @@ var FS_COMMON=
 "}\n"+
 "void main(){\n"+
 "  vec3 N=normalize(vN);\n"+
-"  if(vE>0.5){ oColor=vec4(vC*((vE>1.5)?uEmit:1.0),1.0); oNormal=vec4(N*0.5+0.5,1.0); return; }\n"+
+"  float wf=warLevel();\n"+
+// A lamp is geometry too. Letting the emissive path skip the fog is how a
+// brazier you have never found still glows at you across a black map.
+"  if(vE>0.5){ oColor=vec4(warApply(vC*((vE>1.5)?uEmit:1.0),wf),1.0);\n"+
+"               oNormal=vec4(N*0.5+0.5,wf); return; }\n"+
 "  float shd=shadowAt();\n"+
 "  float lit=max(dot(N,uLightDir),0.0)*shd;\n"+
 "  float band = lit>0.62 ? 1.0 : (lit>0.22 ? 0.66 : (lit>0.045 ? 0.40 : 0.30));\n"+
@@ -74,7 +99,9 @@ var FS_COMMON=
 "  }\n"+
 "  float rim=pow(1.0-max(dot(N,Vs),0.0),(vM>2.5)?2.2:3.5);\n"+
 "  col += vC*0.9*rim*rimK*(uSun*0.72+uSky*0.55);\n"+
-"  oColor=vec4(col,1.0); oNormal=vec4(N*0.5+0.5,1.0);\n"+
+// the fog level rides in the normal buffer alpha so the ink pass can fade too
+"  oColor=vec4(warApply(col,wf),1.0);\n"+
+"  oNormal=vec4(N*0.5+0.5,wf);\n"+
 "}";
 
 var VS_STATIC="#version 300 es\n"+
@@ -151,7 +178,11 @@ var FS_POST="#version 300 es\nprecision highp float;\n"+
 "    e=max(e, smoothstep(0.00028,0.0016,abs(d-d2)));\n"+
 "    e=max(e, smoothstep(0.42,0.86,1.0-dot(n,n2))*0.85);\n"+
 "  }\n"+
-"  e*=(1.0-sky)*uOutline;\n"+
+// The ink pass would happily draw a crisp outline around a building sitting in
+// unexplored ground: the edge comes from depth and normals, neither of which
+// knows about fog. That is what the alpha written above is for.
+"  float wf=texture(uNormal,vUv).a;\n"+
+"  e*=(1.0-sky)*uOutline*wf;\n"+
 "  c=mix(c,mix(vec3(0.055,0.045,0.055),c*0.16,0.35),clamp(e,0.0,1.0)*0.92);\n"+
 "  float fogT=smoothstep(0.28,0.80,d)*(1.0-sky);\n"+
 "  c=mix(c,uFog,fogT*0.88);\n"+
@@ -186,6 +217,18 @@ function create(canvas){
     if(!gl.getProgramParameter(p,gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p));
     return p;
   }
+
+  // ---- war fog texture ----------------------------------------------------
+  // One channel, one texel per cell, LINEAR so the boundary lands between
+  // texels rather than on a cell edge. NEAREST here is the difference between
+  // fog and a chequerboard.
+  var warTex=gl.createTexture(), warN=0, warSO=[0,0], warK=[0,0.06,0.42];
+  gl.bindTexture(gl.TEXTURE_2D,warTex);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
+  gl.bindTexture(gl.TEXTURE_2D,null);
 
   var pStatic=prog(VS_STATIC,"#version 300 es\n"+FS_COMMON);
   var pInst  =prog(VS_INST,  "#version 300 es\n"+FS_COMMON);
@@ -424,6 +467,11 @@ function create(canvas){
       gl.uniform1f(u(p,"uSMWorld"),SM_WORLD);
       gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D,smTex);
       gl.uniform1i(u(p,"uShadow"),0);
+      gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D,warTex);
+      gl.uniform1i(u(p,"uWarTex"),1);
+      gl.uniform3f(u(p,"uWarK"),warN?warK[0]:0,warK[1],warK[2]);
+      gl.uniform2f(u(p,"uWarSO"),warSO[0],warSO[1]);
+      gl.activeTexture(gl.TEXTURE0);
     }
     gl.useProgram(pStatic); common(pStatic);
     gl.bindVertexArray(st.vao);
@@ -505,8 +553,26 @@ function create(canvas){
     return out[0];
   }
 
+  // The simulation owns what has been seen; this only draws it. `data` is one
+  // byte per cell — 0 never seen, 128 seen before, 255 in sight — and `half` is
+  // the world half-extent the grid covers. Pass null to switch fog off, which
+  // is what every tool that is not testing fog wants.
+  function setFog(data,n,half,cell,dark,dim){
+    if(!data||!n){ warN=0; return; }
+    warN=n;
+    warK=[1, dark===undefined?0.06:dark, dim===undefined?0.42:dim];
+    // Texel centres, not texel corners: cell i covers uv [i/n,(i+1)/n] and its
+    // centre is (i+0.5)/n, while gx2w(i) is the corner. Half a cell out is half
+    // a cell of fog lag on every edge, and it reads as the fog trailing you.
+    var span=half*2;
+    warSO=[1/span, (half+cell*0.5)/span];
+    gl.bindTexture(gl.TEXTURE_2D,warTex);
+    gl.pixelStorei(gl.UNPACK_ALIGNMENT,1);
+    gl.texImage2D(gl.TEXTURE_2D,0,gl.R8,n,n,0,gl.RED,gl.UNSIGNED_BYTE,data);
+    gl.bindTexture(gl.TEXTURE_2D,null);
+  }
   return {gl:gl, setStatic:setStatic, makeBatch:makeBatch, rebuildBatch:rebuildBatch, setInstances:setInstances, pickAt:pickAt,
-          render:render, setOptions:setOptions, setTime:setTime, setLamps:setLamps,
+          render:render, setOptions:setOptions, setTime:setTime, setLamps:setLamps, setFog:setFog,
           time:function(){return dayPhase;}, size:function(){return [W,H];}};
 }
 

@@ -79,13 +79,35 @@ the building owes, and the retrain loop asks. Counting the garrison as a total
 again would make a hall with three workers read as full, and a dead scout come
 back as a worker.
 
-**Sight hides the horde and nothing else.** Everything you own has a `sight` in
-the balance table, `visionMask(pid)` stamps those into a byte grid, and the
-minimap only marks attackers that grid can see. Nests, salvage, terrain and
-buildings stay visible on purpose — the map is known ground, and it is where the
-horde is *right now* that has to be earned. If this ever starts hiding anything
-else it has become fog of war by accident, which is a design decision nobody has
-made yet. `tools/scout.mjs` checks both halves.
+**Fog dims places and culls things.** A building, a nest or a salvage pile you
+have found stays drawn once you leave — that is what "explored" means, and the
+shader greys it rather than hiding it. Anything alive gets culled outright:
+attackers, corpses, the other player's units. Dimming something that moves does
+not hide it — a dark silhouette crossing a dark field is still a silhouette, and
+at a gentler `fog.dark` it is plainly readable. `tools/fog.mjs` counts instances
+rather than sampling pixels for exactly this reason: "it went dark" and "it is
+not in the buffer" are different claims and only one of them is hiding.
+
+**Your own units are never fogged.** They are the eyes. A unit that vanished
+because it walked out of its own sight would be a bug wearing a rule's clothes.
+
+**Fog is a texture, not a per-instance flag.** `fogStep()` writes one byte per
+cell — 0 never seen, 128 seen before, 255 in sight — and `R.setFog()` uploads
+it; `FS_COMMON` samples it by world XZ. That is what makes the boundary a smooth
+curve instead of a staircase of 1.5-unit cells, and it is why terrain, props,
+buildings and units all obey fog without a single draw site knowing it exists.
+The emissive early-out and the ink outline pass both had to be taught about it
+separately — a lamp that skips the fog glows across a black map, and the outline
+comes from depth and normals, neither of which knows anything. The fog level
+rides in the normal buffer's alpha for the outline's sake.
+
+**Sight is one number per thing, and everything downstream reads it.**
+Everything you own has a `sight` in the balance table; `visionMask(pid)` stamps
+those into a byte grid and both the fog and the minimap are built from that one
+grid. There is no second notion of "can see" anywhere — if you add one, the
+minimap and the world will disagree about what is visible and only one of them
+will be wrong in a way anybody notices. `tools/scout.mjs` and `tools/fog.mjs`
+check the two ends of it.
 
 **A construction site is not a building.** `b.site` means materials on the
 ground. Sites do not shoot, train, house, light, or accept repair, and each of
@@ -218,8 +240,8 @@ bug found here was found by reading numbers out of the running game.
 anything that puts words on screen, `node tools/roads.mjs` and
 `node tools/pathing.mjs` for anything touching roads, movement or worker jobs,
 `node tools/economy.mjs` for
-anything touching salvage, workers or the map, `node tools/scout.mjs` for
-anything touching sight, the minimap or who a building musters, `node tools/net.mjs` for anything
+anything touching salvage, workers or the map, `node tools/scout.mjs` and `node tools/fog.mjs` for
+anything touching sight, fog, the minimap or who a building musters, `node tools/net.mjs` for anything
 touching intents, the snapshot or the two-player screen,
 and `node tools/balance.mjs --ab id.key=value` for anything touching difficulty.
 `tools/README.md` explains them; read it before writing a new one.

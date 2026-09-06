@@ -38,9 +38,12 @@ python3 -m http.server 8899   # then http://127.0.0.1:8899/nightward.html
 The map is a 120-unit grid — 80 cells of 1.5. You start with a commander and a
 small purse. You place the
 town hall, he walks to it and raises it, and it musters two workers and a scout.
-The scout wins no fight and outruns everything: park it out on a lane and the
-horde shows up on your minimap before it shows up at your wall, because the
-minimap only marks attackers something of yours can see. Six minutes
+
+The map opens dark. You know only what somebody of yours can see, ground stays
+known once you have walked it, and anything alive in ground nobody is watching
+is not drawn at all — so the nests have to be found before they can be fought.
+The scout wins no fight and outruns everything on the field, which is what makes
+it the thing you send. Six minutes
 of daylight: workers strip salvage piles, cottages compound the workforce, and
 you spend the proceeds on walls, towers and troops. Two minutes of night: the
 nests empty and come for the hall.
@@ -142,8 +145,10 @@ screen and fails on a word that no text key owns. `tools/roads.mjs` proves
 snapping joins rather than duplicates, that a road only builds with a worker on
 it, and that the flow field cannot see one. `tools/pathing.mjs` sends a unit
 round a building, through a gate and out of a walled pocket, and checks an open-
-ground order is still a straight line. `tools/scout.mjs` covers the scout and the
-sight rule that hides the horde from the minimap. `tools/net.mjs` runs two
+ground order is still a straight line. `tools/scout.mjs` covers the scout and
+sight; `tools/fog.mjs` covers fog of war, and counts instances rather than
+sampling pixels because "it went dark" and "it is not drawn" are different
+claims. `tools/net.mjs` runs two
 browsers over a
 real peer connection, drives the invite screen by its buttons, and proves a
 guest's click reaches the world only by way of the host. `tools/README.md`

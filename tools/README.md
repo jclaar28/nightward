@@ -140,6 +140,28 @@ comment claimed a late night — timing the cheap case and quoting it as the
 expensive one is how a performance check passes for years and then does not. It
 now builds a 900-attacker field and a real settlement's worth of watchers.
 
+**`fog.mjs`** — what the map hides, what it remembers, and what it must never
+hide. Fog has one failure mode that looks exactly like success: the picture goes
+dark, everything appears to work, and the thing you meant to hide is still on
+screen at a lower brightness. That is not hypothetical — the first pass here
+dimmed attackers instead of culling them, and at a gentler setting a nest in
+unexplored ground was plainly readable in the screenshot. So every check counts
+instances rather than sampling pixels: an attacker nobody can see is not merely
+dark, it is not in the buffer.
+
+The split it defends is places against things. A nest, a pile or a building you
+have found stays drawn after you leave; an attacker, a corpse or the other
+player's units go with the sight. It also checks the one that would read as a
+bug rather than a rule — your own units are drawn wherever they are, because
+they are the eyes — and that the `fog.on` switch actually restores the map,
+since a feature with a broken off-switch is one nobody can bisect against.
+
+Note that `instances.mjs` turns fog off for its whole run. Everything that tool
+asserts is geometry, and fog answers a different question; leaving it on did not
+make those checks stricter, it emptied them — the nest-grounding checks started
+reporting "drawn []" because an undiscovered nest is correctly not drawn, and a
+check with no subject is worse than no check.
+
 **`net.mjs`** — the two-player path, which had no cover at all and is the
 riskiest thing to leave that way: a regression here is silent. Nothing throws,
 no frame looks wrong, and it is only discoverable by two people at two machines
