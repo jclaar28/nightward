@@ -48,6 +48,16 @@ three sources of movement at once; and it counted raw body Y, which includes the
 terrain under the unit, so a 0.055 bob was lost against a hillside. It runs its
 own quiet round now and measures height above the ground.
 
+And it checks that rings sit on the ground. Every ring in the game — selection,
+rally, tower range, brazier aura, the move marker's pulse — used to be a single
+flat annulus at the height of its own centre, so on a slope half of it was
+buried and half hung in the air. They are runs of grounded chips now, and this
+measures every chip against the terrain directly beneath it. Note what the check
+does first: it hunts the map for the roughest ground it can find and stands the
+commander there. Measured on the flat plateau where the hall usually goes, the
+old code passes and proves nothing — confirmed the other way too, the check
+reports 29 of 52 segments below ground against the flat version.
+
 **`campaign.mjs`** — the round loop. A night is not the end of anything, so
 these drive several full day/night cycles: dawn hands you the next day, the
 night counter advances, each wave is bigger than the last by a widening margin,

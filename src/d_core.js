@@ -1237,6 +1237,14 @@ var ASSETS=[
     {id:"pip",  name:"Pip",  prim:"box",  p:[0,0.02,0], s:[0.09,0.02,0.09], emit:true}
   ]},
 
+{ id:"ringchip", name:"Ring Segment", group:"Overlays",
+  colA:[0.30,0.56,0.47], colB:[0.30,0.56,0.47], scale:1.0,
+  note:"One short arc of a range ring. A ring used to be a single flat annulus placed at the height of its own centre, which on any slope buried the uphill half and floated the downhill half. Instancing gives one transform per instance, so a ring that follows the ground has to BE many instances — this is one of them, laid tangentially and grounded where it lands. Length is well over the spacing on purpose: a chip is a straight chord and its neighbours angle away from it on the curve, so an overlap that looks generous on paper still reads as a dashed line on a tight ring.",
+  slots:["A — emissive"],
+  parts:[
+    {id:"chip", name:"Segment", prim:"box", p:[0,0,0], s:[1.35,0.02,0.085], emit:true}
+  ]},
+
 { id:"ring", name:"Range Ring", group:"Overlays",
   colA:[0.30,0.56,0.47], colB:[0.30,0.56,0.47], scale:2.4,
   note:"Unit radius, scaled per instance to the tower's range.",

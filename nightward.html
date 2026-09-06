@@ -2396,6 +2396,14 @@ var ASSETS=[
     {id:"pip",  name:"Pip",  prim:"box",  p:[0,0.02,0], s:[0.09,0.02,0.09], emit:true}
   ]},
 
+{ id:"ringchip", name:"Ring Segment", group:"Overlays",
+  colA:[0.30,0.56,0.47], colB:[0.30,0.56,0.47], scale:1.0,
+  note:"One short arc of a range ring. A ring used to be a single flat annulus placed at the height of its own centre, which on any slope buried the uphill half and floated the downhill half. Instancing gives one transform per instance, so a ring that follows the ground has to BE many instances — this is one of them, laid tangentially and grounded where it lands. Length is well over the spacing on purpose: a chip is a straight chord and its neighbours angle away from it on the curve, so an overlap that looks generous on paper still reads as a dashed line on a tight ring.",
+  slots:["A — emissive"],
+  parts:[
+    {id:"chip", name:"Segment", prim:"box", p:[0,0,0], s:[1.35,0.02,0.085], emit:true}
+  ]},
+
 { id:"ring", name:"Range Ring", group:"Overlays",
   colA:[0.30,0.56,0.47], colB:[0.30,0.56,0.47], scale:2.4,
   note:"Unit radius, scaled per instance to the tower's range.",
@@ -4847,7 +4855,11 @@ function init(renderer, cv, settings, endCb){
     corpse:R.makeBatch(M.buildAsset("corpse")),
     bolt :R.makeBatch(M.buildAsset("tracer"),false),
     spark:R.makeBatch(M.buildAsset("spark"),false),
-    ring :R.makeBatch(M.buildAsset("ring"),false), tile:R.makeBatch(M.meshTile(),false),
+    // The flat annulus asset is still in the Library to look at, but nothing
+    // draws one any more: every ring in the game follows the ground now and is
+    // made of ringchip segments. See groundRing().
+    tile:R.makeBatch(M.meshTile(),false),
+    rchip:R.makeBatch(M.buildAsset("ringchip"),false),
     grid :R.makeBatch(M.buildAsset("grid"),false),
     road :R.makeBatch(M.meshRoadPad(),false),
     site :R.makeBatch(M.buildAsset("site"))
@@ -4858,7 +4870,7 @@ function init(renderer, cv, settings, endCb){
            B.barracks,B.archery,B.cottage,
            B.wall,B.wpost,B.gate,
            B.nest,B.soldier,B.archer,B.worker,B.scout,B.commander,
-           B.bolt,B.arrow,B.spark,B.debris,B.ring,B.marker,B.tile,B.grid];
+           B.bolt,B.arrow,B.spark,B.debris,B.rchip,B.marker,B.tile,B.grid];
   buildRigs(true);
   // bones draw with the living attackers, between the buildings and the effects
   var rigB=[];
@@ -4875,11 +4887,12 @@ function init(renderer, cv, settings, endCb){
            debris:MAX_PARTS,
            bolt:400,arrow:300,wall:1400,soldier:120,archer:120,worker:120,
            scout:40, commander:8,
-           marker:24,salvage:24,cottage:120,nest:24,site:600,road:5200};
+           marker:24,salvage:24,cottage:120,nest:24,site:600,road:5200,
+           rchip:6000};
   ["hall","tower","ballista","brazier","barracks","archery","cottage",
    "wall","wpost","gate",
    "soldier","archer","worker","scout","commander","salvage","nest",
-   "corpse","bolt","arrow","spark","debris","ring","marker","tile","grid","site",
+   "corpse","bolt","arrow","spark","debris","rchip","marker","tile","grid","site",
    "road"].forEach(function(k){
     buf[k]=new Float32Array(12*(CAP[k]||700));
   });
@@ -7835,11 +7848,32 @@ function wallRot(gx,gz){
   if(v>h) return Math.PI/2;
   return Math.abs(M.gx2w(gx))>Math.abs(M.gx2w(gz))?Math.PI/2:0;
 }
+// A ring that follows the ground. Every one of these used to be a single flat
+// annulus placed at gy() of its own centre, so on a slope the uphill half sank
+// into the hill and the downhill half hung in the air — worst on the biggest
+// ones, which is why the commander's rally was where it showed.
+//
+// One instance carries one transform, so there is no way to bend a mesh over
+// terrain here: a ring that follows the ground has to be a run of short chips,
+// each sampling gy() where it lands. Spacing is finer than the 1.5-unit terrain
+// cell so the run cannot step over a ridge, and the chip is longer than the
+// spacing so it reads as a line rather than a dashed one.
+var RING_STEP=0.8;
+function groundRing(n,x,z,r,col,lift){
+  if(!(r>0)) return;
+  var cnt=Math.max(8,Math.min(220,Math.round(6.2832*r/RING_STEP)));
+  var ly=(lift===undefined?0.05:lift);
+  for(var i=0;i<cnt;i++){
+    var a=i/cnt*6.2832, rx=x+Math.cos(a)*r, rz=z+Math.sin(a)*r;
+    // yaw is the tangent, so the chip lies along the circle rather than across
+    n.rchip=put(buf.rchip,n.rchip,rx,gy(rx,rz)+ly,rz,a+1.5708,col,1,col);
+  }
+}
 function pack(){
   var n={hall:0,tower:0,ballista:0,brazier:0,barracks:0,archery:0,cottage:0,
          wall:0,wpost:0,gate:0,salvage:0,
          soldier:0,archer:0,worker:0,scout:0,commander:0,nest:0,
-         corpse:0,bolt:0,arrow:0,spark:0,debris:0,ring:0,marker:0,tile:0,grid:0,site:0,
+         corpse:0,bolt:0,arrow:0,spark:0,debris:0,rchip:0,marker:0,tile:0,grid:0,site:0,
          road:0};
   for(var rk0 in RIGDEF){
     n[rk0+"Body"]=0; n[rk0+"Arm"]=0; n[rk0+"Leg"]=0;
@@ -7903,14 +7937,14 @@ function pack(){
     }
     if(S.bsel===c){
       var br=0.75+((ty.foot||1)-1)*0.75;
-      n.ring=put(buf.ring,n.ring,x,by+0.05,z,0,[0.55,2.10,2.20],br,[0.55,2.10,2.20]);
+      groundRing(n,x,z,br,[0.55,2.10,2.20],0.05);
     }
     if(playable()&&ty.range&&S.sel===c.type){
       var rc=c.lit?[0.62,0.50,0.26]:[0.30,0.56,0.47];
-      n.ring=put(buf.ring,n.ring,x,by+0.05,z,0,rc,ty.range,rc);
+      groundRing(n,x,z,ty.range,rc,0.05);
     }
     if(playable()&&c.type==="brazier"&&S.sel&&(S.sel==="brazier"||TYPES[S.sel].range))
-      n.ring=put(buf.ring,n.ring,x,by+0.05,z,0,[0.58,0.42,0.20],ty.aura,[0.58,0.42,0.20]);
+      groundRing(n,x,z,ty.aura,[0.58,0.42,0.20],0.05);
   }
   for(var si=0;si<S.nodes.length;si++){
     var nd=S.nodes[si], nf=Math.max(0,nd.amt/nd.max);
@@ -7918,8 +7952,7 @@ function pack(){
     if(fogOn&&lookingAt(nd.x,nd.z)<1) continue;   // a pile you have found stays found
     var na=dim([0.348,0.276,0.190],0.45+0.55*nf), nb=dim([0.300,0.325,0.360],0.45+0.55*nf);
     n.salvage=put(buf.salvage,n.salvage,nd.x,gy(nd.x,nd.z),nd.z,nd.rot,na,0.62+0.62*nf,nb);
-    if(nd.worked) n.ring=put(buf.ring,n.ring,nd.x,gy(nd.x,nd.z)+0.03,nd.z,0,
-                             [0.72,1.10,0.42],1.35,[0.72,1.10,0.42]);
+    if(nd.worked) groundRing(n,nd.x,nd.z,1.35,[0.72,1.10,0.42],0.03);
   }
   for(var i=0;i<S.corpses.length;i++){
     var cp=S.corpses[i], cf=Math.min(1,cp.life/cp.max);
@@ -7958,14 +7991,13 @@ function pack(){
     // out of its own sight would be a bug rather than a rule. The other
     // player's are subject to the same fog as anything else that moves.
     if(fogOn&&(u.own|0)!==(S.me|0)&&lookingAt(u.x,u.z)<2) continue;
-    if(u.sel) n.ring=put(buf.ring,n.ring,u.x,gy(u.x,u.z)+0.03,u.z,0,
-                         [0.55,2.10,2.20],0.62,[0.55,2.10,2.20]);
+    if(u.sel) groundRing(n,u.x,u.z,0.62,[0.55,2.10,2.20],0.03);
     // the rally is only a decision if you can see where it reaches
     if(u.t==="commander"&&(u.own|0)===S.me){
       var UC=UNITS.commander, rr=(UC.rally===undefined?5.6:UC.rally);
       if(rr>0&&(u.sel||S.phase==="attack")){
         var rc=u.sel?[1.05,0.85,0.36]:[0.46,0.37,0.16];
-        n.ring=put(buf.ring,n.ring,u.x,gy(u.x,u.z)+0.045,u.z,0,rc,rr,rc);
+        groundRing(n,u.x,u.z,rr,rc,0.045);
       }
     }
     // the other player's people carry their seat colour so a mixed fight reads
@@ -7984,7 +8016,11 @@ function pack(){
   for(i=0;i<S.markers.length;i++){
     var mk=S.markers[i], mf=Math.max(0,mk.life/mk.max);
     var mc=[0.42*mf,1.55*mf,1.62*mf];
-    n.marker=put(buf.marker,n.marker,mk.x,gy(mk.x,mk.z)+0.04,mk.z,0,mc,1.0+(1-mf)*1.5,mc);
+    // The pulse is a grounded ring so it does not sink into a slope; the marker
+    // mesh stays for its pip, at a fixed small scale because a single point on
+    // the ground cannot clip into anything.
+    groundRing(n,mk.x,mk.z,0.42*(1.0+(1-mf)*1.5),mc,0.04);
+    n.marker=put(buf.marker,n.marker,mk.x,gy(mk.x,mk.z)+0.04,mk.z,0,mc,0.30,mc);
   }
   for(i=0;i<S.bolts.length;i++){
     var bo=S.bolts[i];
@@ -8162,14 +8198,14 @@ function pack(){
       else if(S.sel==="tower"||S.sel==="ballista"){
         var gk=S.sel;
         n[gk]=put(buf[gk],n[gk],gxw,ghy,gzw,rot,gA,t2.scale,gB);
-        n.ring=put(buf.ring,n.ring,gxw,ghy+0.06,gzw,0,[0.80,0.68,0.33],t2.range,[0.80,0.68,0.33]);
+        groundRing(n,gxw,gzw,t2.range,[0.80,0.68,0.33],0.06);
       }
       else if(S.sel==="barracks"||S.sel==="archery"||S.sel==="cottage"){
         n[S.sel]=put(buf[S.sel],n[S.sel],gxw,ghy,gzw,rot,gA,t2.scale,gB);
       }
       else if(S.sel==="brazier"){
         n.brazier=put(buf.brazier,n.brazier,gxw,ghy,gzw,rot,gA,t2.scale,gB);
-        n.ring=put(buf.ring,n.ring,gxw,ghy+0.06,gzw,0,[0.80,0.62,0.28],t2.aura,[0.80,0.62,0.28]);
+        groundRing(n,gxw,gzw,t2.aura,[0.80,0.62,0.28],0.06);
       }
       else if(S.sel==="wall"){
         var gm=armMask({gx:S.hover.gx,gz:S.hover.gz,rotAuto:S.rotAuto,

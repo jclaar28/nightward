@@ -135,6 +135,17 @@ loop moves off `m.spd` and never consults it. A road that reaches the field is
 a highway to your hall, and it would read as a pathing bug rather than a design
 mistake. `tools/roads.mjs` diffs the field with and without roads present.
 
+**Anything that lies on the ground and is bigger than a cell has to be many
+instances.** One instance carries one transform, so a mesh cannot bend over
+terrain: a flat annulus placed at `gy()` of its own centre buries its uphill
+half and floats its downhill half, which is what every range ring, aura,
+selection ring and move marker used to do. `groundRing()` lays a run of
+`ringchip` segments, each sampling `gy()` where it lands, spaced finer than the
+1.5-unit terrain cell so the run cannot step over a ridge. The same rule already
+governs roads and is why they are pads rather than one long quad. A consequence
+worth remembering: the instance count is now set by how much the player built,
+so it gets the same cap check roads get.
+
 **A gait is two rates off one phase.** `u.ph` advances with distance walked.
 The legs swing once per stride — `sin(ph)` — and the body rises once per foot
 planted, which is twice per stride, which is `abs(sin(ph))`. The sway is the

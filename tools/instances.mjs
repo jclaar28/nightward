@@ -204,5 +204,76 @@ check('...and the body rises once per footfall, not four times',
       Math.abs(gait.bob - 2) < 0.35,
       `${gait.bob.toFixed(2)} bounces per stride (2 is one per foot; it was 4)`);
 
+// ---- rings follow the ground -----------------------------------------------
+// Every ring in the game — selection, rally, tower range, brazier aura, the
+// move marker's pulse — used to be one flat annulus placed at the height of its
+// own centre. One instance carries one transform, so on a slope the uphill half
+// of a 5.6-unit rally ring sank into the hill and the downhill half hung over
+// it. They are runs of grounded chips now, and this measures every chip against
+// the terrain directly beneath it.
+//
+// It deliberately hunts for the worst ground on the map first. Measuring this
+// on the flat plateau where the hall usually goes would pass with the old code
+// and prove nothing.
+const rings = await page.evaluate(seed => {
+  HF.setStat('fog', 'on', 0);
+  __nw.start(seed);
+  const S = __nw.state();
+  S.players[0].supply = 9999;
+  const R = HF.statsOf('commander').rally;
+  let best = null;
+  for (let x = -40; x <= 40; x += 3)
+    for (let z = -40; z <= 40; z += 3) {
+      let lo = 9, hi = -9;
+      for (let a = 0; a < 8; a++) {
+        const g = __nw.ground(x + Math.cos(a / 8 * 6.283) * R,
+                              z + Math.sin(a / 8 * 6.283) * R);
+        lo = Math.min(lo, g); hi = Math.max(hi, g);
+      }
+      if (!best || hi - lo > best.d) best = { x, z, d: hi - lo };
+    }
+  __nw.hall(best.x, best.z);
+  __nw.run(26);
+  const cmd = S.units.filter(u => u.t === 'commander')[0];
+  cmd.x = best.x; cmd.z = best.z; cmd.sel = true;
+  HFGAME.update(1 / 60);
+  const rows = __nw.frame().rows.filter(q => q.b === 'rchip');
+  let worst = 0, below = 0;
+  for (const q of rows) {
+    const d = q.y - __nw.ground(q.x, q.z);
+    if (d < 0) below++;
+    worst = Math.max(worst, Math.abs(d));
+  }
+  return { relief: best.d, chips: rows.length, below, worst };
+}, SEED);
+check('the ring test is standing on ground worth testing on',
+      rings.relief > 1.5 && rings.chips > 20,
+      `${rings.relief.toFixed(2)}u of relief across the ring, ${rings.chips} chips`);
+check('every ring segment sits on the ground under it',
+      rings.below === 0 && rings.worst < 0.2,
+      `${rings.below} below ground, worst gap ${rings.worst.toFixed(3)}u`);
+
+// A ring is many instances now, so the count is set by how much the player
+// built — the same failure shape roads have, and "miss the cap and it silently
+// truncates" is a documented one here. So it is measured, not assumed.
+const ringCap = await page.evaluate(seed => {
+  __nw.start(seed);
+  const S = __nw.state();
+  S.players[0].supply = 999999;
+  __nw.hall(0, 0); __nw.run(26);
+  let n = 0;
+  for (let i = 0; i < 40; i++)
+    if (__nw.place('tower', -30 + (i % 10) * 6, -24 + Math.floor(i / 10) * 8)) n++;
+  for (let i = 0; i < 20; i++) __nw.place('ballista', -28 + (i % 10) * 6, 20);
+  __nw.run(10);
+  S.sel = 'tower';                       // every one of them draws its range
+  S.units.forEach(u => u.sel = true);
+  HFGAME.update(1 / 60);
+  return { towers: n, chips: __nw.frame().counts.rchip || 0 };
+}, SEED);
+check('a defence far bigger than anyone builds still fits the ring buffer',
+      ringCap.chips > 500 && ringCap.chips < 6000,
+      `${ringCap.towers} towers drew ${ringCap.chips} segments against a 6000 cap`);
+
 await close();
 done(errors);
