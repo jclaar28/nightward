@@ -1931,7 +1931,14 @@ var ASSETS=[
     // is 0.23 across, so ten of them leave gaps you can see the far wall
     // through — it reads as a cage rather than a tower, and no amount of
     // colour fixes that. Fourteen overlap slightly and close it.
-    {id:"staves",name:"Staves",    prim:"cyl", p:[0,0.20,0.46], s:[0.115,2.10], seg:6,
+    // p is the ring's CENTRE, not a member of it — rep:"ring" adds
+    // cos/sin(angle)*r to this position. Writing the radius into BOTH put every
+    // ringed part on a circle of twice the radius, offset off-axis: the staves
+    // sat at 0.92 instead of 0.46, the merlons at 1.24 outside a 0.66 deck
+    // (which is why they read as posts coming up through the floor), and the
+    // iron bands at 0.665 were buried inside a drum that was actually 1.04
+    // across. One mistake, three symptoms.
+    {id:"staves",name:"Staves",    prim:"cyl", p:[0,0.20,0], s:[0.115,2.10], seg:6,
        cap:false, shade:0.94, rep:{mode:"ring", n:14, r:0.46, a0:0, altShade:0.07}},
     {id:"core",  name:"Inner post",prim:"cyl", p:[0,0.20,0],    s:[0.20,1.90], seg:6,
        cap:false, shade:0.74},
@@ -1953,21 +1960,30 @@ var ASSETS=[
        shade:0.80, rep:{mode:"ring", n:3, r:0, a0:30}},
     // Merlons are palisade posts again, cut short — same vocabulary as the run
     // it stands in, which is the whole point of the change.
-    {id:"merlon",name:"Merlons",   prim:"cyl", p:[0,2.45,0.55], s:[0.098,0.40], seg:6,
-       cap:false, shade:1.02, rep:{mode:"ring", n:8, r:0.55, a0:22}},
-    {id:"cap",   name:"Merlon caps",prim:"cone",p:[0,2.85,0.55],s:[0.098,0.20], seg:6,
-       tint:1, shade:1.18, rep:{mode:"ring", n:8, r:0.55, a0:22}},
+    //
+    // They belong ON THE RIM. At r=0.55 inside a 0.66 deck they stood a tenth
+    // of a unit in from the edge, which from above does not read as a parapet:
+    // it reads as posts growing up through the floor, which is exactly what it
+    // was reported as. Twelve at 0.62 make an edge; eight at 0.55 made a
+    // scatter.
+    {id:"merlon",name:"Merlons",   prim:"cyl", p:[0,2.45,0], s:[0.085,0.34], seg:6,
+       cap:false, shade:1.02, rep:{mode:"ring", n:12, r:0.56, a0:15}},
+    {id:"cap",   name:"Merlon caps",prim:"cone",p:[0,2.79,0],s:[0.085,0.17], seg:6,
+       tint:1, shade:1.18, rep:{mode:"ring", n:12, r:0.56, a0:15}},
     // A dark gap between staves at eye height, so the drum has a front and
     // reads as occupied before anybody is in it.
-    {id:"slit",  name:"Loophole",  prim:"box", p:[0,1.24,0.44], s:[0.09,0.40,0.14],
-       shade:0.26, rep:{mode:"ring", n:4, r:0.44, a0:45}},
+    {id:"slit",  name:"Loophole",  prim:"box", p:[0,1.24,0], s:[0.09,0.40,0.14],
+       shade:0.26, rep:{mode:"ring", n:4, r:0.47, a0:45}},
     // Scenery, not a route. Nothing climbs it and no code knows it exists — it
     // is here because a platform with no way up reads as a mistake, and the
     // fastest way to answer that question in the player's head is to show the
     // ladder. If a unit ever needs to physically climb something, this is not
     // the thing to make load-bearing; it is drawn on one face of a drum that
     // has no facing.
-    {id:"rails", name:"Ladder rails",prim:"cyl",p:[0.17,0.06,0.615],s:[0.042,2.28], seg:5,
+    // Stops just under the deck. At 2.28 long from y=0.06 the rails topped out
+    // at 2.34, and the deck's 12-gon has an apothem of 0.637 against the rails'
+    // 0.638 radius — so at the flats the rail tips came through the floor.
+    {id:"rails", name:"Ladder rails",prim:"cyl",p:[0.17,0.06,0.615],s:[0.042,2.20], seg:5,
        cap:false, shade:0.86, rep:{mode:"mirrorX"}},
     {id:"rungs", name:"Ladder rungs",prim:"box",p:[0,0.34,0.615], s:[0.40,0.048,0.055],
        tint:1, shade:1.00, rep:{mode:"linY", n:6, step:0.36}}
@@ -5190,6 +5206,12 @@ function ghostRot(t,gx,gz){
 }
 function bRot(b){
   if(b.rotAuto && (b.type==="wall"||b.type==="gate")) return wallRot(b.gx,b.gz);
+  // A turret took whatever rotation the cursor happened to be holding, which is
+  // why it sometimes faced the wrong way: the drum is symmetric so nobody
+  // notices until the ladder ends up buried in the wall run. It faces ACROSS
+  // the run — wallRot is along it — so the ladder and the loopholes always look
+  // out from the line rather than into it.
+  if(b.type==="turret") return wallRot(b.gx,b.gz)+Math.PI/2;
   return b.rot||0;
 }
 // Building is not a day job. The dock, the ghost, rotation, selling back — all

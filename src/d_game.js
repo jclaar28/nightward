@@ -516,6 +516,12 @@ function ghostRot(t,gx,gz){
 }
 function bRot(b){
   if(b.rotAuto && (b.type==="wall"||b.type==="gate")) return wallRot(b.gx,b.gz);
+  // A turret took whatever rotation the cursor happened to be holding, which is
+  // why it sometimes faced the wrong way: the drum is symmetric so nobody
+  // notices until the ladder ends up buried in the wall run. It faces ACROSS
+  // the run — wallRot is along it — so the ladder and the loopholes always look
+  // out from the line rather than into it.
+  if(b.type==="turret") return wallRot(b.gx,b.gz)+Math.PI/2;
   return b.rot||0;
 }
 // Building is not a day job. The dock, the ghost, rotation, selling back — all

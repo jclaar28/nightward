@@ -270,6 +270,13 @@ A part is `{id, name, prim, p:[x,y,z], s:[…], shade, tint, ...}` where:
   the child in mid-air. Position tilted children outright.
 - **`rep`** repeats a part: `mirrorX`, `mirrorZ`, `mirrorXZ`, `linX`, `linY`,
   `linZ`, `ring`. Mirroring flips the yaw and roll it needs to.
+  **For `ring`, `p` is the ring's CENTRE, not one member of it** — the mode adds
+  `cos/sin(angle) * r` to `p`. Writing the radius into both `p` and `rep.r` puts
+  the ring at twice the radius and off-axis, and it does not look obviously
+  wrong: the turret shipped with its staves at 0.92 instead of 0.46, its merlons
+  at 1.24 outside a 0.66 platform, and its iron bands buried inside a drum that
+  was twice the width they were sized for. One mistake, three separate symptoms,
+  none of which pointed at the cause.
 - **`tint:1`** takes the asset's second colour slot; `col:` sets an absolute
   colour; `emit` / `ecol` make it a light source.
 
