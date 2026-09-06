@@ -245,9 +245,22 @@ const same = k => JSON.stringify(a[k]) === JSON.stringify(b[k]);
 // guest first drew them. The second is what tells a live channel apart from a
 // guest quietly running its own copy of the same seed.
 const moved = JSON.stringify(b.where) !== JSON.stringify(spawn);
+// Near the same places, not identical ones. The guest eases toward each
+// snapshot rather than teleporting, and snapshots arrive at 15Hz, so a walking
+// unit is legitimately up to a frame or two behind — an exact comparison passed
+// ten runs in a row only because that scene's units happened to be standing
+// still, and started failing the moment a scout was wandering in it. The claim
+// worth making is "the guest is looking at the host's world", and 2 units of
+// slack still separates that from a guest simulating its own: a dead channel
+// leaves it at spawn, which `moved` catches, and a divergent one drifts far
+// further than this within seconds.
+let drift = 0;
+for (let i = 0; i < Math.min(a.where.length, b.where.length); i++)
+  drift = Math.max(drift, Math.hypot(a.where[i][0] - b.where[i][0],
+                                     a.where[i][1] - b.where[i][1]) / 20);
 check('host and guest hold the same units, in the same places',
-      a.units === b.units && same('uids') && same('where') && moved,
-      `${a.units} units, moved since the round opened ${moved}`);
+      a.units === b.units && same('uids') && drift < 2 && moved,
+      `${a.units} units, worst drift ${drift.toFixed(2)}u, moved since the round opened ${moved}`);
 check('...the same buildings', same('cells'), `${a.cells.length} vs ${b.cells.length}`);
 check('...and the same supply on both books', same('supply'),
       `${a.supply.join('/')} vs ${b.supply.join('/')}`);

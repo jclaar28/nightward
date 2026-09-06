@@ -755,6 +755,32 @@ var ASSETS=[
        tint:1, shade:1.05, anchorY:{to:"post", mode:"top", off:0}}
   ]},
 
+{ id:"turret", name:"Turret", group:"Structures",
+  colA:PAL.stone, colB:PAL.iron, scale:1.0,
+  note:"A stone drum in a timber line. It joins a wall run the way a gate does — the neighbouring cells grow their arms into it — and stands a head taller than the posts so the platform reads as somewhere you could put an archer. It shoots nothing on its own: the range belongs to whoever is standing on it.",
+  slots:["A — stone","B — iron (band, merlon caps)"],
+  parts:[
+    // Footing wider than the drum so the join with a palisade sill reads as
+    // built rather than abutted.
+    {id:"base",  name:"Footing",  prim:"box", p:[0,0,0],      s:[1.26,0.26,1.26], shade:0.62},
+    {id:"drum",  name:"Drum",     prim:"cyl", p:[0,0.22,0],   s:[0.52,2.05], seg:8, cap:false,
+       shade:1.00},
+    {id:"band",  name:"Iron band",prim:"cyl", p:[0,1.30,0],   s:[0.556,0.16], seg:8, cap:false,
+       tint:1, shade:1.10},
+    // The platform overhangs, which is what makes the silhouette read as a
+    // turret rather than a fat post at this camera angle.
+    {id:"deck",  name:"Platform", prim:"cyl", p:[0,2.27,0],   s:[0.74,0.18], seg:8,
+       shade:1.14, anchorY:{to:"drum", mode:"top", off:0}},
+    {id:"merlon",name:"Merlons",  prim:"box", p:[0,2.45,0.60],s:[0.26,0.44,0.16],
+       shade:1.06, rep:{mode:"ring", n:8, r:0.60, a0:22}},
+    {id:"cap",   name:"Merlon caps",prim:"box",p:[0,2.87,0.60],s:[0.30,0.07,0.20],
+       tint:1, shade:1.18, rep:{mode:"ring", n:8, r:0.60, a0:22}},
+    // A dark slit at eye height so the drum has a front and reads as occupied
+    // even before anybody is in it.
+    {id:"slit",  name:"Arrow slit",prim:"box",p:[0,1.62,0.50], s:[0.10,0.42,0.10],
+       shade:0.30, rep:{mode:"ring", n:4, r:0.50, a0:45}}
+  ]},
+
 { id:"gate", name:"Gate", group:"Structures",
   colA:PAL.timberL, colB:PAL.iron, scale:1.0,
   note:"Path cost 2 — cheaper than open ground, so the swarm prefers to walk through it.",
@@ -1374,6 +1400,24 @@ var STAT_DEFS={
      hint:"how far it puts attackers on your minimap"}
   ]},
 
+  // Hand-built, like a road: `build` is worker-seconds, not wall-clock seconds,
+  // so the price of a turret is the workers who are not gathering while it goes
+  // up. `range` is added to whoever is standing on it — the turret itself has no
+  // weapon and never will.
+  turret:{ note:"A platform on the wall line. Worth exactly what you garrison it with.", fields:[
+    {k:"cost",     label:"Cost",           def:34,  lo:1,   hi:200,  step:1,  int:true, unit:"supply"},
+    {k:"hp",       label:"Hit points",     def:280, lo:20,  hi:1200, step:10, int:true},
+    {k:"build",    label:"Labour",         def:9,   lo:0.5, hi:120,  step:0.5, unit:"worker-s",
+     hint:"seconds of a worker's hands, not seconds on a clock"},
+    {k:"cap",      label:"Garrison",       def:2,   lo:0,   hi:8,    step:1,  int:true,
+     hint:"archers who can stand on it"},
+    {k:"range",    label:"Range added",    def:3.4, lo:0,   hi:20,   step:0.1, unit:"u",
+     hint:"added to the range of whoever is up there"},
+    {k:"sight",   label:"Sight",         def:11,  lo:0,  hi:40,  step:0.5, unit:"u",
+     hint:"how far it puts attackers on your minimap"},
+    {k:"pathCost", label:"Path cost",      def:20,  lo:0,   hi:999,  step:1,  int:true,
+     hint:"how hard attackers try to route around it"}
+  ]},
   barracks:{ note:"Musters soldiers on placement, retrains losses while it stands.", fields:[
     {k:"cost",    label:"Cost",          def:44,  lo:1,  hi:300, step:1, int:true, unit:"supply"},
     {k:"hp",      label:"Hit points",    def:220, lo:20, hi:1200,step:10,int:true},
@@ -1792,6 +1836,12 @@ var TEXT_DEFS={
   "bld.barracks.blurb":{g:"bld",def:"{cap} soldiers · {retrain}s each"},
   "bld.archery.name":{g:"bld",def:"Archery Range"},
   "bld.archery.blurb":{g:"bld",def:"{cap} archers · {retrain}s each"},
+  "bld.turret.name":{g:"bld",def:"Turret"},
+  "bld.turret.blurb":{g:"bld",def:"holds {cap} archers · +{range}u range"},
+  "sel.turret.crew":{g:"sel",def:"{n} on the platform"},
+  "sel.turret.empty":{g:"sel",def:"nobody up there"},
+  "sel.turret.hint":{g:"sel",def:"right-click it with archers to put them up"},
+  "sel.turret.down":{g:"sel",def:"Bring them down"},
   "bld.road.name":{g:"bld",def:"Road"},
   "bld.road.blurb":{g:"bld",def:"drag a run · no supply"},
   "bld.road.tooshort":{g:"bld",def:"too short to be worth laying"},

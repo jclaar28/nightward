@@ -12,6 +12,7 @@
     "roster": "node tools/roster.mjs",
     "scout": "node tools/scout.mjs",
     "fog": "node tools/fog.mjs",
+    "turret": "node tools/turret.mjs",
     "check": "python3 src/build.py && node tools/smoke.mjs && node tools/instances.mjs"
   },
   "devDependencies": {

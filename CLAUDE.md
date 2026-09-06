@@ -49,9 +49,13 @@ what `putP()` is for. Writing anything else there rotates a body part.
 
 **Batch buffers are pre-sized and never grow.** `buf[k]` is allocated from a
 `CAP` table at init. A new kind of instance needs an entry in `B`, a slot in
-`BATCHES`, a name in the `buf` list, a cap, and a zero in the per-frame `n`
-counter reset. Miss the counter and it silently draws nothing; miss the cap and
-it silently truncates.
+`BATCHES`, a name in the `buf` list, a cap, a zero in the per-frame `n` counter
+reset, and a line in `rebuildAssets()`. Miss the counter and it silently draws
+nothing; miss the cap and it silently truncates. `rebuildAssets()` is the only
+one of the six that fails loudly, because it dereferences `B[name]` — and the
+only path that reaches it is the Library rebuilding, which nothing but
+`tools/text.mjs` walks. Removing a batch means removing all six; a stale line
+there shipped a crash that seven other tools ran straight past.
 
 **`BATCHES` has a seam.** Rig bones are spliced in at `BATCHES.indexOf(B.nest)`
 so they draw between the buildings and the effects. It used to be a hard-coded
@@ -171,11 +175,38 @@ same dark grey as the stones already scattered on the grass, so every mark was
 in the buffer and none of them could be seen. Anything drawn flat on the ground
 here has to beat the ground litter on value, not just exist.
 
-**Road work is the only construction that needs a worker.** Every other site is
-`prog += dt` and finishes whether anyone came; a road edge advances only while
-a worker stands on it. That asymmetry is the feature — it is what makes the
-cost of a road the workers who are not gathering — so do not "fix" it into a
-timer for consistency.
+**`hand:true` means a worker's hands, not a clock.** Roads were the first, the
+turret is the second: `prog += dt` in the site loop skips any type with `hand`,
+and `updateSiteWork()` advances it only while a worker is standing there. Its
+`build` stat is worker-seconds and it deliberately is NOT called `raise` —
+calling both the same would make a turret look like it takes nine seconds when
+it takes nine seconds of somebody's hands. That asymmetry is the feature — the
+cost is the workers who are not gathering — so do not "fix" it into a timer for
+consistency.
+
+**A turret is the only building that may be placed onto something already
+standing**, and only onto your own finished palisade: `upgradable()` is the
+whole exception and `canPlace` refuses an occupied cell for everything else.
+Not onto a gate — a gate is a decision about where the horde is invited
+through, and quietly replacing one changes the shape of a defence the player
+thought they had. `place()` deletes the old cells before writing the new ones,
+or the palisade outlives the turret in `S.cells` and the run draws an arm into a
+wall that is not there.
+
+**`wallish:true` is what joins a wall run.** `joins()` and `wallRot()` ask the
+type, not a list of names, so a turret dropped into a palisade closes the run
+without a line of drawing code knowing turrets exist. Add the flag to anything
+that should read as part of a wall; leave it off anything that should not.
+
+**A turret's garrison is not a building's garrison.** `b.garrison` is units a
+building MAKES (barracks, hall). A turret's crew is units you already own,
+standing on it, tracked by `u.tur` on the unit. It must not share `u.inside`
+either: `inside` means invisible and inert, and an archer on a platform is
+neither — it is drawn on the deck and shooting with `turret.range` added. The
+one thing it shares with `inside` is that a melee attacker's target scan skips
+it, which is what "safe from things that cannot reach it" means. The horde is
+all melee today, so that reads as safety; a ranged attacker added later needs no
+change here to be able to shoot at it.
 
 **Every player-facing string lives in one table too.** `TEXT_DEFS` in
 `d_core.js` defines it; `M.t(key, vars)` resolves it through the live overrides.
@@ -261,7 +292,8 @@ anything that puts words on screen, `node tools/roads.mjs` and
 `node tools/pathing.mjs` for anything touching roads, movement or worker jobs,
 `node tools/economy.mjs` for
 anything touching salvage, workers or the map, `node tools/scout.mjs` and `node tools/fog.mjs` for
-anything touching sight, fog, the minimap or who a building musters, `node tools/net.mjs` for anything
+anything touching sight, fog or the minimap, `node tools/turret.mjs` for
+anything touching placement, hand-built sites or who a building musters, `node tools/net.mjs` for anything
 touching intents, the snapshot or the two-player screen,
 and `node tools/balance.mjs --ab id.key=value` for anything touching difficulty.
 `tools/README.md` explains them; read it before writing a new one.

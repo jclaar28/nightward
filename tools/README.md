@@ -182,6 +182,22 @@ make those checks stricter, it emptied them — the nest-grounding checks starte
 reporting "drawn []" because an undiscovered nest is correctly not drawn, and a
 check with no subject is worse than no check.
 
+**`turret.mjs`** — the turret pokes three holes in assumptions the rest of the
+code makes, so each is measured. It is the second thing a worker builds with
+their hands rather than a timer (checked by putting every worker indoors and
+across the map, where a timer would tick anyway). It is the only building that
+may be placed onto something already standing — onto your own palisade, never
+onto a gate, and nothing else onto anything. And its garrison is units you put
+there rather than units it makes, which is a different mechanic from the
+barracks' and must not share the `inside` flag.
+
+The check that carries the feature is the range one, and it is built to be
+falsifiable: it parks an attacker between an archer's own range and the
+turret's, asserts the target really is in that gap, then fires the same archer
+at it from the platform and from the same spot on the ground. 18 arrows against
+0. Measuring "it shot something" from up top alone would pass with the bonus set
+to zero.
+
 **`net.mjs`** — the two-player path, which had no cover at all and is the
 riskiest thing to leave that way: a regression here is silent. Nothing throws,
 no frame looks wrong, and it is only discoverable by two people at two machines

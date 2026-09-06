@@ -62,10 +62,13 @@ a second copy would stop following the values the in-game library edits.*
 |---|---|---|---|---|---|---|---|
 | **Palisade** | 3 | 110 | 1s | 14 | 4 | 1×1 | — |
 | **Gate** | 7 | 90 | 1.5s | 2 | 4 | 1×1 | — |
+| **Turret** | 34 | 280 | 9s of labour | 20 | 11 | 1×1 | 2 archers may stand on it, each shooting 3.4u further |
 
 **Palisade.** Half a cell, growing from the centre toward +X. A wall cell emits one run per connected neighbour, so corners, tees and crossings build themselves.
 
 **Gate.** Path cost 2 — cheaper than open ground, so the swarm prefers to walk through it.
+
+**Turret.** A stone drum in a timber line. It joins a wall run the way a gate does — the neighbouring cells grow their arms into it — and stands a head taller than the posts so the platform reads as somewhere you could put an archer. It shoots nothing on its own: the range belongs to whoever is standing on it.
 
 #### Troops
 

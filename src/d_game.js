@@ -46,12 +46,19 @@ var TYPES={
   brazier:{cat:"guns", foot:1, scale:0.90,
           colA:M.PAL.stone, colB:M.PAL.iron,
           blurb:function(t){ return M.t("bld.brazier.blurb",{}); }},
-  wall : {cat:"walls", foot:1, scale:1.00,
+  wall : {cat:"walls", foot:1, scale:1.00, wallish:true,
           colA:M.PAL.timber, colB:M.PAL.iron,
           blurb:function(t){ return M.t("bld.wall.blurb",{hp:t.hp}); }},
-  gate : {cat:"walls", foot:1, scale:1.00,
+  gate : {cat:"walls", foot:1, scale:1.00, wallish:true,
           colA:M.PAL.timberL, colB:M.PAL.iron,
           blurb:function(t){ return M.t("bld.gate.blurb",{hp:t.hp}); }},
+  // `wallish` puts it in a wall run: joins() and wallRot() count it as a
+  // neighbour, so the palisades either side grow their arms into it and the
+  // join builds itself rather than being drawn. `hand` makes it a worker's job
+  // rather than a timer — the road's rule, applied to a second thing.
+  turret:{cat:"walls", foot:1, scale:1.00, wallish:true, hand:true,
+          colA:M.PAL.stone, colB:M.PAL.iron,
+          blurb:function(t){ return M.t("bld.turret.blurb",{cap:t.cap, range:t.range}); }},
   barracks:{cat:"muster", foot:1, scale:0.72, spawns:"soldier",
           colA:M.PAL.timber, colB:M.PAL.slate,
           blurb:function(t){ return M.t("bld.barracks.blurb",{cap:t.cap, retrain:t.retrain}); }},
@@ -253,6 +260,7 @@ function init(renderer, cv, settings, endCb){
     wpost:R.makeBatch(M.buildAsset("wallpost")),
     ballista:R.makeBatch(M.buildAsset("ballista")), brazier:R.makeBatch(M.buildAsset("brazier")),
     barracks:R.makeBatch(M.buildAsset("barracks")), archery:R.makeBatch(M.buildAsset("archery")),
+    turret:R.makeBatch(M.buildAsset("turret")),
     soldier:R.makeBatch(M.buildAsset("soldier")), archer:R.makeBatch(M.buildAsset("archer")),
     worker:R.makeBatch(M.buildAsset("worker")), cottage:R.makeBatch(M.buildAsset("cottage")),
     scout:R.makeBatch(M.buildAsset("scout")),
@@ -278,7 +286,7 @@ function init(renderer, cv, settings, endCb){
   // ground clutter, so it sits with the salvage rather than with the buildings
   BATCHES=[B.road,B.corpse,B.salvage,B.site,B.hall,B.tower,B.ballista,B.brazier,
            B.barracks,B.archery,B.cottage,
-           B.wall,B.wpost,B.gate,
+           B.wall,B.wpost,B.gate,B.turret,
            B.nest,B.soldier,B.archer,B.worker,B.scout,B.commander,
            B.bolt,B.arrow,B.spark,B.debris,B.rchip,B.marker,B.tile,B.grid];
   buildRigs(true);
@@ -295,12 +303,12 @@ function init(renderer, cv, settings, endCb){
   // a batch that overflows its buffer truncates silently.
   var CAP={swarm:2600,runner:1900,brute:900,corpse:MAX_CORPSES,spark:MAX_PARTS,
            debris:MAX_PARTS,
-           bolt:400,arrow:300,wall:1400,soldier:120,archer:120,worker:120,
+           bolt:400,arrow:300,wall:1400,turret:200,soldier:120,archer:120,worker:120,
            scout:40, commander:8,
            marker:24,salvage:24,cottage:120,nest:24,site:600,road:5200,
            rchip:6000};
   ["hall","tower","ballista","brazier","barracks","archery","cottage",
-   "wall","wpost","gate",
+   "wall","wpost","gate","turret",
    "soldier","archer","worker","scout","commander","salvage","nest",
    "corpse","bolt","arrow","spark","debris","rchip","marker","tile","grid","site",
    "road"].forEach(function(k){
@@ -422,8 +430,15 @@ function restoreScene(){ if(S&&S.staticMesh) R.setStatic(S.staticMesh); }
 function rebuildAssets(){
   syncStats();
   if(!B) return;
+  // This list is the SIXTH place a batch has to be registered, after B,
+  // BATCHES, the buf list, CAP and the per-frame counter reset — and the only
+  // one that fails at runtime rather than silently, because it dereferences
+  // B[name] directly. Deleting the flat ring batch without deleting its line
+  // here shipped a crash that only fires when the Library rebuilds assets,
+  // which is a path only tools/text.mjs walks.
   [["hall","hall"],["tower","tower"],["wall","wall"],["gate","gate"],
-   ["bolt","tracer"],["ring","ring"],["grid","grid"],["debris","spark"],
+   ["turret","turret"],
+   ["bolt","tracer"],["rchip","ringchip"],["grid","grid"],["debris","spark"],
    ["wpost","wallpost"],["ballista","ballista"],["brazier","brazier"],
    ["corpse","corpse"],["spark","spark"],["nest","nest"],
    ["barracks","barracks"],["archery","archery"],
@@ -463,6 +478,11 @@ function footCells(t,gx,gz){
   for(var dx=-r;dx<=r;dx++) for(var dz=-r;dz<=r;dz++) out.push([gx+dx,gz+dz]);
   return out;
 }
+// The one cell a building may be placed onto rather than beside.
+function upgradable(c,p){
+  var b=rootOf(c);
+  return b.type==="wall" && !b.site && (b.own|0)===(p.id|0);
+}
 function canPlace(t,gx,gz,p){
   if(TYPES[t]&&TYPES[t].road) return false;   // roads are not cells; see queueRoad
   p=p||me();
@@ -474,7 +494,13 @@ function canPlace(t,gx,gz,p){
   var cs=footCells(t,gx,gz);
   for(var i=0;i<cs.length;i++){
     if(!inBuildZone(cs[i][0],cs[i][1],p)) return false;
-    if(cellAt(cs[i][0],cs[i][1])) return false;
+    // A turret is the one thing that may be placed on something already there,
+    // and only on a finished palisade of your own: it takes that cell over and
+    // the run closes around it. Not a gate — a gate is a decision about where
+    // the horde is invited through, and quietly replacing one would change the
+    // shape of a defence the player thought they had.
+    var occ=cellAt(cs[i][0],cs[i][1]);
+    if(occ && !(t==="turret" && upgradable(occ,p))) return false;
     // you cannot wall an attacker in: the ground has to be clear first
     if(S.phase==="attack" &&
        nearestEnemy(M.gx2w(cs[i][0]),M.gx2w(cs[i][1]),M.CELL*0.72)) return false;
@@ -514,6 +540,15 @@ function place(t,gx,gz,pid,rotOv){
     return intent({m:"pl",t:t,gx:gx,gz:gz,r:r2(ghostRot(t,gx,gz))});
   var p=(pid===undefined||pid===null)?me():S.players[pid];
   if(!p||!canPlace(t,gx,gz,p)) return false;
+  // Take the old palisade out before the turret goes in, or its cells outlive
+  // it in S.cells and the run draws an arm into a wall that is not there.
+  if(t==="turret"){
+    var oc=cellAt(gx,gz);
+    if(oc){
+      var ob=rootOf(oc);
+      footCells(ob.type,ob.gx,ob.gz).forEach(function(cc){ delete S.cells[key(cc[0],cc[1])]; });
+    }
+  }
   var b={type:t,gx:gx,gz:gz,hp:TYPES[t].hp,max:TYPES[t].hp,cd:Math.random()*0.4,
          rot:(rotOv===undefined?ghostRot(t,gx,gz):rotOv),
          rotAuto:(rotOv===undefined?S.rotAuto:false), own:p.id};
@@ -533,7 +568,11 @@ function place(t,gx,gz,pid,rotOv){
     // Everything else goes up on its own, but it still goes up: what you place
     // is a heap of materials that becomes the building when the work is done.
     // Nothing shoots, trains, houses or lights from a heap of materials.
-    var rz=+TYPES[t].raise||0;
+    // A hand-built type measures its work in worker-seconds under `build`
+    // rather than wall-clock seconds under `raise`, because the two are not the
+    // same number and calling both `raise` would make a turret look like it
+    // takes nine seconds when it takes nine seconds of somebody's hands.
+    var rz=TYPES[t].hand ? (+TYPES[t].build||0) : (+TYPES[t].raise||0);
     if(rz>0){
       b.site=true; b.prog=0; b.need=rz;
       b.hp=Math.max(1,Math.round(b.max*0.30));
@@ -555,6 +594,7 @@ function removeAt(gx,gz,pid){
   evict(b);
   if(b.garrison) disband(b);
   if(S.bsel===b) S.bsel=null;
+  if(b.type==="turret") clearTurret(b,true);   // nobody is left standing on air
   footCells(b.type,b.gx,b.gz).forEach(function(cc){ delete S.cells[key(cc[0],cc[1])]; });
   if(p) p.supply+=Math.round(TYPES[b.type].cost*0.8);
   if(SND) SND.remove(M.gx2w(b.gx),M.gx2w(b.gz));
@@ -810,6 +850,58 @@ function popOut(u){
     u.x=d[0]; u.z=d[1]; u.rot=d[2];
   }
   u.px=u.x; u.pz=u.z;
+}
+// ---- the turret platform ---------------------------------------------------
+// Distinct from shelter, which is workers hiding and doing nothing. A garrison
+// is archers standing up top and shooting further, and the two must not share a
+// flag: `inside` means invisible and inert, and an archer on a platform is
+// neither. It gets `u.tur`, the turret it is standing on.
+function turretOf(u){
+  var t=u.tur;
+  if(!t) return null;
+  // the turret it remembers may have come down under it
+  var c=S.cells[key(t.gx,t.gz)];
+  if(!c||rootOf(c)!==t||t.site){ u.tur=null; return null; }
+  return t;
+}
+function crewOf(b){
+  var out=[];
+  for(var i=0;i<S.units.length;i++) if(turretOf(S.units[i])===b) out.push(S.units[i]);
+  return out;
+}
+// Only ranged units, because the whole benefit is range and a soldier up a
+// tower is a soldier not blocking a lane.
+function canCrew(u){ return !UNITS[u.t].civil && !UNITS[u.t].melee; }
+function manTurret(list,b,net){
+  if(!b||b.type!=="turret"||b.site) return 0;
+  if(guest()&&!net) return intent({m:"tu",gx:b.gx,gz:b.gz,u:uids(list)});
+  if((b.own|0)!==(list.length?(list[0].own|0):-1)) return 0;
+  var cap=(M.statsOf("turret").cap|0), have=crewOf(b).length, n=0;
+  for(var i=0;i<list.length&&have+n<cap;i++){
+    var u=list[i];
+    if(!canCrew(u)||(u.own|0)!==(b.own|0)||turretOf(u)===b) continue;
+    u.tur=b; u.job=null; u.target=null; u.shelter=false; u.inside=false;
+    n++;
+  }
+  if(n){
+    if(SND) SND.order();
+    if(UI.building) UI.building();
+    if(UI.units) UI.units();
+  }
+  return n;
+}
+// Coming down is an order like any other, and it is also what happens when the
+// turret does: see turretOf().
+function clearTurret(b,net){
+  if(!b) return 0;
+  if(guest()&&!net) return intent({m:"td",gx:b.gx,gz:b.gz});
+  var list=crewOf(b), i;
+  for(i=0;i<list.length;i++){
+    var u=list[i], d=doorOf(b,2.4);
+    u.tur=null; u.x=d[0]; u.z=d[1]; u.px=u.x; u.pz=u.z; u.mode="idle";
+  }
+  if(list.length&&UI.building) UI.building();
+  return list.length;
 }
 // Ordered out by hand: they leave the door and walk to the spot you clicked.
 function sendOut(b,x,z,net){
@@ -1221,6 +1313,23 @@ function stepVia(u,U,tx,tz,stop){ return stepPath(u,U,tx,tz,stop); }
 // along a long run instead of queueing at one stake — and only then does the
 // progress move. Several workers on one edge finish it proportionally faster,
 // which is the whole reason to pull a crew off salvage.
+// Same shape as the road below it: walk to it, and only then does the work
+// move. Standing somewhere else does nothing at all, which is the whole point.
+function updateSiteWork(u,U,dt,job){
+  if(u.carry>0) return false;               // finish the delivery first
+  u.job=null;
+  u.mode="road";
+  if(!stepToBuilding(u,U,job.b,0.35)) return true;
+  u.rot=Math.atan2(job.z-u.z,job.x-u.x);
+  if(u.atk<0) u.atk=0;
+  job.b.prog+=dt;
+  job.b.hp=Math.min(job.b.max, job.b.hp+job.b.max*dt/Math.max(0.001,job.b.need));
+  if(Math.random()<dt*1.8)
+    spark(job.x+(Math.random()-0.5)*1.2, gy(job.x,job.z)+0.7, job.z+(Math.random()-0.5)*1.2,
+          1,[0.78,0.72,0.60],0.6,1.2,0.22,0.45);
+  if(job.b.prog>=job.b.need) finishBuild(job.b);
+  return true;
+}
 function nearestRoadwork(u,pid){
   var best=null, bd=1e9;
   for(var i=0;i<S.roadE.length;i++){
@@ -1233,9 +1342,27 @@ function nearestRoadwork(u,pid){
   }
   return best;
 }
+// Hand-built sites, alongside road edges. Two kinds of job, one queue: a worker
+// takes whichever is nearest, so a turret does not sit unbuilt because a road
+// happened to be asked for first. The turret is the second thing in the game
+// that a timer will not finish, and generalising here rather than adding a
+// parallel loop is what keeps "does this need a worker" a property of the type
+// instead of a place in the code.
+function nearestHandSite(u,pid){
+  var best=null, bd=1e9;
+  for(var k in S.cells){
+    var b=S.cells[k];
+    if(b.ref||!b.site||(b.own|0)!==(pid|0)||!TYPES[b.type].hand) continue;
+    var bx=M.gx2w(b.gx), bz=M.gx2w(b.gz);
+    var d=Math.hypot(bx-u.x,bz-u.z);
+    if(d<bd){ bd=d; best={b:b, x:bx, z:bz, d:d}; }
+  }
+  return best;
+}
 function updateRoadwork(u,U,dt,op){
-  if(!S.roadE.length) return false;
-  var job=nearestRoadwork(u,u.own|0);
+  var site=nearestHandSite(u,u.own|0);
+  var job=S.roadE.length?nearestRoadwork(u,u.own|0):null;
+  if(site&&(!job||site.d<job.d)) return updateSiteWork(u,U,dt,site);
   if(!job){ if(u.mode==="road") u.mode="idle"; return false; }
   // Carrying a load? Finish the delivery first. Dropping salvage on the ground
   // to go and dig is the kind of "helpful" reshuffle that loses a player's
@@ -1487,9 +1614,19 @@ function updateUnits(dt){
       }
     }
 
+    // On a platform: it does not move, it does not chase, and it shoots
+    // further. Everything below that depends on walking is skipped rather than
+    // given a special case, because a unit that is standing on a building has
+    // no post to return to and no leash to run out.
+    var TUR=turretOf(u);
+    if(TUR){
+      u.x=M.gx2w(TUR.gx); u.z=M.gx2w(TUR.gz); u.px=u.x; u.pz=u.z;
+      u.shelter=false; u.inside=false;
+    }
+    var turBonus = TUR ? (+M.statsOf("turret").range||0) : 0;
     // acquire: hold stays near the post, pursue reaches a full leash further
-    var lead = (stanceOf(u.own)==="hold") ? Math.min(U.leash,2.4) : U.leash;
-    var scan = U.melee ? (U.reach+lead) : U.range;
+    var lead = TUR ? 0 : ((stanceOf(u.own)==="hold") ? Math.min(U.leash,2.4) : U.leash);
+    var scan = U.melee ? (U.reach+lead) : (U.range+turBonus);
     var tgt = (u.target&&u.target.hp>0) ? u.target : nearestEnemy(u.px,u.pz,scan+0.6);
     if(!tgt) tgt=nearestNest(u.px,u.pz,scan+2.6);   // march them out and they bite
     if(tgt && Math.hypot(tgt.x-u.px,tgt.z-u.pz) > scan+(tgt.nest?3.4:1.4)) tgt=null;
@@ -1498,7 +1635,7 @@ function updateUnits(dt){
     var mx=u.px, mz=u.pz, engaging=false;
     if(tgt){
       var d=Math.hypot(tgt.x-u.x,tgt.z-u.z);
-      var strike = U.melee ? U.reach : U.range;
+      var strike = U.melee ? U.reach : (U.range+turBonus);
       if(d<=strike){
         engaging=true;
         u.rot=Math.atan2(tgt.z-u.z,tgt.x-u.x);
@@ -1528,6 +1665,10 @@ function updateUnits(dt){
     // while a soldier sent to the far side of a wall has to find the gate
     // rather than lean on the stones. This loop used to do the first for both,
     // which is why an ordered squad could not get out of a walled yard.
+    if(TUR){
+      gaitStep(u,gx0,gz0);            // still animates, just never goes anywhere
+      continue;
+    }
     if(engaging){
       var dx=mx-u.x, dz=mz-u.z, L=Math.hypot(dx,dz);
       var stop=(U.melee?U.reach*0.85:U.range*0.9);
@@ -1545,7 +1686,9 @@ function updateUnits(dt){
   // commander's hands rather than on the clock.
   for(var sk in S.cells){
     var sb=S.cells[sk];
-    if(sb.ref||!sb.site||sb.type==="hall") continue;
+    // The hall waits on the commander's hands; a hand-built site waits on a
+    // worker's. Everything else is a timer that runs whether anybody came.
+    if(sb.ref||!sb.site||sb.type==="hall"||TYPES[sb.type].hand) continue;
     sb.prog+=dt;
     if(sb.prog>=sb.need) finishBuild(sb);
   }
@@ -2232,6 +2375,10 @@ function damageBuilding(b,amt){
       eliminate(b.own||0); return;
     }
     evict(b);
+    // The platform is gone, so its archers are on the ground — hurt, in the
+    // open, and exactly where the thing that killed the turret is standing.
+    // That is the counterplay to a garrison being unreachable.
+    if(b.type==="turret") clearTurret(b,true);
     if(S.bsel===b) S.bsel=null;
     footCells(b.type,b.gx,b.gz).forEach(function(c){ delete S.cells[key(c[0],c[1])]; });
     S.distDirty=true; S.netCellsDirty=true; S.pathVer=(S.pathVer|0)+1;
@@ -2331,7 +2478,11 @@ function stepCombat(dt){
     var blockU=null, bud=m.reach+0.55;
     for(var ui=0;ui<S.units.length;ui++){
       var fu=S.units[ui];
-      if(fu.hp<=0||fu.inside) continue;
+      // Nothing on a platform is reachable from the ground. The horde is
+      // entirely melee today, so in practice a garrison is safe — but the rule
+      // is "you cannot reach it", not "it cannot be hurt", so a ranged attacker
+      // added later shoots at it without anything here changing.
+      if(fu.hp<=0||fu.inside||fu.tur) continue;
       var fd=Math.hypot(fu.x-m.x,fu.z-m.z);
       if(fd<bud){ bud=fd; blockU=fu; }
     }
@@ -2845,6 +2996,14 @@ function applyIntent(msg,pid){
     // host authors them and the snapshot carries them, and an index would mean
     // a guest cancelling whichever road happened to slide into that slot.
     case "rx": cancelRoad(msg.a|0,msg.b|0,pid); break;
+    case "tu":
+      var tb=rootOf(cellAt(msg.gx|0,msg.gz|0));
+      if(tb&&(tb.own|0)===pid) manTurret(byUid(msg.u||[],pid),tb,true);
+      break;
+    case "td":
+      var tb2=rootOf(cellAt(msg.gx|0,msg.gz|0));
+      if(tb2&&(tb2.own|0)===pid) clearTurret(tb2,true);
+      break;
     case "or": orderTo(byUid(msg.u||[],pid),msg.x,msg.z,true); break;
     case "jb":
       var nd=S.nodes[msg.n|0];
@@ -2901,7 +3060,8 @@ function snapshot(full){
     var u=S.units[i];
     out.un.push([u.uid, UK_I[u.t]|0, u.own|0, r2(u.x), r2(u.z), r2(u.rot),
                  Math.round(u.hp), r2(u.sc), u.hit>0.01?1:0, Math.round(u.carry),
-                 u.inside?1:0, r2(u.atk), r2(u.atkT||0.75)]);
+                 u.inside?1:0, r2(u.atk), r2(u.atkT||0.75),
+                 u.tur?(u.tur.gx*100+u.tur.gz):-1]);
   }
   // buildings only when they change, since they are the bulk of a packet
   if(full||S.netCellsDirty){
@@ -3002,6 +3162,14 @@ function applySnapshot(sn){
     // walking any more, it is gone from the field
     if(!u.inside&&row[10]){ u.x=row[3]; u.z=row[4]; }
     u.inside=!!row[10]; u.shelter=!!row[10];
+    // The platform, resolved back to the building on this side. Without it a
+    // guest draws the garrison standing on the ground inside the turret.
+    var tk=(row[13]===undefined?-1:row[13]);
+    if(tk<0) u.tur=null;
+    else {
+      var tc=S.cells[key(Math.floor(tk/100),tk%100)];
+      u.tur=tc?rootOf(tc):null;
+    }
     // a swing that has just started on the host starts here too
     if(row[11]!==undefined){
       if(row[11]>=0&&(u.atk<0||row[11]<u.atk)) u.atk=row[11];
@@ -3133,6 +3301,16 @@ function drawEnemy(m,n){
 // The same five-instance rig the horde uses, driven from a unit's own state.
 // Two differences: a friendly figure stands upright rather than hunched, and
 // where it has two distinct arms each side gets its own bone.
+// How high a garrisoned archer stands. Read off the asset rather than typed in,
+// so moving the platform in the Library moves the archers with it.
+var DECK_Y=null;
+function deckY(){
+  if(DECK_Y===null){
+    var m=M.partBase("turret","deck");
+    DECK_Y=m?m[1]+0.18:2.45;
+  }
+  return DECK_Y;
+}
 function drawUnit(u,n,ca,cb){
   var UK=UNITS[u.t], id=UK.asset, r=RIG[id];
   if(!r) return false;
@@ -3165,8 +3343,17 @@ function drawUnit(u,n,ca,cb){
   var lean  = g.lean + (moving? swayK*g.sway*0.35 : 0) + strike*0.24;
 
   var c=Math.cos(yaw), sn=Math.sin(yaw), ug=gy(u.x,u.z);
+  // Standing on the platform rather than on the ground. Crew are spread around
+  // the deck so two archers are two figures rather than one in two places.
+  var tur=turretOf(u), ox0=0, oz0=0;
+  if(tur){
+    var crew=crewOf(tur), ix=crew.indexOf(u), cn=Math.max(1,crew.length);
+    var ang=(ix<0?0:ix)/cn*6.2832;
+    ox0=Math.cos(ang)*0.30; oz0=Math.sin(ang)*0.30;
+    ug+=deckY();
+  }
   function place(ox,oy,oz){
-    return [u.x + (ox*c - oz*sn)*sc, ug + oy*sc, u.z + (ox*sn + oz*c)*sc];
+    return [u.x+ox0 + (ox*c - oz*sn)*sc, ug + oy*sc, u.z+oz0 + (ox*sn + oz*c)*sc];
   }
   var hp=r.hip, sh=r.sho;
   var bp=place(0, r.rootY + bobY, 0);
@@ -3232,8 +3419,7 @@ function joins(gx,gz,ghost){
   if(ghost && ghost.gx===gx && ghost.gz===gz) return true;
   var c=cellAt(gx,gz);
   if(!c) return false;
-  var t=rootOf(c).type;
-  return t==="wall"||t==="gate";
+  return !!TYPES[rootOf(c).type].wallish;
 }
 function wallMask(gx,gz,ghost){
   var m=0;
@@ -3251,7 +3437,7 @@ function armMask(b,ghost){
 }
 
 function wallRot(gx,gz){
-  function isW(c){ if(!c) return false; var t=rootOf(c).type; return t==="wall"||t==="gate"; }
+  function isW(c){ if(!c) return false; return !!TYPES[rootOf(c).type].wallish; }
   var h=(isW(cellAt(gx-1,gz))?1:0)+(isW(cellAt(gx+1,gz))?1:0);
   var v=(isW(cellAt(gx,gz-1))?1:0)+(isW(cellAt(gx,gz+1))?1:0);
   if(h>v) return 0;
@@ -3281,7 +3467,7 @@ function groundRing(n,x,z,r,col,lift){
 }
 function pack(){
   var n={hall:0,tower:0,ballista:0,brazier:0,barracks:0,archery:0,cottage:0,
-         wall:0,wpost:0,gate:0,salvage:0,
+         wall:0,wpost:0,gate:0,turret:0,salvage:0,
          soldier:0,archer:0,worker:0,scout:0,commander:0,nest:0,
          corpse:0,bolt:0,arrow:0,spark:0,debris:0,rchip:0,marker:0,tile:0,grid:0,site:0,
          road:0};
@@ -3339,6 +3525,7 @@ function pack(){
     else if(c.type==="archery") n.archery=put(buf.archery,n.archery,x,by,z,rt,ca,ty.scale,cb);
     else if(c.type==="cottage") n.cottage=put(buf.cottage,n.cottage,x,by,z,rt,ca,ty.scale,cb);
     else if(c.type==="gate") n.gate=put(buf.gate,n.gate,x,by,z,rt,ca,ty.scale,cb);
+    else if(c.type==="turret") n.turret=put(buf.turret,n.turret,x,by,z,rt,ca,ty.scale,cb);
     else if(c.type==="wall"){
       var mk=armMask(c,ghostCell);
       n.wpost=put(buf.wpost,n.wpost,x,by,z,0,ca,1,cb);
@@ -3991,6 +4178,15 @@ function wireInput(){
         var g=pick(ev.clientX,ev.clientY), list=selectedUnits();
         // a selected house turns its own people out to wherever you clicked
         if(g&&S.bsel&&housedBy(S.bsel).length&&!cellAt(g.gx,g.gz)) sendOut(S.bsel,g.x,g.z);
+        // A right-click on your own turret with ranged troops selected puts
+        // them on it. It comes before the order below because "go and stand
+        // there" and "go and stand on that" are the same gesture, and the
+        // turret is the more specific reading.
+        var turB=g?rootOf(cellAt(g.gx,g.gz)):null;
+        if(turB&&turB.type==="turret"&&!turB.site&&(turB.own|0)===S.me){
+          var crewList=selectedUnits().filter(canCrew);
+          if(crewList.length&&manTurret(crewList,turB)) { mode=null; S.marquee=null; return; }
+        }
         if(g&&list.length){
           var civ=list.filter(function(u){ return UNITS[u.t].civil; });
           var hurtB=rootOf(cellAt(g.gx,g.gz));
@@ -4136,6 +4332,7 @@ return {
   bsel:function(){ return S?S.bsel:null; },
   selectBuilding:selectBuilding, setShelter:setShelter, sendOut:sendOut,
   housedBy:housedBy, sheltering:sheltering, shelteredCount:shelteredCount,
+  crewOf:crewOf, manTurret:manTurret, clearTurret:clearTurret, canCrew:canCrew,
   select:function(t){ if(S) S.sel=(S.sel===t)?null:t; },
   held:function(){ return S?S.sel:null; },
   rotate:rotate, rotAuto:rotAuto,

@@ -239,6 +239,18 @@ HFGAME.UI.building=function(){
   el("bldBar").style.width=(f*100).toFixed(1)+"%";
   el("bldBar").classList.toggle("crit",!site&&f<0.35);
 
+  // A turret's people are a crew, not residents: they are not sheltered, they
+  // are standing on it shooting. Different line, different verb.
+  if(b.type==="turret"&&!site){
+    var crew=HFGAME.crewOf(b), tcap=HF.statsOf('turret').cap|0;
+    el("bldHouse").hidden=false;
+    el("bldHoused").textContent=crew.length
+      ? M.t("sel.turret.crew",{n:crew.length}) : M.t("sel.turret.empty");
+    el("bldIn").textContent=crew.length?(crew.length+"/"+tcap):"";
+    el("bldHint").textContent=crew.length?"":M.t("sel.turret.hint");
+    dockActs(b,T,[]);
+    return;
+  }
   var housed=HFGAME.housedBy(b), inside=0;
   for(var i=0;i<housed.length;i++) if(housed[i].inside) inside++;
   var house=el("bldHouse");
@@ -381,6 +393,15 @@ function dockActs(b,T,housed,road){
   box.hidden=false;
   el("dockWhat").textContent=T.name;
   var ds=el("dockShelter");
+  if(!road&&b.type==="turret"&&!b.site){
+    var tc=HFGAME.crewOf(b).length;
+    ds.hidden=!tc;
+    if(tc){ ds.textContent=M.t("sel.turret.down"); ds.setAttribute("aria-pressed","false"); }
+    var dsell2=el("dockSell");
+    dsell2.hidden=false;
+    dsell2.textContent=M.t(b.site?"sel.cancel":"sel.selldown",{n:Math.round(T.cost*0.8)});
+    return;
+  }
   ds.hidden=road||!housed.length;
   if(!road&&housed.length){
     var on=HFGAME.sheltering(b);
@@ -1062,6 +1083,7 @@ el("grpArmy").addEventListener("click",function(){
 });
 el("dockShelter").addEventListener("click",function(){
   var b=HFGAME.bsel(); if(!b) return;
+  if(b.type==="turret"){ HFGAME.clearTurret(b); HFGAME.UI.building(); return; }
   HFGAME.setShelter(b,!HFGAME.sheltering(b));
   HFGAME.UI.building();
 });

@@ -31,7 +31,8 @@ const R = await page.evaluate(() => {
   for (const t in G.TYPES) {
     const T = G.TYPES[t];
     out.types.push({ id: t, name: T.name, cat: T.cat, foot: T.foot | 0,
-                     road: !!T.road, s: HF.statsOf(t) || {}, note: note(t) });
+                     road: !!T.road, hand: !!T.hand,
+                     s: HF.statsOf(t) || {}, note: note(t) });
   }
   for (const u in G.UNITS) {
     const U = G.UNITS[u];
@@ -105,7 +106,12 @@ for (const c of R.cats) {
       bits.push(`splash ${Math.round(s.splashK * 100)}% across ${n(s.splash)}`);
     if (s.aura !== undefined)
       bits.push(`guns within ${n(s.aura)} reload ${Math.round((1 - s.auraK) * 100)}% faster`);
-    if (s.cap !== undefined)
+    // A turret's cap is a garrison you fill yourself, not residents it makes —
+    // same field, different sentence, and printing "houses 2, replaced every
+    // undefined" is what happens when a generator assumes one meaning per key.
+    if (t.id === 'turret')
+      bits.push(`${s.cap} archers may stand on it, each shooting ${n(s.range)}u further`);
+    else if (s.cap !== undefined)
       bits.push(`houses ${s.cap}${(s.scouts | 0) ? ' and ' + s.scouts + ' scout' + (s.scouts > 1 ? 's' : '') : ''}` +
                 `, replaced every ${n(s.retrain)}s`);
     if (t.road)
@@ -113,7 +119,8 @@ for (const c of R.cats) {
                 `runs of ${s.minLen}–${s.maxLen}, ends snap within ${n(s.snap)}`);
     push(`| **${t.name}** | ${t.road ? '—' : (s.cost === undefined ? 'free' : s.cost)} | ` +
          `${s.hp === undefined ? '—' : n(s.hp, 0)} | ` +
-         `${t.road ? n(s.build) + 's per unit' : n(s.raise) + 's'} | ` +
+         `${t.road ? n(s.build) + 's per unit'
+                   : (t.hand ? n(s.build) + 's of labour' : n(s.raise) + 's')} | ` +
          `${s.pathCost === undefined ? '—' : s.pathCost} | ${n(s.sight)} | ` +
          `${t.road ? 'off-grid' : t.foot + '×' + t.foot} | ${bits.join('; ') || '—'} |`);
   }

@@ -145,8 +145,9 @@ screen and fails on a word that no text key owns. `tools/roads.mjs` proves
 snapping joins rather than duplicates, that a road only builds with a worker on
 it, and that the flow field cannot see one. `tools/pathing.mjs` sends a unit
 round a building, through a gate and out of a walled pocket, and checks an open-
-ground order is still a straight line. `tools/scout.mjs` covers the scout and
-sight; `tools/fog.mjs` covers fog of war, and counts instances rather than
+ground order is still a straight line. `tools/turret.mjs` covers hand-built
+sites, placing onto a wall and the platform garrison. `tools/scout.mjs` covers
+the scout and sight; `tools/fog.mjs` covers fog of war, and counts instances rather than
 sampling pixels because "it went dark" and "it is not drawn" are different
 claims. `tools/net.mjs` runs two
 browsers over a
@@ -172,8 +173,8 @@ run properly.
 ## Where it stands
 
 **Working and verified.** Full day/night cycle. Commander, workers, soldiers,
-archers, scouts, all animated. Walls, gates, towers, ballistae, braziers, barracks,
-archery ranges, cottages. Construction sites. Repair, shelter, stances. Salvage
+archers, scouts, all animated. Walls, gates, turrets, towers, ballistae,
+braziers, barracks, archery ranges, cottages. Construction sites. Repair, shelter, stances. Salvage
 economy. The map editor and the live asset/balance library. Two-player rounds
 over WebRTC with the host and guest in exact agreement — measured drift of zero.
 
