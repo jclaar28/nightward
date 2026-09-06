@@ -245,7 +245,10 @@ after that has proven out.
   population has not been measured. It is cheap to find out —
   `tools/instances.mjs` captures every instance for a frame and the harness
   drives a headless round at any wave size — so this should be a measurement
-  before it is a target.
+  before it is a target. The player's own side has a second cost now: units
+  run A* per order, which is affordable because orders are rare (twenty units
+  routed round a wall on one frame costs ~4ms, measured in `tools/pathing.mjs`)
+  but scales with army size rather than wave size. A persistent map grows both.
 - **The two-player path has no automated cover at all**, and every string on
   that screen moved into the text table recently. `tools/text.mjs` proves the
   words resolve; nothing proves a peer still connects. Worth one real

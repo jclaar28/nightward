@@ -180,8 +180,9 @@ bug found here was found by reading numbers out of the running game.
 
 **Run `node tools/smoke.mjs`, `node tools/instances.mjs` and
 `node tools/campaign.mjs` after any change**, plus `node tools/text.mjs` for
-anything that puts words on screen, `node tools/roads.mjs` for anything
-touching roads, movement or worker jobs, `node tools/economy.mjs` for
+anything that puts words on screen, `node tools/roads.mjs` and
+`node tools/pathing.mjs` for anything touching roads, movement or worker jobs,
+`node tools/economy.mjs` for
 anything touching salvage, workers or the map,
 and `node tools/balance.mjs --ab id.key=value` for anything touching difficulty.
 `tools/README.md` explains them; read it before writing a new one.
@@ -273,17 +274,28 @@ without talking to Jarrod first.
 - **Selling is only ever a hotbar button** with a structure selected. It is
   never a click on the world, because a misclick that deletes a tower mid-wave
   is unforgivable.
-- **The game routes jobs; the player's orders are literal.** A worker sent to
-  a pile takes the fastest route it can find, roads included — the player said
-  which pile, not which line to walk. A right-click on ground is a move order
-  and goes straight there, even if a road points the same way. Breaking that
-  during a night, when someone points at a gap in the wall, is the failure the
-  rule exists to prevent.
-- **Attackers path, defenders steer.** The horde runs a Dijkstra flow field, so
-  a wall's high path cost pushes them elsewhere and a gate's low cost invites
-  them in — that is the whole tactical language of the wall system. Your own
-  units steer directly and follow walls around obstacles, deliberately: a
-  player's order should be obeyed literally rather than re-planned.
+- **The destination is literal; the route is not.** A right-click names a place,
+  and the unit goes to that place — not to somewhere near it, not to whatever
+  the game thinks you meant. How it gets there is the game's problem: it rounds
+  buildings, takes a gate rather than leaning on the stones, and runs the road
+  when the road is quicker. If a route exists the unit walks it however long it
+  is; there is no detour cap, because a unit that gives up and grinds on a wall
+  is the failure this replaced. The literal half still has teeth — ordered
+  across a road corridor the unit crosses it rather than turning down it, and
+  breaking *that* during a night, when someone points at a gap in the wall, is
+  what the rule exists to prevent. `tools/pathing.mjs` measures both halves.
+- **The horde does not path, and defenders do not flow.** Two separate systems
+  on purpose. The horde runs a Dijkstra flow field, so a wall's high path cost
+  pushes them elsewhere and a gate's low cost invites them in — that is the
+  whole tactical language of the wall system, and it is rebuilt once for the
+  whole army. Player units run A* per order, which is affordable only because
+  a player issues a handful of orders a minute. Do not merge them: a flow field
+  that knows about roads is a highway to your hall, and A* per attacker is a
+  hitch every night.
+- **A soldier closing on an enemy still steers.** `stepPath` is for the march;
+  the last few units onto a moving target are a straight line. Routing at a
+  target that moves every frame would be a search per soldier per frame and buy
+  nothing. The split is the `engaging` branch in the military loop.
 - **The HUD has fixed homes.** Supply top-left, selection panels bottom-left,
   worker/army counts bottom-right, minimap and clock top-right, build cards in
   the bottom dock. The dock is where the player's hand lives during a round and

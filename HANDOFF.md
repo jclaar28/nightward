@@ -137,8 +137,10 @@ instance the renderer is handed for one frame and asserts against it.
 `--ab` mode for comparing one stat against stock. `tools/text.mjs` walks every
 screen and fails on a word that no text key owns. `tools/roads.mjs` proves
 snapping joins rather than duplicates, that a road only builds with a worker on
-it, and that the flow field cannot see one. `tools/README.md` covers
-writing new ones and the traps worth knowing.
+it, and that the flow field cannot see one. `tools/pathing.mjs` sends a unit
+round a building, through a gate and out of a walled pocket, and checks an open-
+ground order is still a straight line. `tools/README.md` covers writing new ones
+and the traps worth knowing.
 
 A worked example. "The nests are floating" could have been fixed by nudging a
 constant until it looked right. Instead: terrain height at each nest was −0.17
@@ -188,9 +190,9 @@ over WebRTC with the host and guest in exact agreement — measured drift of zer
 
 **Deliberately left alone.** The design decisions listed under "Design intent"
 in `CLAUDE.md` — no calling the night early, the commander walking to the hall,
-selling only from the hotbar, defenders steering rather than pathing. They look
-like oversights in the code and aren't. Please raise them with Jarrod before
-changing any of them.
+selling only from the hotbar, a move order going to the exact spot named rather
+than somewhere sensible near it. They look like oversights in the code and
+aren't. Please raise them with Jarrod before changing any of them.
 
 ---
 

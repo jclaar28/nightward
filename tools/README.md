@@ -83,6 +83,28 @@ so it now also measures a road laid along the route, where the whole 35% is on
 the table. And "the ordered unit strayed 0.00u sideways" is exactly what a unit
 that never moved would report, so it now asserts the trip was actually made.
 
+**`pathing.mjs`** — your own units, and whether they get where you sent them.
+Drives one soldier through the three shapes that used to defeat reactive
+steering — a building squarely in the way, a wall with a single gate, a
+three-sided pocket — and then the two rules the search must not break: an order
+across empty ground is still a straight walk, and the horde's flow field never
+learns any of it. It closes by ordering twenty units through a solid wall on one
+frame, because A* per order is the price of all of the above and a whole army
+ordered at once is the worst case a player can actually create.
+
+Read the `startOk` assertion before writing a case here. The town hall is a 3x3
+footprint at the origin spanning ±2.4 units, A* correctly declines to search
+from inside a building, and the fallback is a straight walk — so a start planted
+in the hall turns a pathfinding test into a steering test that still reads like
+a pathfinding test. That mistake produced three failures the code did not have
+and one pass it did not deserve. The same trap sits in `roads.mjs`, where a walk
+timed from the origin measured nothing at all.
+
+Fixing those setups is what surfaced the real bug: workers had been routed and
+soldiers had not, so an ordered squad still could not leave a walled yard. The
+check had been passing the wrong thing and failing for the wrong reason at the
+same time.
+
 **`audio.mjs`** — renders every sound offline and measures it. "It did not
 throw" is not a test for a sound: it has a level, a length, a weight and a
 stereo position, and every one is a number you can be wrong about. Checks that

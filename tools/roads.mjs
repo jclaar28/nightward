@@ -94,7 +94,10 @@ const speed = await page.evaluate(() => {
     S.roadE.forEach(e => { e.done = useRoad; e.prog = useRoad ? e.need : 0; });
     S.roadVer++;
     const u = S.units.filter(x => x.t === 'worker')[0];
-    u.x = 0; u.z = 0; u.route = null;
+    // Clear of the hall's 3x3 footprint. Starting at the origin puts the unit
+    // INSIDE the town hall, where pathfinding correctly declines to search and
+    // the walk falls back to a straight line — which quietly measured nothing.
+    u.x = -1; u.z = -3; u.route = null; u.path = null; u.pathTo = null;
     let t = 0;
     const U = G.UNITS.worker;
     // drive the primitive directly: this is a travel measurement, not a
@@ -116,7 +119,7 @@ const speed = await page.evaluate(() => {
     straightEdge.done = useRoad; straightEdge.prog = straightEdge.need;
     S.roadVer++;
     const u = S.units.filter(x => x.t === 'worker')[0];
-    u.x = 0; u.z = -20; u.route = null;
+    u.x = 0; u.z = -20; u.route = null; u.path = null; u.pathTo = null;
     let t = 0;
     for (let i = 0; i < 30 * 60; i++) { t += 1 / 30; if (G.stepVia(u, G.UNITS.worker, 20, -20, 0.4)) break; }
     return t;
