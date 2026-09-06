@@ -110,7 +110,9 @@ for (const c of R.cats) {
     // same field, different sentence, and printing "houses 2, replaced every
     // undefined" is what happens when a generator assumes one meaning per key.
     if (t.id === 'turret')
-      bits.push(`${s.cap} archers may stand on it, each shooting ${n(s.range)}u further`);
+      bits.push((s.cap | 0) === 1
+        ? `one archer may stand on it, shooting ${n(s.range)}u further`
+        : `${s.cap} archers may stand on it, each shooting ${n(s.range)}u further`);
     else if (s.cap !== undefined)
       bits.push(`houses ${s.cap}${(s.scouts | 0) ? ' and ' + s.scouts + ' scout' + (s.scouts > 1 ? 's' : '') : ''}` +
                 `, replaced every ${n(s.retrain)}s`);

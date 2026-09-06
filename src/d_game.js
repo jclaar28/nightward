@@ -58,7 +58,8 @@ var TYPES={
   // rather than a timer — the road's rule, applied to a second thing.
   turret:{cat:"walls", foot:1, scale:1.00, wallish:true, hand:true,
           colA:M.PAL.timber, colB:M.PAL.iron,
-          blurb:function(t){ return M.t("bld.turret.blurb",{cap:t.cap, range:t.range}); }},
+          blurb:function(t){ return M.t((t.cap|0)===1?"bld.turret.blurb.one":"bld.turret.blurb",
+                                        {cap:t.cap, range:t.range}); }},
   barracks:{cat:"muster", foot:1, scale:0.72, spawns:"soldier",
           colA:M.PAL.timber, colB:M.PAL.slate,
           blurb:function(t){ return M.t("bld.barracks.blurb",{cap:t.cap, retrain:t.retrain}); }},
@@ -3427,7 +3428,10 @@ function wallMask(gx,gz,ghost){
   return m;
 }
 function armMask(b,ghost){
-  if(!b.rotAuto){                       // manual facing: force a straight run
+  // A turret has no facing of its own to force — it is a drum, it looks the
+  // same from every side, and honouring a manual rotation here would make it
+  // emit arms into empty ground.
+  if(!b.rotAuto&&b.type!=="turret"){    // manual facing: force a straight run
     var k=Math.round((b.rot||0)/(Math.PI/2))%4;
     if(k<0) k+=4;
     return (1<<k)|(1<<((k+2)%4));
@@ -3525,7 +3529,20 @@ function pack(){
     else if(c.type==="archery") n.archery=put(buf.archery,n.archery,x,by,z,rt,ca,ty.scale,cb);
     else if(c.type==="cottage") n.cottage=put(buf.cottage,n.cottage,x,by,z,rt,ca,ty.scale,cb);
     else if(c.type==="gate") n.gate=put(buf.gate,n.gate,x,by,z,rt,ca,ty.scale,cb);
-    else if(c.type==="turret") n.turret=put(buf.turret,n.turret,x,by,z,rt,ca,ty.scale,cb);
+    else if(c.type==="turret"){
+      n.turret=put(buf.turret,n.turret,x,by,z,rt,ca,ty.scale,cb);
+      // A turret emits the same arms a palisade does, into whichever sides have
+      // a neighbour. Without them the run stops 0.75 from the turret's centre
+      // while the staves stop at 0.575, and that 0.175-unit hole is visible
+      // from every angle. Reusing the wall's own arm rather than widening the
+      // turret means the join is the same geometry on both sides of it — and
+      // the arm's inner end is buried inside the drum, which is opaque, so only
+      // the gap-filling part of it shows.
+      var tm=armMask(c,ghostCell);
+      for(var d3=0;d3<4;d3++)
+        if(tm&(1<<d3)) n.wall=put(buf.wall,n.wall,x,by,z,d3*Math.PI/2,
+                                  TYPES.wall.colA,1,TYPES.wall.colB);
+    }
     else if(c.type==="wall"){
       var mk=armMask(c,ghostCell);
       n.wpost=put(buf.wpost,n.wpost,x,by,z,0,ca,1,cb);

@@ -801,7 +801,17 @@ var ASSETS=[
     // A dark gap between staves at eye height, so the drum has a front and
     // reads as occupied before anybody is in it.
     {id:"slit",  name:"Loophole",  prim:"box", p:[0,1.24,0.44], s:[0.09,0.40,0.14],
-       shade:0.26, rep:{mode:"ring", n:4, r:0.44, a0:45}}
+       shade:0.26, rep:{mode:"ring", n:4, r:0.44, a0:45}},
+    // Scenery, not a route. Nothing climbs it and no code knows it exists — it
+    // is here because a platform with no way up reads as a mistake, and the
+    // fastest way to answer that question in the player's head is to show the
+    // ladder. If a unit ever needs to physically climb something, this is not
+    // the thing to make load-bearing; it is drawn on one face of a drum that
+    // has no facing.
+    {id:"rails", name:"Ladder rails",prim:"cyl",p:[0.17,0.06,0.615],s:[0.042,2.28], seg:5,
+       cap:false, shade:0.86, rep:{mode:"mirrorX"}},
+    {id:"rungs", name:"Ladder rungs",prim:"box",p:[0,0.34,0.615], s:[0.40,0.048,0.055],
+       tint:1, shade:1.00, rep:{mode:"linY", n:6, step:0.36}}
   ]},
 
 { id:"gate", name:"Gate", group:"Structures",
@@ -1432,7 +1442,7 @@ var STAT_DEFS={
     {k:"hp",       label:"Hit points",     def:280, lo:20,  hi:1200, step:10, int:true},
     {k:"build",    label:"Labour",         def:9,   lo:0.5, hi:120,  step:0.5, unit:"worker-s",
      hint:"seconds of a worker's hands, not seconds on a clock"},
-    {k:"cap",      label:"Garrison",       def:2,   lo:0,   hi:8,    step:1,  int:true,
+    {k:"cap",      label:"Garrison",       def:1,   lo:0,   hi:8,    step:1,  int:true,
      hint:"archers who can stand on it"},
     {k:"range",    label:"Range added",    def:3.4, lo:0,   hi:20,   step:0.1, unit:"u",
      hint:"added to the range of whoever is up there"},
@@ -1861,6 +1871,7 @@ var TEXT_DEFS={
   "bld.archery.blurb":{g:"bld",def:"{cap} archers · {retrain}s each"},
   "bld.turret.name":{g:"bld",def:"Turret"},
   "bld.turret.blurb":{g:"bld",def:"holds {cap} archers · +{range}u range"},
+  "bld.turret.blurb.one":{g:"bld",def:"holds an archer · +{range}u range"},
   "sel.turret.crew":{g:"sel",def:"{n} on the platform"},
   "sel.turret.empty":{g:"sel",def:"nobody up there"},
   "sel.turret.hint":{g:"sel",def:"right-click it with archers to put them up"},
