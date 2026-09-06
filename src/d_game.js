@@ -20,8 +20,12 @@ var B=null, BATCHES=null, buf={};
 // edited in the Library reaches the hotbar without a reload.
 var CATS=[{id:"core"},{id:"guns"},{id:"walls"},{id:"muster"}];
 var TYPES={
+  // `also` is a second kind in the same garrison. The hall is the only building
+  // that musters two, and it gets a second field rather than a second building
+  // because a scout is not something you choose to build — it comes with having
+  // a town at all.
   hall : {cat:"core", foot:3, scale:1.00, cost:0,
-          colA:M.PAL.plaster, colB:M.PAL.slate, spawns:"worker",
+          colA:M.PAL.plaster, colB:M.PAL.slate, spawns:"worker", also:"scout",
           blurb:function(t){ return M.t("bld.hall.blurb",{cap:t.cap, raise:t.raise}); }},
   // A road is in here so the dock, the tabs and the number keys treat it like
   // anything else you hold. `road:true` is the flag every piece of cell code
@@ -70,6 +74,12 @@ var UNITS={
   worker :{asset:"worker",  civil:true,
            scBase:1.18, scVar:0.08, colA:[0.430,0.398,0.300], colB:[0.545,0.520,0.470],
            gib:[0.70,0.66,0.56]},
+  // Military rather than civil: it holds a post, takes a stance, counts with
+  // your army and stays out at night. Which is the point — a scout that ran
+  // indoors at dusk would be asleep for the only hours it is useful.
+  scout  :{asset:"scout",   melee:true,
+           scBase:1.16, scVar:0.06, colA:[0.318,0.372,0.352], colB:[0.585,0.512,0.352],
+           gib:[0.64,0.68,0.62]},
   // One per player, on the field before anything is built. It is the only unit
   // that can raise a hall, which is why the round starts with a walk rather
   // than a click: where you put the hall costs you the time to get there.
@@ -130,6 +140,13 @@ var RIGDEF={
           arm:["arms","haft","head2"], armL:["arms"], leg:["legs"],
           gait:{swing:0.55, armK:0.40, cad:2.45, bob:0.055, lean:0.04, sway:0.07,
                 reach:0.55, wind:0.38} },
+  // The spyglass rides on the arm bone so it swings with the hand rather than
+  // floating beside the head. Long, light stride: the fastest cadence and the
+  // most lean of anything you own, which is most of how the speed reads.
+  scout:{ body:["torso","cape","belt","head","hat","crownH","horn","satch","sig"],
+          arm:["arms","glass","lens"], armL:["arms"], leg:["legs"],
+          gait:{swing:0.66, armK:0.30, cad:2.70, bob:0.062, lean:0.09, sway:0.08,
+                reach:0.30, wind:0.30} },
   commander:{ body:["tabard","cuirass","sash","pauldron","mantle","cloakC","cloakM",
                     "cloakO","clasp","neck","head","crown","points","jewel","scab","sig"],
           arm:["arms","grip","guard","sword"], armL:["arms"], leg:["legs","boots"],
@@ -238,6 +255,7 @@ function init(renderer, cv, settings, endCb){
     barracks:R.makeBatch(M.buildAsset("barracks")), archery:R.makeBatch(M.buildAsset("archery")),
     soldier:R.makeBatch(M.buildAsset("soldier")), archer:R.makeBatch(M.buildAsset("archer")),
     worker:R.makeBatch(M.buildAsset("worker")), cottage:R.makeBatch(M.buildAsset("cottage")),
+    scout:R.makeBatch(M.buildAsset("scout")),
     commander:R.makeBatch(M.buildAsset("commander")),
     salvage:R.makeBatch(M.buildAsset("salvage")),
     nest:R.makeBatch(M.buildAsset("nest")),
@@ -257,7 +275,7 @@ function init(renderer, cv, settings, endCb){
   BATCHES=[B.road,B.corpse,B.salvage,B.site,B.hall,B.tower,B.ballista,B.brazier,
            B.barracks,B.archery,B.cottage,
            B.wall,B.wpost,B.gate,
-           B.nest,B.soldier,B.archer,B.worker,B.commander,
+           B.nest,B.soldier,B.archer,B.worker,B.scout,B.commander,
            B.bolt,B.arrow,B.spark,B.debris,B.ring,B.marker,B.tile,B.grid];
   buildRigs(true);
   // bones draw with the living attackers, between the buildings and the effects
@@ -274,11 +292,11 @@ function init(renderer, cv, settings, endCb){
   var CAP={swarm:2600,runner:1900,brute:900,corpse:MAX_CORPSES,spark:MAX_PARTS,
            debris:MAX_PARTS,
            bolt:400,arrow:300,wall:1400,soldier:120,archer:120,worker:120,
-           commander:8,
+           scout:40, commander:8,
            marker:24,salvage:24,cottage:120,nest:24,site:600,road:5200};
   ["hall","tower","ballista","brazier","barracks","archery","cottage",
    "wall","wpost","gate",
-   "soldier","archer","worker","commander","salvage","nest",
+   "soldier","archer","worker","scout","commander","salvage","nest",
    "corpse","bolt","arrow","spark","debris","ring","marker","tile","grid","site",
    "road"].forEach(function(k){
     buf[k]=new Float32Array(12*(CAP[k]||700));
@@ -613,8 +631,33 @@ function doorOf(b,spread){
   var r=standOff(b)+0.25+Math.random()*0.35;
   return [bx+Math.cos(a)*r, bz+Math.sin(a)*r, a];
 }
-function muster(b){
-  var kind=TYPES[b.type].spawns, U=UNITS[kind];
+// What a building keeps in its garrison: a list of kinds and how many of each.
+// Every building but the hall musters one kind, which is all `spawns` and `cap`
+// have ever meant; the hall musters two. Making the roster the general form and
+// the single-kind case a roster of one is what keeps the retrain loop from
+// growing a special case — it asks what the building is short of and does not
+// care how many kinds the answer could have come from.
+function rosterOf(t){
+  var T=TYPES[t]; if(!T||!T.spawns) return null;
+  var s=M.statsOf(t)||{};
+  var out=[{t:T.spawns, n:s.cap|0}];
+  if(T.also&&(s.scouts|0)>0) out.push({t:T.also, n:s.scouts|0});
+  return out;
+}
+function countIn(b,kind){
+  var n=0;
+  for(var i=0;i<b.garrison.length;i++) if(b.garrison[i].t===kind) n++;
+  return n;
+}
+// The kind this building owes, or null when its roster is full.
+function shortOf(b){
+  var r=rosterOf(b.type); if(!r) return null;
+  for(var i=0;i<r.length;i++) if(countIn(b,r[i].t)<r[i].n) return r[i].t;
+  return null;
+}
+function muster(b,kind){
+  kind=kind||TYPES[b.type].spawns;
+  var U=UNITS[kind];
   if(!U) return null;
   var d=doorOf(b), a=d[2], r=0;
   var u={
@@ -631,8 +674,9 @@ function muster(b){
   return u;
 }
 function musterAll(b){
-  var cap=TYPES[b.type].cap|0;
-  for(var i=b.garrison.length;i<cap;i++) muster(b);
+  var r=rosterOf(b.type); if(!r) return;
+  for(var i=0;i<r.length;i++)
+    for(var j=countIn(b,r[i].t);j<r[i].n;j++) muster(b,r[i].t);
 }
 function disband(b){
   if(!b.garrison) return;
@@ -1494,15 +1538,15 @@ function updateUnits(dt){
   for(var k in S.cells){
     var b=S.cells[k];
     if(b.ref||b.site||!b.garrison) continue;
-    var cap=TYPES[b.type].cap|0;
-    if(b.garrison.length>=cap){ b.trainCd=0; continue; }
+    var want=shortOf(b);
+    if(!want){ b.trainCd=0; continue; }
     // the clock starts when the loss happens, so a replacement always costs the
     // full retrain time rather than arriving on the same frame
     if(b.trainCd<=0) b.trainCd=TYPES[b.type].retrain;
     b.trainCd-=dt;
     if(b.trainCd<=0){
       b.trainCd=0;
-      muster(b);
+      muster(b,want);
       if(SND) SND.muster(M.gx2w(b.gx),M.gx2w(b.gz));
       if(UI.units) UI.units();
     }
@@ -1520,6 +1564,64 @@ function dropGib(x,z,rot,sc,col){
 }
 
 // ---- flow field -----------------------------------------------------------
+// ---- what you can see ------------------------------------------------------
+// The minimap used to draw every attacker on the map unconditionally, which
+// meant a scout could not tell you anything you did not already know. Now
+// everything you own has a `sight` in the balance table and the minimap only
+// marks what somebody is looking at.
+//
+// Deliberately narrow: this hides ATTACKERS and nothing else. Nests, salvage,
+// terrain and your own buildings stay on the map, because the map itself is
+// known ground — a settlement knows where the hills and the nests are. It is
+// where the horde is right now that you have to earn.
+//
+// A grid rather than a distance test per enemy per watcher: a late night is
+// ~800 attackers against ~40 watchers, and 32,000 hypots several times a second
+// to draw a 150-pixel canvas is not a trade worth making. Stamping discs into a
+// byte grid is ~4,000 writes and the lookup is one index.
+var seeMask=null, seeOwn=-1;
+function visionMask(pid){
+  pid=pid|0;
+  var N=M.GN;
+  if(!seeMask||seeMask.length!==N*N) seeMask=new Uint8Array(N*N);
+  else seeMask.fill(0);
+  seeOwn=pid;
+  var i;
+  function stamp(x,z,r){
+    if(!(r>0)) return;
+    var g0x=M.w2gx(x-r), g1x=M.w2gx(x+r), g0z=M.w2gx(z-r), g1z=M.w2gx(z+r);
+    if(g0x<0) g0x=0; if(g0z<0) g0z=0;
+    if(g1x>=N) g1x=N-1; if(g1z>=N) g1z=N-1;
+    var r2=r*r;
+    for(var gz=g0z;gz<=g1z;gz++){
+      var wz=M.gx2w(gz), dz=wz-z;
+      for(var gx=g0x;gx<=g1x;gx++){
+        var dx=M.gx2w(gx)-x;
+        if(dx*dx+dz*dz<=r2) seeMask[gz*N+gx]=1;
+      }
+    }
+  }
+  for(i=0;i<S.units.length;i++){
+    var u=S.units[i];
+    if((u.own|0)!==pid||u.inside||u.hp<=0) continue;
+    stamp(u.x,u.z,(M.statsOf(u.t)||{}).sight||0);
+  }
+  for(var k in S.cells){
+    var c=S.cells[k];
+    if(c.ref||(c.own|0)!==pid) continue;
+    // A site is a heap of materials. It does not shoot, house, light or accept
+    // repair, and it does not keep watch either.
+    if(c.site) continue;
+    stamp(M.gx2w(c.gx),M.gx2w(c.gz),(M.statsOf(c.type)||{}).sight||0);
+  }
+  return seeMask;
+}
+// Cheap enough to call per enemy once the mask is built for this frame.
+function seenAt(mask,x,z){
+  var gx=M.w2gx(x), gz=M.w2gx(z);
+  if(gx<0||gz<0||gx>=M.GN||gz>=M.GN) return false;
+  return !!mask[gz*M.GN+gx];
+}
 function rebuildField(){
   var N=GN, dist=new Float64Array(N*N); dist.fill(1e9);
   var halls=[];
@@ -3092,7 +3194,7 @@ function wallRot(gx,gz){
 function pack(){
   var n={hall:0,tower:0,ballista:0,brazier:0,barracks:0,archery:0,cottage:0,
          wall:0,wpost:0,gate:0,salvage:0,
-         soldier:0,archer:0,worker:0,commander:0,nest:0,
+         soldier:0,archer:0,worker:0,scout:0,commander:0,nest:0,
          corpse:0,bolt:0,arrow:0,spark:0,debris:0,ring:0,marker:0,tile:0,grid:0,site:0,
          road:0};
   for(var rk0 in RIGDEF){
@@ -3866,6 +3968,8 @@ return {
   // so a test exercises the real snapping rather than a back channel.
   queueRoad:queueRoad, roadSpeed:roadSpeed, roadAnchor:roadAnchor,
   roadRefusal:roadRefusal, stepVia:stepVia,
+  // vision, for the minimap and the tools
+  visionMask:visionMask, seenAt:seenAt,
   cancelRoad:cancelRoad, roadAt:roadAt, selectRoad:selectRoad,
   rsel:selRoad, roadCrew:roadCrew, edgeLen:edgeLen,
   // pathfinding, for the tools: findPath is the search, stepPath the follower

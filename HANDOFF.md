@@ -37,7 +37,10 @@ python3 -m http.server 8899   # then http://127.0.0.1:8899/nightward.html
 
 The map is a 120-unit grid — 80 cells of 1.5. You start with a commander and a
 small purse. You place the
-town hall, he walks to it and raises it, and it musters two workers. Six minutes
+town hall, he walks to it and raises it, and it musters two workers and a scout.
+The scout wins no fight and outruns everything: park it out on a lane and the
+horde shows up on your minimap before it shows up at your wall, because the
+minimap only marks attackers something of yours can see. Six minutes
 of daylight: workers strip salvage piles, cottages compound the workforce, and
 you spend the proceeds on walls, towers and troops. Two minutes of night: the
 nests empty and come for the hall.
@@ -139,7 +142,9 @@ screen and fails on a word that no text key owns. `tools/roads.mjs` proves
 snapping joins rather than duplicates, that a road only builds with a worker on
 it, and that the flow field cannot see one. `tools/pathing.mjs` sends a unit
 round a building, through a gate and out of a walled pocket, and checks an open-
-ground order is still a straight line. `tools/net.mjs` runs two browsers over a
+ground order is still a straight line. `tools/scout.mjs` covers the scout and the
+sight rule that hides the horde from the minimap. `tools/net.mjs` runs two
+browsers over a
 real peer connection, drives the invite screen by its buttons, and proves a
 guest's click reaches the world only by way of the host. `tools/README.md`
 covers writing new ones and the traps worth knowing.
@@ -162,7 +167,7 @@ run properly.
 ## Where it stands
 
 **Working and verified.** Full day/night cycle. Commander, workers, soldiers,
-archers, all animated. Walls, gates, towers, ballistae, braziers, barracks,
+archers, scouts, all animated. Walls, gates, towers, ballistae, braziers, barracks,
 archery ranges, cottages. Construction sites. Repair, shelter, stances. Salvage
 economy. The map editor and the live asset/balance library. Two-player rounds
 over WebRTC with the host and guest in exact agreement — measured drift of zero.

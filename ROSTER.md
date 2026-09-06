@@ -10,12 +10,13 @@ a second copy would stop following the values the in-game library edits.*
 
 ### Units
 
-| | health | speed | damage | dps | reach / range | leash | also |
-|---|---|---|---|---|---|---|---|
-| **Commander** | 260 | 2.55 | 32 / 0.8s | 40 | 1.5 | 5.5 | rallies within 5.6, cutting their swing to 70% |
-| **Soldier** | 105 | 2.1 | 19 / 0.85s | 22.4 | 1.35 | 4 | — |
-| **Archer** | 52 | 2.3 | 15 / 1.05s | 14.3 | 8.2 | 1.5 | — |
-| **Worker** | 45 | 2.45 | — | — | — | — | gathers 2.4/s · carries 3 · repairs 17 hp/s |
+| | health | speed | damage | dps | reach / range | sight | leash | also |
+|---|---|---|---|---|---|---|---|---|
+| **Commander** | 260 | 2.55 | 32 / 0.8s | 40 | 1.5 | 9 | 5.5 | rallies within 5.6, cutting their swing to 70% |
+| **Soldier** | 105 | 2.1 | 19 / 0.85s | 22.4 | 1.35 | 8 | 4 | — |
+| **Archer** | 52 | 2.3 | 15 / 1.05s | 14.3 | 8.2 | 10 | 1.5 | — |
+| **Scout** | 58 | 2.9 | 7 / 1.1s | 6.4 | 1.2 | 22 | 1 | — |
+| **Worker** | 45 | 2.45 | — | — | — | 6 | — | gathers 2.4/s · carries 3 · repairs 17 hp/s |
 
 **Commander.** The one unit you start with, and the only one who can raise a town hall. Taller than a soldier, hits harder, and wears the crown — until the hall is up, losing the commander loses the round.
 
@@ -23,17 +24,19 @@ a second copy would stop following the values the in-game library edits.*
 
 **Archer.** Out-ranges every attacker in the game and dies to any of them. Wants a wall in front and a soldier between it and whatever gets through.
 
+**Scout.** The only thing you own that can outrun a runner, and it wins no fight it starts. Its job is to be somewhere else: parked out on a lane, it puts the horde on your minimap minutes before the horde arrives. Sees 22 units — nearly three times a watchtower.
+
 **Worker.** Gathers, carries, and cannot fight. Runs for the hall when the horde comes and dies to anything that catches it — losing workers costs you the next day, not just this night.
 
 ### Structures
 
 #### Base
 
-| | supply | health | goes up in | path cost | footprint | what it does |
-|---|---|---|---|---|---|---|
-| **Town Hall** | free | 600 | 14s | 999 | 3×3 | houses 2, replaced every 18s |
-| **Road** | — | — | 2.6s per unit | — | off-grid | +55% speed within 1.1, runs of 2–26, ends snap within 2.4 |
-| **Cottage** | 26 | 90 | 4.5s | 30 | 1×1 | houses 2, replaced every 14s |
+| | supply | health | goes up in | path cost | sight | footprint | what it does |
+|---|---|---|---|---|---|---|---|
+| **Town Hall** | free | 600 | 14s | 999 | 12 | 3×3 | houses 2 and 1 scout, replaced every 18s |
+| **Road** | — | — | 2.6s per unit | — | — | off-grid | +55% speed within 1.1, runs of 2–26, ends snap within 2.4 |
+| **Cottage** | 26 | 90 | 4.5s | 30 | 7 | 1×1 | houses 2, replaced every 14s |
 
 **Town Hall.** The objective. 3×3 footprint (4.5 units), impassable. Timber-framed over a stone base course, with a banded door and shuttered windows — the vocabulary every other building borrows.
 
@@ -41,11 +44,11 @@ a second copy would stop following the values the in-game library edits.*
 
 #### Defences
 
-| | supply | health | goes up in | path cost | footprint | what it does |
-|---|---|---|---|---|---|---|
-| **Watchtower** | 30 | 170 | 4s | 60 | 1×1 | 13 every 0.42s to 6.6 (31 dps) |
-| **Ballista** | 48 | 200 | 7s | 60 | 1×1 | 105 every 1.75s to 9.6 (60 dps); splash 70% across 2.4 |
-| **Brazier** | 12 | 70 | 2.5s | 8 | 1×1 | guns within 4.8 reload 22% faster |
+| | supply | health | goes up in | path cost | sight | footprint | what it does |
+|---|---|---|---|---|---|---|---|
+| **Watchtower** | 30 | 170 | 4s | 60 | 8 | 1×1 | 13 every 0.42s to 6.6 (31 dps) |
+| **Ballista** | 48 | 200 | 7s | 60 | 11 | 1×1 | 105 every 1.75s to 9.6 (60 dps); splash 70% across 2.4 |
+| **Brazier** | 12 | 70 | 2.5s | 8 | 6 | 1×1 | guns within 4.8 reload 22% faster |
 
 **Watchtower.** 13 damage every 0.42 s at the nearest attacker within 6.6 units — deliberately short, so a tower covers an approach rather than the whole map. Drawn at 0.70 scale in play.
 
@@ -55,10 +58,10 @@ a second copy would stop following the values the in-game library edits.*
 
 #### Walls
 
-| | supply | health | goes up in | path cost | footprint | what it does |
-|---|---|---|---|---|---|---|
-| **Palisade** | 3 | 110 | 1s | 14 | 1×1 | — |
-| **Gate** | 7 | 90 | 1.5s | 2 | 1×1 | — |
+| | supply | health | goes up in | path cost | sight | footprint | what it does |
+|---|---|---|---|---|---|---|---|
+| **Palisade** | 3 | 110 | 1s | 14 | 4 | 1×1 | — |
+| **Gate** | 7 | 90 | 1.5s | 2 | 4 | 1×1 | — |
 
 **Palisade.** Half a cell, growing from the centre toward +X. A wall cell emits one run per connected neighbour, so corners, tees and crossings build themselves.
 
@@ -66,10 +69,10 @@ a second copy would stop following the values the in-game library edits.*
 
 #### Troops
 
-| | supply | health | goes up in | path cost | footprint | what it does |
-|---|---|---|---|---|---|---|
-| **Barracks** | 44 | 220 | 6s | 40 | 1×1 | houses 3, replaced every 11s |
-| **Archery Range** | 40 | 160 | 5.5s | 40 | 1×1 | houses 3, replaced every 13s |
+| | supply | health | goes up in | path cost | sight | footprint | what it does |
+|---|---|---|---|---|---|---|---|
+| **Barracks** | 44 | 220 | 6s | 40 | 8 | 1×1 | houses 3, replaced every 11s |
+| **Archery Range** | 40 | 160 | 5.5s | 40 | 8 | 1×1 | houses 3, replaced every 13s |
 
 **Barracks.** Houses three soldiers. They muster the moment you place it, so you can walk them into position during the build phase, and it retrains one loss at a time for as long as it stands.
 

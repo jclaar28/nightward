@@ -69,9 +69,9 @@ push('# Nightward — roster', '',
 push('---', '', '## Yours', '');
 
 push('### Units', '');
-push('| | health | speed | damage | dps | reach / range | leash | also |',
-     '|---|---|---|---|---|---|---|---|');
-const order = ['commander', 'soldier', 'archer', 'worker'];
+push('| | health | speed | damage | dps | reach / range | sight | leash | also |',
+     '|---|---|---|---|---|---|---|---|---|');
+const order = ['commander', 'soldier', 'archer', 'scout', 'worker'];
 const us = R.units.slice().sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id));
 for (const u of us) {
   const s = u.s, every = u.melee ? s.swing : s.fire, also = [];
@@ -81,7 +81,8 @@ for (const u of us) {
     also.push(`rallies within ${n(s.rally)}, cutting their swing to ${Math.round(s.rallyK * 100)}%`);
   push(`| **${u.name}** | ${n(s.hp, 0)} | ${n(s.speed)} | ` +
        (s.dmg ? `${s.dmg} / ${n(every)}s` : '—') + ` | ${dps(s.dmg, every)} | ` +
-       `${n(u.melee ? s.reach : s.range)} | ${n(s.leash)} | ${also.join('; ') || '—'} |`);
+       `${n(u.melee ? s.reach : s.range)} | ${n(s.sight)} | ${n(s.leash)} | ` +
+       `${also.join('; ') || '—'} |`);
 }
 push('');
 // The notes carry the prose and usually quote their own numbers, so nothing
@@ -94,8 +95,8 @@ for (const c of R.cats) {
   const inCat = R.types.filter(t => t.cat === c.id);
   if (!inCat.length) continue;
   push(`#### ${c.name}`, '');
-  push('| | supply | health | goes up in | path cost | footprint | what it does |',
-       '|---|---|---|---|---|---|---|');
+  push('| | supply | health | goes up in | path cost | sight | footprint | what it does |',
+       '|---|---|---|---|---|---|---|---|');
   for (const t of inCat) {
     const s = t.s, bits = [];
     if (s.dmg !== undefined)
@@ -105,14 +106,15 @@ for (const c of R.cats) {
     if (s.aura !== undefined)
       bits.push(`guns within ${n(s.aura)} reload ${Math.round((1 - s.auraK) * 100)}% faster`);
     if (s.cap !== undefined)
-      bits.push(`houses ${s.cap}, replaced every ${n(s.retrain)}s`);
+      bits.push(`houses ${s.cap}${(s.scouts | 0) ? ' and ' + s.scouts + ' scout' + (s.scouts > 1 ? 's' : '') : ''}` +
+                `, replaced every ${n(s.retrain)}s`);
     if (t.road)
       bits.push(`+${Math.round(s.speed * 100)}% speed within ${n(s.width)}, ` +
                 `runs of ${s.minLen}–${s.maxLen}, ends snap within ${n(s.snap)}`);
     push(`| **${t.name}** | ${t.road ? '—' : (s.cost === undefined ? 'free' : s.cost)} | ` +
          `${s.hp === undefined ? '—' : n(s.hp, 0)} | ` +
          `${t.road ? n(s.build) + 's per unit' : n(s.raise) + 's'} | ` +
-         `${s.pathCost === undefined ? '—' : s.pathCost} | ` +
+         `${s.pathCost === undefined ? '—' : s.pathCost} | ${n(s.sight)} | ` +
          `${t.road ? 'off-grid' : t.foot + '×' + t.foot} | ${bits.join('; ') || '—'} |`);
   }
   push('');

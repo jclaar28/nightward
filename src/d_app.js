@@ -297,6 +297,7 @@ function abilityOf(t,s){
                {rally:num(s.rally,10), pct:Math.round((1-s.rallyK)*100)});
   if(t==="archer") return M.t("unit.archer.ability",{range:num(s.range,10)});
   if(t==="soldier") return M.t("unit.soldier.ability");
+  if(t==="scout")   return M.t("unit.scout.ability",{sight:num(s.sight,10)});
   if(t==="worker")  return M.t("unit.worker.ability",{repair:s.repair});
   return "";
 }
@@ -669,15 +670,35 @@ function minimap(dt){
     var sz=(c.type==="hall")?4:2;
     MM.fillRect(b[0]-sz/2,b[1]-sz/2,sz,sz);
   }
+  // What you have eyes on. Drawn before the marks rather than as an overlay
+  // over them, so it reads as ground you are watching rather than a filter laid
+  // on top. Without this the horde simply vanishes at the edge of your sight
+  // and that reads as a bug, not as a rule — the lit patch is the explanation.
+  var mask=HFGAME.visionMask(S.me), gn=HF.GN, cell=HF.CELL*k;
+  MM.fillStyle="rgba(150,190,180,.085)";
+  for(var mz=0;mz<gn;mz++){
+    for(var mx=0;mx<gn;mx++){
+      if(!mask[mz*gn+mx]) continue;
+      var mp=px(HF.gx2w(mx),HF.gx2w(mz));
+      MM.fillRect(mp[0]-cell/2,mp[1]-cell/2,cell+0.6,cell+0.6);
+    }
+  }
   // units and attackers
   MM.fillStyle="rgba(110,200,210,.95)";
   for(i=0;i<S.units.length;i++){
+    if(S.units[i].inside) continue;
     var u=px(S.units[i].x,S.units[i].z);
     MM.fillRect(u[0]-1,u[1]-1,2,2);
   }
+  // The horde only appears where somebody of yours is looking. This is the
+  // whole reason the scout exists: parked out on a lane it is the difference
+  // between knowing which way the night is coming and finding out when it
+  // arrives.
   MM.fillStyle="rgba(232,96,72,.95)";
   for(i=0;i<S.enemies.length;i++){
-    var e=px(S.enemies[i].x,S.enemies[i].z);
+    var en=S.enemies[i];
+    if(!HFGAME.seenAt(mask,en.x,en.z)) continue;
+    var e=px(en.x,en.z);
     MM.fillRect(e[0]-1,e[1]-1,2,2);
   }
   // nests last so they sit on top of their own pool

@@ -121,6 +121,25 @@ soldiers had not, so an ordered squad still could not leave a walled yard. The
 check had been passing the wrong thing and failing for the wrong reason at the
 same time.
 
+**`scout.mjs`** — the scout, and the vision rule that gives it a job. The scout
+is the first unit whose whole value is information, and information is the
+easiest kind of feature to ship broken: it looks finished because the unit walks
+around, and nobody notices the minimap is still telling you everything it always
+did. So most of these checks are about what you *cannot* see — an attacker
+nobody is looking at is off the map, a scout sent out puts it back on, and a
+worker standing in the same spot cannot.
+
+It also covers the first building that musters two kinds of unit. That path was
+`spawns` + `cap` with the retrain loop counting the whole garrison, which is
+wrong twice over once a hall owes both workers and a scout: three workers would
+read as full, and a dead scout would come back as a worker. Both are checked.
+
+Its cost check was weak first and is worth copying the fix from. It timed the
+mask against the fifteen attackers a first wave happens to have while the
+comment claimed a late night — timing the cheap case and quoting it as the
+expensive one is how a performance check passes for years and then does not. It
+now builds a 900-attacker field and a real settlement's worth of watchers.
+
 **`net.mjs`** — the two-player path, which had no cover at all and is the
 riskiest thing to leave that way: a regression here is silent. Nothing throws,
 no frame looks wrong, and it is only discoverable by two people at two machines

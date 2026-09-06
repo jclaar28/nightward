@@ -71,6 +71,22 @@ one root plus references.** A cell with `.ref` points at the root; `rootOf(c)`
 resolves it. Iterating `S.cells` without skipping `.ref` counts a town hall
 nine times.
 
+**One building can muster more than one kind of unit.** `spawns` plus `cap` was
+a single kind for a long time and the retrain loop counted the whole garrison
+against one number. The hall musters workers *and* a scout, so that shape is
+gone: `rosterOf(type)` returns a list of `{t, n}`, `shortOf(b)` says which kind
+the building owes, and the retrain loop asks. Counting the garrison as a total
+again would make a hall with three workers read as full, and a dead scout come
+back as a worker.
+
+**Sight hides the horde and nothing else.** Everything you own has a `sight` in
+the balance table, `visionMask(pid)` stamps those into a byte grid, and the
+minimap only marks attackers that grid can see. Nests, salvage, terrain and
+buildings stay visible on purpose — the map is known ground, and it is where the
+horde is *right now* that has to be earned. If this ever starts hiding anything
+else it has become fog of war by accident, which is a design decision nobody has
+made yet. `tools/scout.mjs` checks both halves.
+
 **A construction site is not a building.** `b.site` means materials on the
 ground. Sites do not shoot, train, house, light, or accept repair, and each of
 those is a separate guard in a separate loop. If you add a behaviour driven by a
@@ -202,7 +218,8 @@ bug found here was found by reading numbers out of the running game.
 anything that puts words on screen, `node tools/roads.mjs` and
 `node tools/pathing.mjs` for anything touching roads, movement or worker jobs,
 `node tools/economy.mjs` for
-anything touching salvage, workers or the map, `node tools/net.mjs` for anything
+anything touching salvage, workers or the map, `node tools/scout.mjs` for
+anything touching sight, the minimap or who a building musters, `node tools/net.mjs` for anything
 touching intents, the snapshot or the two-player screen,
 and `node tools/balance.mjs --ab id.key=value` for anything touching difficulty.
 `tools/README.md` explains them; read it before writing a new one.

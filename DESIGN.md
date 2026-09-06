@@ -92,9 +92,11 @@ dependencies between them are real:
 
 1. **Territory and outposts.** Independent of exploration. Gives ground taken
    a way to stay taken, which is what makes step 2 worth doing.
-2. **Fog of war and the scout.** The largest engineering item here. Do it
-   after territory exists, so the information it reveals is information about
-   something.
+2. **Full fog of war.** The scout has shipped and so has the narrow version of
+   sight — see §4 — so what is left here is the expensive part: hiding the 3D
+   view rather than the minimap, and storing explored-but-not-currently-visible.
+   Still do it after territory exists, so the information it reveals is
+   information about something.
 3. **Tech tree.** Last, because it drags in status effects, and because it is
    the one system that is more fun to design once there is a longer game to
    spend across.
@@ -135,20 +137,25 @@ got for free.
 
 ## 4. Exploration
 
-**Fog of war does not exist and is not free.** It needs its own pass: per-tile
-visibility, a persistent explored-but-not-currently-visible state, and a
-vision radius per unit. Flagged here so it is never costed as part of the
-scout.
+**The scout has shipped, and with it the narrow half of sight.** Everything you
+own has a vision radius and the minimap marks only the attackers something of
+yours can see. `HANDOFF.md` and `ROSTER.md` describe the unit; what belongs here
+is what is still missing.
 
-**The scout** is fast, lightly armed, and can fire while moving, but loses
-badly in a sustained fight. Its weapons are for getting away and for
-harassing something isolated — not for holding a line, which is what the
-soldier is for. It carries the largest vision radius in the game.
+**Full fog of war is not free and is not what shipped.** What exists hides the
+horde on the minimap and nothing else — the map itself stays known, terrain and
+nests included, and the 3D view hides nothing at all. Real fog needs per-tile
+visibility, a persistent explored-but-not-currently-visible state, and a pass
+over the renderer rather than the minimap. It would replace the narrow version
+rather than extend it. Flagged here so it is never costed as already half done.
 
-Its job is intel, and under the spine in §1 that is a first-class job: which
-nest to hit next, what garrison is sitting on it, which way a night's wave
-came from. A player who scouts well should be able to pick the cheapest nest
-on the map, and a player who does not should be guessing.
+**The open question is whether the narrow version is enough**, because it
+already buys the thing §1 wants: which way a night's wave came from is now
+something you can know by having somebody out there, at a fraction of the cost.
+What it does not yet answer is which nest to hit next — a nest's garrison is
+visible to nobody, so choosing a target is still a guess. That gap is the
+cheapest remaining piece of intel and probably the next one to close, with or
+without full fog.
 
 ---
 
@@ -235,7 +242,13 @@ after that has proven out.
   it yet.
 - **Fog of war's visibility model** — per-tile vs. per-unit-radius, how
   explored-but-not-visible is stored, and what it costs at the population
-  sizes §1 implies.
+  sizes §1 implies. Half of this now exists and should be read before the rest
+  is designed: everything you own has a `sight`, and the minimap marks only the
+  attackers somebody is looking at. It is deliberately the narrow version — the
+  map itself stays known, terrain and nests included, and nothing is hidden in
+  the 3D view. Full fog is a different feature and would replace this rather
+  than extend it; the open question is whether the narrow version is enough,
+  because it already gives scouting a job at a fraction of the cost.
 - **How status effects tick** against a swing-based combat model without
   becoming invisible.
 - **Outpost balance.** New building, no numbers drafted.

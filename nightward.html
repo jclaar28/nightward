@@ -2277,6 +2277,43 @@ var ASSETS=[
        emit:true, ecol:GLOW_SIG}
   ]},
 
+{ id:"scout", name:"Scout", group:"Units",
+  colA:[0.318,0.372,0.352], colB:[0.585,0.512,0.352], scale:1.0,
+  note:"The only thing you own that can outrun a runner, and it wins no fight it starts. Its job is to be somewhere else: parked out on a lane, it puts the horde on your minimap minutes before the horde arrives. Sees 22 units — nearly three times a watchtower.",
+  slots:["A — travelling cloak","B — leather, glass, brass"],
+  parts:[
+    // Deliberately the slightest silhouette on the field: no shoulders, no
+    // weapon above the waist, and a head that reads as looking rather than
+    // fighting. At this camera the only things that separate one unit from
+    // another are height, width and what breaks the outline, so the scout is
+    // narrow, short-cloaked and carries everything low.
+    {id:"legs",  name:"Legs",      prim:"box", p:[0.088,0,0],       s:[0.100,0.46,0.110], shade:0.70,
+       rep:{mode:"mirrorX"}},
+    {id:"torso", name:"Torso",     prim:"box", p:[0,0.42,0],        s:[0.255,0.38,0.205], shade:1.00},
+    {id:"cape",  name:"Short cape",prim:"box", p:[0,0.60,-0.09],    s:[0.290,0.30,0.075],
+       tint:1, shade:0.86},
+    {id:"belt",  name:"Belt",      prim:"box", p:[0,0.40,0],        s:[0.272,0.07,0.222], tint:1, shade:0.80},
+    {id:"head",  name:"Head",      prim:"box", p:[0,0.80,0.02],     s:[0.190,0.185,0.185], shade:1.04},
+    {id:"hat",   name:"Brim",      prim:"cyl", p:[0,0.985,0.02],    s:[0.215,0.045], seg:10,
+       tint:1, shade:0.84, anchorY:{to:"head", mode:"top", off:-0.015}},
+    {id:"crownH",name:"Hat crown", prim:"cone",p:[0,1.03,0.02],     s:[0.130,0.16], seg:6,
+       tint:1, shade:0.92, anchorY:{to:"hat", mode:"top", off:0}},
+    {id:"arms",  name:"Arms",      prim:"box", p:[0.180,0.50,0.05], s:[0.080,0.36,0.090], shade:0.86,
+       rep:{mode:"mirrorX"}},
+    // Held up at the eye, which is the whole read of the unit from above: the
+    // one part of it that is not at rest.
+    {id:"glass", name:"Spyglass",  prim:"cyl", p:[0.180,0.78,0.16], s:[0.042,0.26], seg:6,
+       tint:1, shade:1.12, rot:[1.42,0,0]},
+    {id:"lens",  name:"Lens",      prim:"cyl", p:[0.180,0.78,0.40], s:[0.050,0.030], seg:6,
+       emit:true, ecol:[0.95,1.32,1.30], rot:[1.42,0,0]},
+    {id:"horn",  name:"Signal horn",prim:"cone",p:[-0.190,0.40,-0.05],s:[0.088,0.26], seg:6,
+       tint:1, shade:1.06, rot:[0.20,0,0.55]},
+    {id:"satch", name:"Satchel",   prim:"box", p:[-0.185,0.32,-0.10],s:[0.130,0.150,0.090],
+       tint:1, shade:0.90},
+    {id:"sig",   name:"Signal lamp",prim:"box",p:[0,0.60,0.122],    s:[0.078,0.072,0.046],
+       emit:true, ecol:GLOW_SIG}
+  ]},
+
 { id:"corpse", name:"Corpse", group:"Units",
   colA:[0.150,0.156,0.135], colB:[0.196,0.196,0.168], scale:1.0,
   note:"What is left where an attacker went down. Fades over about eight seconds; the field stays readable but you can still see where the pressure landed.",
@@ -2418,9 +2455,13 @@ var STAT_DEFS={
     {k:"raise",    label:"Raising time",   def:14,  lo:1,   hi:120,  step:0.5, unit:"s",
      hint:"how long the commander works before it stands"},
     {k:"cap",      label:"Workers housed", def:2,   lo:0,   hi:12,   step:1,  int:true},
+    {k:"scouts",   label:"Scouts",         def:1,   lo:0,   hi:6,    step:1,  int:true,
+     hint:"mustered with the workers, and replaced on the same clock"},
     {k:"retrain",  label:"Rebuild time",   def:18,  lo:1,   hi:90,   step:0.5, unit:"s"},
     {k:"pathCost", label:"Path cost",      def:999, lo:0,   hi:999,  step:1,  int:true,
-     hint:"how hard attackers try to route around it"}
+     hint:"how hard attackers try to route around it"},
+    {k:"sight",   label:"Sight",         def:12,  lo:0,  hi:40,  step:0.5, unit:"u",
+     hint:"how far it puts attackers on your minimap"}
   ]},
   tower:{ note:"Volume damage. Short range on purpose.", fields:[
     {k:"cost",     label:"Cost",           def:30,  lo:1,   hi:200,  step:1,  int:true, unit:"supply"},
@@ -2432,7 +2473,9 @@ var STAT_DEFS={
     {k:"boltSpeed",label:"Bolt speed",     def:30,  lo:4,   hi:120,  step:1,  int:true, unit:"u/s"},
     {k:"raise",    label:"Build time",     def:4, lo:0,   hi:120,  step:0.5, unit:"s",
      hint:"materials sit on the ground until this runs out"},
-    {k:"pathCost", label:"Path cost",      def:60,  lo:0,   hi:999,  step:1,  int:true}
+    {k:"pathCost", label:"Path cost",      def:60,  lo:0,   hi:999,  step:1,  int:true},
+    {k:"sight",   label:"Sight",         def:8,  lo:0,  hi:40,  step:0.5, unit:"u",
+     hint:"how far it puts attackers on your minimap"}
   ]},
   ballista:{ note:"Reach and splash. Targets the heaviest thing in range.", fields:[
     {k:"cost",     label:"Cost",           def:48,  lo:1,   hi:300,  step:1,  int:true, unit:"supply"},
@@ -2446,7 +2489,9 @@ var STAT_DEFS={
     {k:"boltSpeed",label:"Bolt speed",     def:22,  lo:4,   hi:80,   step:1,  int:true, unit:"u/s"},
     {k:"raise",    label:"Build time",     def:7, lo:0,   hi:120,  step:0.5, unit:"s",
      hint:"materials sit on the ground until this runs out"},
-    {k:"pathCost", label:"Path cost",      def:60,  lo:0,   hi:999,  step:1,  int:true}
+    {k:"pathCost", label:"Path cost",      def:60,  lo:0,   hi:999,  step:1,  int:true},
+    {k:"sight",   label:"Sight",         def:11,  lo:0,  hi:40,  step:0.5, unit:"u",
+     hint:"how far it puts attackers on your minimap"}
   ]},
   brazier:{ note:"No attack. Buys reload speed and light.", fields:[
     {k:"cost",     label:"Cost",           def:12,  lo:1,   hi:120,  step:1,  int:true, unit:"supply"},
@@ -2456,14 +2501,18 @@ var STAT_DEFS={
      hint:"multiplies turret reload; stacks twice"},
     {k:"raise",    label:"Build time",     def:2.5, lo:0,   hi:120,  step:0.5, unit:"s",
      hint:"materials sit on the ground until this runs out"},
-    {k:"pathCost", label:"Path cost",      def:8,   lo:0,   hi:999,  step:1,  int:true}
+    {k:"pathCost", label:"Path cost",      def:8,   lo:0,   hi:999,  step:1,  int:true},
+    {k:"sight",   label:"Sight",         def:6,  lo:0,  hi:40,  step:0.5, unit:"u",
+     hint:"how far it puts attackers on your minimap"}
   ]},
   wall:{ note:"Cheap time. High path cost pushes the swarm elsewhere.", fields:[
     {k:"cost",     label:"Cost",           def:3,   lo:1,   hi:60,   step:1,  int:true, unit:"supply"},
     {k:"hp",       label:"Hit points",     def:110, lo:10,  hi:900,  step:5,  int:true},
     {k:"raise",    label:"Build time",     def:1, lo:0,   hi:120,  step:0.5, unit:"s",
      hint:"materials sit on the ground until this runs out"},
-    {k:"pathCost", label:"Path cost",      def:14,  lo:0,   hi:999,  step:1,  int:true}
+    {k:"pathCost", label:"Path cost",      def:14,  lo:0,   hi:999,  step:1,  int:true},
+    {k:"sight",   label:"Sight",         def:4,  lo:0,  hi:40,  step:0.5, unit:"u",
+     hint:"how far it puts attackers on your minimap"}
   ]},
   gate:{ note:"Deliberately inviting — low path cost pulls the swarm in.", fields:[
     {k:"cost",     label:"Cost",           def:7,   lo:1,   hi:80,   step:1,  int:true, unit:"supply"},
@@ -2471,7 +2520,9 @@ var STAT_DEFS={
     {k:"raise",    label:"Build time",     def:1.5, lo:0,   hi:120,  step:0.5, unit:"s",
      hint:"materials sit on the ground until this runs out"},
     {k:"pathCost", label:"Path cost",      def:2,   lo:0,   hi:999,  step:1,  int:true,
-     hint:"below open ground, so they choose to walk through"}
+     hint:"below open ground, so they choose to walk through"},
+    {k:"sight",   label:"Sight",         def:4,  lo:0,  hi:40,  step:0.5, unit:"u",
+     hint:"how far it puts attackers on your minimap"}
   ]},
 
   barracks:{ note:"Musters soldiers on placement, retrains losses while it stands.", fields:[
@@ -2483,7 +2534,9 @@ var STAT_DEFS={
      hint:"per replacement, only while it stands"},
     {k:"raise",    label:"Build time",     def:6, lo:0,   hi:120,  step:0.5, unit:"s",
      hint:"materials sit on the ground until this runs out"},
-    {k:"pathCost",label:"Path cost",     def:40,  lo:0,  hi:999, step:1, int:true}
+    {k:"pathCost",label:"Path cost",     def:40,  lo:0,  hi:999, step:1, int:true},
+    {k:"sight",   label:"Sight",         def:8,  lo:0,  hi:40,  step:0.5, unit:"u",
+     hint:"how far it puts attackers on your minimap"}
   ]},
   archery:{ note:"Musters archers on placement, retrains losses while it stands.", fields:[
     {k:"cost",    label:"Cost",          def:40,  lo:1,  hi:300, step:1, int:true, unit:"supply"},
@@ -2493,7 +2546,9 @@ var STAT_DEFS={
     {k:"retrain", label:"Retrain time",  def:13,  lo:1,  hi:90,  step:0.5, unit:"s"},
     {k:"raise",    label:"Build time",     def:5.5, lo:0,   hi:120,  step:0.5, unit:"s",
      hint:"materials sit on the ground until this runs out"},
-    {k:"pathCost",label:"Path cost",     def:40,  lo:0,  hi:999, step:1, int:true}
+    {k:"pathCost",label:"Path cost",     def:40,  lo:0,  hi:999, step:1, int:true},
+    {k:"sight",   label:"Sight",         def:8,  lo:0,  hi:40,  step:0.5, unit:"u",
+     hint:"how far it puts attackers on your minimap"}
   ]},
 
   cottage:{ note:"Houses workers. The only building that makes supply instead of spending it.", fields:[
@@ -2503,7 +2558,9 @@ var STAT_DEFS={
     {k:"retrain", label:"Rebuild time",  def:14,  lo:1,  hi:90,  step:0.5, unit:"s"},
     {k:"raise",    label:"Build time",     def:4.5, lo:0,   hi:120,  step:0.5, unit:"s",
      hint:"materials sit on the ground until this runs out"},
-    {k:"pathCost",label:"Path cost",     def:30,  lo:0,  hi:999, step:1, int:true}
+    {k:"pathCost",label:"Path cost",     def:30,  lo:0,  hi:999, step:1, int:true},
+    {k:"sight",   label:"Sight",         def:7,  lo:0,  hi:40,  step:0.5, unit:"u",
+     hint:"how far it puts attackers on your minimap"}
   ]},
   worker:{ note:"Gathers by day, mends by night. Cannot fight.", fields:[
     {k:"hp",      label:"Hit points",    def:45,  lo:10, hi:900, step:5, int:true},
@@ -2515,7 +2572,9 @@ var STAT_DEFS={
     {k:"repair",  label:"Repair rate",   def:17,  lo:1,  hi:200, step:1, int:true, unit:"hp/s",
      hint:"health put back into a damaged building"},
     {k:"nerve",   label:"Nerve",         def:2.1, lo:0, hi:20,   step:0.1, unit:"u",
-     hint:"how close an attacker gets before a worker drops the job and runs"}
+     hint:"how close an attacker gets before a worker drops the job and runs"},
+    {k:"sight",   label:"Sight",         def:6,  lo:0,  hi:40,  step:0.5, unit:"u",
+     hint:"how far it puts attackers on your minimap"}
   ]},
   // The nests are the objective and the bank. A round runs until every hall is
   // gone or every nest is, so these numbers decide how long that takes.
@@ -2593,7 +2652,9 @@ var STAT_DEFS={
     {k:"swing",   label:"Swing time",    def:0.85,lo:0.1,hi:5,   step:0.05, unit:"s"},
     {k:"reach",   label:"Reach",         def:1.35,lo:0.3,hi:5,   step:0.05, unit:"u"},
     {k:"leash",   label:"Leash",         def:4.0, lo:0.5,hi:20,  step:0.5, unit:"u",
-     hint:"how far it will chase from its post"}
+     hint:"how far it will chase from its post"},
+    {k:"sight",   label:"Sight",         def:8,  lo:0,  hi:40,  step:0.5, unit:"u",
+     hint:"how far it puts attackers on your minimap"}
   ]},
   commander:{ note:"Starts the round. Raises the hall, then fights as your heaviest soldier.", fields:[
     {k:"hp",      label:"Hit points",    def:260, lo:20, hi:2000,step:10,int:true},
@@ -2609,7 +2670,9 @@ var STAT_DEFS={
     {k:"rally",   label:"Rally range",   def:5.6, lo:0,  hi:20,  step:0.2, unit:"u",
      hint:"your people fight faster inside this"},
     {k:"rallyK",  label:"Rally speed",   def:0.70,lo:0.2,hi:1,   step:0.02,
-     hint:"multiplies their attack interval — lower is faster"}
+     hint:"multiplies their attack interval — lower is faster"},
+    {k:"sight",   label:"Sight",         def:9,  lo:0,  hi:40,  step:0.5, unit:"u",
+     hint:"how far it puts attackers on your minimap"}
   ]},
   archer:{ note:"Out-ranges everything. Folds if anything reaches it.", fields:[
     {k:"hp",      label:"Hit points",    def:52,  lo:10, hi:900, step:2, int:true},
@@ -2619,7 +2682,27 @@ var STAT_DEFS={
     {k:"fire",    label:"Draw time",     def:1.05,lo:0.1,hi:6,   step:0.05, unit:"s"},
     {k:"range",   label:"Range",         def:8.2, lo:1,  hi:24,  step:0.1, unit:"u"},
     {k:"leash",   label:"Leash",         def:1.5, lo:0.5,hi:20,  step:0.5, unit:"u",
-     hint:"archers hold position rather than close"}
+     hint:"archers hold position rather than close"},
+    {k:"sight",   label:"Sight",         def:10,  lo:0,  hi:40,  step:0.5, unit:"u",
+     hint:"how far it puts attackers on your minimap"}
+  ]},
+
+  // Speed is the whole unit. 2.90 is a deliberate hair over the runner's 2.85,
+  // which makes the scout the only thing you own that cannot be run down —
+  // and the reason it is worth sending somewhere you would not send anything
+  // else. If you retune the runner, retune this with it or the unit loses its
+  // point without anything looking broken.
+  scout:{ note:"Sees far, outruns everything, wins nothing. Its job is to be somewhere else.", fields:[
+    {k:"hp",      label:"Hit points",    def:58,  lo:10, hi:900, step:2, int:true},
+    {k:"speed",   label:"Speed",         def:2.90,lo:0.2,hi:10,  step:0.05, unit:"u/s"},
+    {k:"dmg",     label:"Damage",        def:7,   lo:0,  hi:300, step:1, int:true,
+     hint:"per swing — enough to finish something already dying, not to hold a lane"},
+    {k:"swing",   label:"Swing time",    def:1.10,lo:0.1,hi:5,   step:0.05, unit:"s"},
+    {k:"reach",   label:"Reach",         def:1.20,lo:0.3,hi:5,   step:0.05, unit:"u"},
+    {k:"leash",   label:"Leash",         def:1.0, lo:0.5,hi:20,  step:0.5, unit:"u",
+     hint:"barely leaves its post — a scout that chases is a scout that dies"},
+    {k:"sight",   label:"Sight",         def:22,  lo:0,  hi:40,  step:0.5, unit:"u",
+     hint:"how far it puts attackers on your minimap"}
   ]},
 
   swarm:{ note:"The mass. Every other attacker is measured against it.", fields:[
@@ -2828,7 +2911,7 @@ var TEXT_DEFS={
   "bld.cat.muster":{g:"bld",def:"Troops"},
   "bld.cat.muster.note":{g:"bld",def:"People, not buildings. Right-click to send them somewhere."},
   "bld.hall.name":{g:"bld",def:"Town Hall"},
-  "bld.hall.blurb":{g:"bld",def:"{cap} live here · raise {raise}s"},
+  "bld.hall.blurb":{g:"bld",def:"{cap} live here, and a scout · raise {raise}s"},
   "bld.cottage.name":{g:"bld",def:"Cottage"},
   "bld.cottage.blurb":{g:"bld",def:"{cap} more hands · {retrain}s each"},
   "bld.tower.name":{g:"bld",def:"Watchtower"},
@@ -2863,6 +2946,8 @@ var TEXT_DEFS={
   "unit.archer.ability":{g:"unit",def:"Kills from <em>{range}u</em> and will not close the distance. Keep something between it and them."},
   "unit.worker.name":{g:"unit",def:"Worker"},
   "unit.worker.ability":{g:"unit",def:"Hauls salvage by day, mends walls by night at <em>{repair} hp/s</em>. Runs from anything that fights back."},
+  "unit.scout.name":{g:"unit",def:"Scout"},
+  "unit.scout.ability":{g:"unit",def:"Puts the horde on your minimap from <em>{sight}u</em> away, and outruns anything that comes for it. Send it out; do not ask it to fight."},
 
   // ---- pause & controls
   "pause.tag":{g:"pause",def:"Paused"},
@@ -2974,7 +3059,7 @@ var TEXT_ASSET_NAME={
   wall:"bld.wall.name", gate:"bld.gate.name",
   barracks:"bld.barracks.name", archery:"bld.archery.name",
   commander:"unit.commander.name", soldier:"unit.soldier.name",
-  archer:"unit.archer.name", worker:"unit.worker.name"
+  archer:"unit.archer.name", worker:"unit.worker.name", scout:"unit.scout.name"
 };
 
 var TEXT_OVER={};
@@ -4436,8 +4521,12 @@ var B=null, BATCHES=null, buf={};
 // edited in the Library reaches the hotbar without a reload.
 var CATS=[{id:"core"},{id:"guns"},{id:"walls"},{id:"muster"}];
 var TYPES={
+  // `also` is a second kind in the same garrison. The hall is the only building
+  // that musters two, and it gets a second field rather than a second building
+  // because a scout is not something you choose to build — it comes with having
+  // a town at all.
   hall : {cat:"core", foot:3, scale:1.00, cost:0,
-          colA:M.PAL.plaster, colB:M.PAL.slate, spawns:"worker",
+          colA:M.PAL.plaster, colB:M.PAL.slate, spawns:"worker", also:"scout",
           blurb:function(t){ return M.t("bld.hall.blurb",{cap:t.cap, raise:t.raise}); }},
   // A road is in here so the dock, the tabs and the number keys treat it like
   // anything else you hold. `road:true` is the flag every piece of cell code
@@ -4486,6 +4575,12 @@ var UNITS={
   worker :{asset:"worker",  civil:true,
            scBase:1.18, scVar:0.08, colA:[0.430,0.398,0.300], colB:[0.545,0.520,0.470],
            gib:[0.70,0.66,0.56]},
+  // Military rather than civil: it holds a post, takes a stance, counts with
+  // your army and stays out at night. Which is the point — a scout that ran
+  // indoors at dusk would be asleep for the only hours it is useful.
+  scout  :{asset:"scout",   melee:true,
+           scBase:1.16, scVar:0.06, colA:[0.318,0.372,0.352], colB:[0.585,0.512,0.352],
+           gib:[0.64,0.68,0.62]},
   // One per player, on the field before anything is built. It is the only unit
   // that can raise a hall, which is why the round starts with a walk rather
   // than a click: where you put the hall costs you the time to get there.
@@ -4546,6 +4641,13 @@ var RIGDEF={
           arm:["arms","haft","head2"], armL:["arms"], leg:["legs"],
           gait:{swing:0.55, armK:0.40, cad:2.45, bob:0.055, lean:0.04, sway:0.07,
                 reach:0.55, wind:0.38} },
+  // The spyglass rides on the arm bone so it swings with the hand rather than
+  // floating beside the head. Long, light stride: the fastest cadence and the
+  // most lean of anything you own, which is most of how the speed reads.
+  scout:{ body:["torso","cape","belt","head","hat","crownH","horn","satch","sig"],
+          arm:["arms","glass","lens"], armL:["arms"], leg:["legs"],
+          gait:{swing:0.66, armK:0.30, cad:2.70, bob:0.062, lean:0.09, sway:0.08,
+                reach:0.30, wind:0.30} },
   commander:{ body:["tabard","cuirass","sash","pauldron","mantle","cloakC","cloakM",
                     "cloakO","clasp","neck","head","crown","points","jewel","scab","sig"],
           arm:["arms","grip","guard","sword"], armL:["arms"], leg:["legs","boots"],
@@ -4654,6 +4756,7 @@ function init(renderer, cv, settings, endCb){
     barracks:R.makeBatch(M.buildAsset("barracks")), archery:R.makeBatch(M.buildAsset("archery")),
     soldier:R.makeBatch(M.buildAsset("soldier")), archer:R.makeBatch(M.buildAsset("archer")),
     worker:R.makeBatch(M.buildAsset("worker")), cottage:R.makeBatch(M.buildAsset("cottage")),
+    scout:R.makeBatch(M.buildAsset("scout")),
     commander:R.makeBatch(M.buildAsset("commander")),
     salvage:R.makeBatch(M.buildAsset("salvage")),
     nest:R.makeBatch(M.buildAsset("nest")),
@@ -4673,7 +4776,7 @@ function init(renderer, cv, settings, endCb){
   BATCHES=[B.road,B.corpse,B.salvage,B.site,B.hall,B.tower,B.ballista,B.brazier,
            B.barracks,B.archery,B.cottage,
            B.wall,B.wpost,B.gate,
-           B.nest,B.soldier,B.archer,B.worker,B.commander,
+           B.nest,B.soldier,B.archer,B.worker,B.scout,B.commander,
            B.bolt,B.arrow,B.spark,B.debris,B.ring,B.marker,B.tile,B.grid];
   buildRigs(true);
   // bones draw with the living attackers, between the buildings and the effects
@@ -4690,11 +4793,11 @@ function init(renderer, cv, settings, endCb){
   var CAP={swarm:2600,runner:1900,brute:900,corpse:MAX_CORPSES,spark:MAX_PARTS,
            debris:MAX_PARTS,
            bolt:400,arrow:300,wall:1400,soldier:120,archer:120,worker:120,
-           commander:8,
+           scout:40, commander:8,
            marker:24,salvage:24,cottage:120,nest:24,site:600,road:5200};
   ["hall","tower","ballista","brazier","barracks","archery","cottage",
    "wall","wpost","gate",
-   "soldier","archer","worker","commander","salvage","nest",
+   "soldier","archer","worker","scout","commander","salvage","nest",
    "corpse","bolt","arrow","spark","debris","ring","marker","tile","grid","site",
    "road"].forEach(function(k){
     buf[k]=new Float32Array(12*(CAP[k]||700));
@@ -5029,8 +5132,33 @@ function doorOf(b,spread){
   var r=standOff(b)+0.25+Math.random()*0.35;
   return [bx+Math.cos(a)*r, bz+Math.sin(a)*r, a];
 }
-function muster(b){
-  var kind=TYPES[b.type].spawns, U=UNITS[kind];
+// What a building keeps in its garrison: a list of kinds and how many of each.
+// Every building but the hall musters one kind, which is all `spawns` and `cap`
+// have ever meant; the hall musters two. Making the roster the general form and
+// the single-kind case a roster of one is what keeps the retrain loop from
+// growing a special case — it asks what the building is short of and does not
+// care how many kinds the answer could have come from.
+function rosterOf(t){
+  var T=TYPES[t]; if(!T||!T.spawns) return null;
+  var s=M.statsOf(t)||{};
+  var out=[{t:T.spawns, n:s.cap|0}];
+  if(T.also&&(s.scouts|0)>0) out.push({t:T.also, n:s.scouts|0});
+  return out;
+}
+function countIn(b,kind){
+  var n=0;
+  for(var i=0;i<b.garrison.length;i++) if(b.garrison[i].t===kind) n++;
+  return n;
+}
+// The kind this building owes, or null when its roster is full.
+function shortOf(b){
+  var r=rosterOf(b.type); if(!r) return null;
+  for(var i=0;i<r.length;i++) if(countIn(b,r[i].t)<r[i].n) return r[i].t;
+  return null;
+}
+function muster(b,kind){
+  kind=kind||TYPES[b.type].spawns;
+  var U=UNITS[kind];
   if(!U) return null;
   var d=doorOf(b), a=d[2], r=0;
   var u={
@@ -5047,8 +5175,9 @@ function muster(b){
   return u;
 }
 function musterAll(b){
-  var cap=TYPES[b.type].cap|0;
-  for(var i=b.garrison.length;i<cap;i++) muster(b);
+  var r=rosterOf(b.type); if(!r) return;
+  for(var i=0;i<r.length;i++)
+    for(var j=countIn(b,r[i].t);j<r[i].n;j++) muster(b,r[i].t);
 }
 function disband(b){
   if(!b.garrison) return;
@@ -5910,15 +6039,15 @@ function updateUnits(dt){
   for(var k in S.cells){
     var b=S.cells[k];
     if(b.ref||b.site||!b.garrison) continue;
-    var cap=TYPES[b.type].cap|0;
-    if(b.garrison.length>=cap){ b.trainCd=0; continue; }
+    var want=shortOf(b);
+    if(!want){ b.trainCd=0; continue; }
     // the clock starts when the loss happens, so a replacement always costs the
     // full retrain time rather than arriving on the same frame
     if(b.trainCd<=0) b.trainCd=TYPES[b.type].retrain;
     b.trainCd-=dt;
     if(b.trainCd<=0){
       b.trainCd=0;
-      muster(b);
+      muster(b,want);
       if(SND) SND.muster(M.gx2w(b.gx),M.gx2w(b.gz));
       if(UI.units) UI.units();
     }
@@ -5936,6 +6065,64 @@ function dropGib(x,z,rot,sc,col){
 }
 
 // ---- flow field -----------------------------------------------------------
+// ---- what you can see ------------------------------------------------------
+// The minimap used to draw every attacker on the map unconditionally, which
+// meant a scout could not tell you anything you did not already know. Now
+// everything you own has a `sight` in the balance table and the minimap only
+// marks what somebody is looking at.
+//
+// Deliberately narrow: this hides ATTACKERS and nothing else. Nests, salvage,
+// terrain and your own buildings stay on the map, because the map itself is
+// known ground — a settlement knows where the hills and the nests are. It is
+// where the horde is right now that you have to earn.
+//
+// A grid rather than a distance test per enemy per watcher: a late night is
+// ~800 attackers against ~40 watchers, and 32,000 hypots several times a second
+// to draw a 150-pixel canvas is not a trade worth making. Stamping discs into a
+// byte grid is ~4,000 writes and the lookup is one index.
+var seeMask=null, seeOwn=-1;
+function visionMask(pid){
+  pid=pid|0;
+  var N=M.GN;
+  if(!seeMask||seeMask.length!==N*N) seeMask=new Uint8Array(N*N);
+  else seeMask.fill(0);
+  seeOwn=pid;
+  var i;
+  function stamp(x,z,r){
+    if(!(r>0)) return;
+    var g0x=M.w2gx(x-r), g1x=M.w2gx(x+r), g0z=M.w2gx(z-r), g1z=M.w2gx(z+r);
+    if(g0x<0) g0x=0; if(g0z<0) g0z=0;
+    if(g1x>=N) g1x=N-1; if(g1z>=N) g1z=N-1;
+    var r2=r*r;
+    for(var gz=g0z;gz<=g1z;gz++){
+      var wz=M.gx2w(gz), dz=wz-z;
+      for(var gx=g0x;gx<=g1x;gx++){
+        var dx=M.gx2w(gx)-x;
+        if(dx*dx+dz*dz<=r2) seeMask[gz*N+gx]=1;
+      }
+    }
+  }
+  for(i=0;i<S.units.length;i++){
+    var u=S.units[i];
+    if((u.own|0)!==pid||u.inside||u.hp<=0) continue;
+    stamp(u.x,u.z,(M.statsOf(u.t)||{}).sight||0);
+  }
+  for(var k in S.cells){
+    var c=S.cells[k];
+    if(c.ref||(c.own|0)!==pid) continue;
+    // A site is a heap of materials. It does not shoot, house, light or accept
+    // repair, and it does not keep watch either.
+    if(c.site) continue;
+    stamp(M.gx2w(c.gx),M.gx2w(c.gz),(M.statsOf(c.type)||{}).sight||0);
+  }
+  return seeMask;
+}
+// Cheap enough to call per enemy once the mask is built for this frame.
+function seenAt(mask,x,z){
+  var gx=M.w2gx(x), gz=M.w2gx(z);
+  if(gx<0||gz<0||gx>=M.GN||gz>=M.GN) return false;
+  return !!mask[gz*M.GN+gx];
+}
 function rebuildField(){
   var N=GN, dist=new Float64Array(N*N); dist.fill(1e9);
   var halls=[];
@@ -7508,7 +7695,7 @@ function wallRot(gx,gz){
 function pack(){
   var n={hall:0,tower:0,ballista:0,brazier:0,barracks:0,archery:0,cottage:0,
          wall:0,wpost:0,gate:0,salvage:0,
-         soldier:0,archer:0,worker:0,commander:0,nest:0,
+         soldier:0,archer:0,worker:0,scout:0,commander:0,nest:0,
          corpse:0,bolt:0,arrow:0,spark:0,debris:0,ring:0,marker:0,tile:0,grid:0,site:0,
          road:0};
   for(var rk0 in RIGDEF){
@@ -8282,6 +8469,8 @@ return {
   // so a test exercises the real snapping rather than a back channel.
   queueRoad:queueRoad, roadSpeed:roadSpeed, roadAnchor:roadAnchor,
   roadRefusal:roadRefusal, stepVia:stepVia,
+  // vision, for the minimap and the tools
+  visionMask:visionMask, seenAt:seenAt,
   cancelRoad:cancelRoad, roadAt:roadAt, selectRoad:selectRoad,
   rsel:selRoad, roadCrew:roadCrew, edgeLen:edgeLen,
   // pathfinding, for the tools: findPath is the search, stepPath the follower
@@ -10712,6 +10901,7 @@ function abilityOf(t,s){
                {rally:num(s.rally,10), pct:Math.round((1-s.rallyK)*100)});
   if(t==="archer") return M.t("unit.archer.ability",{range:num(s.range,10)});
   if(t==="soldier") return M.t("unit.soldier.ability");
+  if(t==="scout")   return M.t("unit.scout.ability",{sight:num(s.sight,10)});
   if(t==="worker")  return M.t("unit.worker.ability",{repair:s.repair});
   return "";
 }
@@ -11084,15 +11274,35 @@ function minimap(dt){
     var sz=(c.type==="hall")?4:2;
     MM.fillRect(b[0]-sz/2,b[1]-sz/2,sz,sz);
   }
+  // What you have eyes on. Drawn before the marks rather than as an overlay
+  // over them, so it reads as ground you are watching rather than a filter laid
+  // on top. Without this the horde simply vanishes at the edge of your sight
+  // and that reads as a bug, not as a rule — the lit patch is the explanation.
+  var mask=HFGAME.visionMask(S.me), gn=HF.GN, cell=HF.CELL*k;
+  MM.fillStyle="rgba(150,190,180,.085)";
+  for(var mz=0;mz<gn;mz++){
+    for(var mx=0;mx<gn;mx++){
+      if(!mask[mz*gn+mx]) continue;
+      var mp=px(HF.gx2w(mx),HF.gx2w(mz));
+      MM.fillRect(mp[0]-cell/2,mp[1]-cell/2,cell+0.6,cell+0.6);
+    }
+  }
   // units and attackers
   MM.fillStyle="rgba(110,200,210,.95)";
   for(i=0;i<S.units.length;i++){
+    if(S.units[i].inside) continue;
     var u=px(S.units[i].x,S.units[i].z);
     MM.fillRect(u[0]-1,u[1]-1,2,2);
   }
+  // The horde only appears where somebody of yours is looking. This is the
+  // whole reason the scout exists: parked out on a lane it is the difference
+  // between knowing which way the night is coming and finding out when it
+  // arrives.
   MM.fillStyle="rgba(232,96,72,.95)";
   for(i=0;i<S.enemies.length;i++){
-    var e=px(S.enemies[i].x,S.enemies[i].z);
+    var en=S.enemies[i];
+    if(!HFGAME.seenAt(mask,en.x,en.z)) continue;
+    var e=px(en.x,en.z);
     MM.fillRect(e[0]-1,e[1]-1,2,2);
   }
   // nests last so they sit on top of their own pool

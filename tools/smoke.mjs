@@ -35,7 +35,8 @@ const raised = await page.evaluate(() => {
 });
 check('placing the hall creates a site, not a building', raised.wasSite);
 check('commander raises it', raised.hall);
-check('the hall musters two workers', raised.units === 'commander,worker,worker', raised.units);
+check('the hall musters two workers and a scout',
+      raised.units === 'commander,scout,worker,worker', raised.units);
 
 // ---- everything else goes up as a construction site first ------------------
 const built = await page.evaluate(() => {
@@ -49,7 +50,12 @@ const built = await page.evaluate(() => {
     const c = __nw.at(spots[i][0], spots[i][1]);
     onPlace[k] = !!(c && c.site);
   });
-  const armyDuring = S.units.filter(u => !HFGAME.UNITS[u.t].civil).length;
+  // Soldiers, not "everything that isn't a worker". The commander and the
+  // hall's scout are both non-civil, so counting that way measured three
+  // unrelated things and broke the moment a second non-civil unit existed —
+  // isolate the thing under test.
+  const soldiers = () => S.units.filter(u => u.t === 'soldier').length;
+  const armyDuring = soldiers();
   __nw.run(longest + 2);
   const after = {};
   kinds.forEach((k, i) => {
@@ -59,14 +65,14 @@ const built = await page.evaluate(() => {
   return { allSites: kinds.every(k => onPlace[k]),
            allBuilt: kinds.every(k => after[k]),
            armyDuring,
-           armyAfter: S.units.filter(u => !HFGAME.UNITS[u.t].civil).length,
+           armyAfter: soldiers(),
            longest };
 });
 check('every building starts as a site', built.allSites);
 check('every building finishes on its own', built.allBuilt, `within ${built.longest + 2}s`);
 check('a barracks musters nobody until it stands',
-      built.armyDuring === 1 && built.armyAfter > 1,
-      `${built.armyDuring} during, ${built.armyAfter} after`);
+      built.armyDuring === 0 && built.armyAfter > 0,
+      `${built.armyDuring} soldiers during, ${built.armyAfter} after`);
 
 // ---- a site is inert: it does not shoot ------------------------------------
 // A fresh round with one hall and one tower. Isolation is the point: the first
