@@ -756,29 +756,52 @@ var ASSETS=[
   ]},
 
 { id:"turret", name:"Turret", group:"Structures",
-  colA:PAL.stone, colB:PAL.iron, scale:1.0,
-  note:"A stone drum in a timber line. It joins a wall run the way a gate does — the neighbouring cells grow their arms into it — and stands a head taller than the posts so the platform reads as somewhere you could put an archer. It shoots nothing on its own: the range belongs to whoever is standing on it.",
-  slots:["A — stone","B — iron (band, merlon caps)"],
+  colA:PAL.timber, colB:PAL.iron, scale:1.0,
+  note:"Timber, like the wall it stands in — a ring of staves banded with iron rather than a stone drum, so it reads as the same builders' work at a glance. It joins a wall run the way a gate does, the neighbouring cells growing their arms into it, and stands a head taller than the posts so the platform reads as somewhere you could put an archer. It shoots nothing on its own: the range belongs to whoever is standing on it.",
+  slots:["A — timber","B — iron (bands, footing, merlon caps)"],
   parts:[
-    // Footing wider than the drum so the join with a palisade sill reads as
+    // Footing wider than the staves so the join with a palisade sill reads as
     // built rather than abutted.
-    {id:"base",  name:"Footing",  prim:"box", p:[0,0,0],      s:[1.26,0.26,1.26], shade:0.62},
-    {id:"drum",  name:"Drum",     prim:"cyl", p:[0,0.22,0],   s:[0.52,2.05], seg:8, cap:false,
-       shade:1.00},
-    {id:"band",  name:"Iron band",prim:"cyl", p:[0,1.30,0],   s:[0.556,0.16], seg:8, cap:false,
-       tint:1, shade:1.10},
-    // The platform overhangs, which is what makes the silhouette read as a
-    // turret rather than a fat post at this camera angle.
-    {id:"deck",  name:"Platform", prim:"cyl", p:[0,2.27,0],   s:[0.74,0.18], seg:8,
-       shade:1.14, anchorY:{to:"drum", mode:"top", off:0}},
-    {id:"merlon",name:"Merlons",  prim:"box", p:[0,2.45,0.60],s:[0.26,0.44,0.16],
-       shade:1.06, rep:{mode:"ring", n:8, r:0.60, a0:22}},
-    {id:"cap",   name:"Merlon caps",prim:"box",p:[0,2.87,0.60],s:[0.30,0.07,0.20],
-       tint:1, shade:1.18, rep:{mode:"ring", n:8, r:0.60, a0:22}},
-    // A dark slit at eye height so the drum has a front and reads as occupied
-    // even before anybody is in it.
-    {id:"slit",  name:"Arrow slit",prim:"box",p:[0,1.62,0.50], s:[0.10,0.42,0.10],
-       shade:0.30, rep:{mode:"ring", n:4, r:0.50, a0:45}}
+    {id:"sill",  name:"Footing",   prim:"box", p:[0,0,0],      s:[1.24,0.24,1.24],
+       tint:1, shade:0.66},
+    // The drum is a ring of the same posts the palisade is made of, not a
+    // cylinder. At this camera the silhouette is the whole read, and a smooth
+    // drum among faceted posts looks like a different material however it is
+    // coloured.
+    // Fourteen, not ten. The circumference at r=0.46 is 2.89 units and a stave
+    // is 0.23 across, so ten of them leave gaps you can see the far wall
+    // through — it reads as a cage rather than a tower, and no amount of
+    // colour fixes that. Fourteen overlap slightly and close it.
+    {id:"staves",name:"Staves",    prim:"cyl", p:[0,0.20,0.46], s:[0.115,2.10], seg:6,
+       cap:false, shade:0.94, rep:{mode:"ring", n:14, r:0.46, a0:0, altShade:0.07}},
+    {id:"core",  name:"Inner post",prim:"cyl", p:[0,0.20,0],    s:[0.20,1.90], seg:6,
+       cap:false, shade:0.74},
+    // Proud of the staves. A stave reaches 0.46+0.115 = 0.575, so a band at
+    // 0.545 is buried inside the timber and simply never appears. 0.605 was
+    // also not enough: three centimetres proud on a 2.3-unit tower is not a
+    // band, it is a rounding error.
+    {id:"bandL", name:"Lower band",prim:"cyl", p:[0,0.86,0],    s:[0.665,0.19], seg:14,
+       cap:false, tint:1, shade:1.06},
+    {id:"bandU", name:"Upper band",prim:"cyl", p:[0,1.78,0],    s:[0.665,0.19], seg:14,
+       cap:false, tint:1, shade:1.12},
+    // A plank deck, overhanging: the overhang is what makes this a turret
+    // rather than a fat post from above.
+    // Overhangs the staves enough to read as a platform and no more: wider and
+    // brighter and it becomes a tabletop with a post under it.
+    {id:"deck",  name:"Platform",  prim:"cyl", p:[0,2.30,0],    s:[0.66,0.15], seg:12,
+       shade:1.04},
+    {id:"joist", name:"Joists",    prim:"box", p:[0,2.20,0],    s:[1.52,0.11,0.14],
+       shade:0.80, rep:{mode:"ring", n:3, r:0, a0:30}},
+    // Merlons are palisade posts again, cut short — same vocabulary as the run
+    // it stands in, which is the whole point of the change.
+    {id:"merlon",name:"Merlons",   prim:"cyl", p:[0,2.45,0.55], s:[0.098,0.40], seg:6,
+       cap:false, shade:1.02, rep:{mode:"ring", n:8, r:0.55, a0:22}},
+    {id:"cap",   name:"Merlon caps",prim:"cone",p:[0,2.85,0.55],s:[0.098,0.20], seg:6,
+       tint:1, shade:1.18, rep:{mode:"ring", n:8, r:0.55, a0:22}},
+    // A dark gap between staves at eye height, so the drum has a front and
+    // reads as occupied before anybody is in it.
+    {id:"slit",  name:"Loophole",  prim:"box", p:[0,1.24,0.44], s:[0.09,0.40,0.14],
+       shade:0.26, rep:{mode:"ring", n:4, r:0.44, a0:45}}
   ]},
 
 { id:"gate", name:"Gate", group:"Structures",

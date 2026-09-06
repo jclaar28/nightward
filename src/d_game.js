@@ -57,7 +57,7 @@ var TYPES={
   // join builds itself rather than being drawn. `hand` makes it a worker's job
   // rather than a timer — the road's rule, applied to a second thing.
   turret:{cat:"walls", foot:1, scale:1.00, wallish:true, hand:true,
-          colA:M.PAL.stone, colB:M.PAL.iron,
+          colA:M.PAL.timber, colB:M.PAL.iron,
           blurb:function(t){ return M.t("bld.turret.blurb",{cap:t.cap, range:t.range}); }},
   barracks:{cat:"muster", foot:1, scale:0.72, spawns:"soldier",
           colA:M.PAL.timber, colB:M.PAL.slate,
