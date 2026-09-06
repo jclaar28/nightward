@@ -84,6 +84,30 @@ the ink pass never sees it. Two consequences to keep in mind when adding one:
 so they draw between the buildings and the effects. It used to be a hard-coded
 index and drifted twice. Do not put an index back.
 
+**The ground is sampled by position, never by cell.** The map is 40,000 quads
+of 1.2 units and each one used to take a single colour and a single face normal.
+Every ingredient of that colour was a value two neighbouring quads worked out
+independently — a random jitter, a damp/dry noise read at the quad's midpoint, a
+hard switch to dry grass past a radius, a slope threshold that painted a whole
+quad stone — so every quad edge was a step and the map read as tiling: grey
+tiles strewn over rolling hills, a chequerboard of greens everywhere else, and
+lamp pools at night that came out square because the light was being wrapped
+around a normal that changed at every seam.
+
+Colour and normal are per VERTEX now (`Mesh.triV` / `quadVN`), and every term is
+a function of the point rather than of the square it sits in: rock and cliff
+arrive as a gradient off the height field's own slope, dry grass as a gradient
+off distance, and the grain as three octaves of noise. Two quads sharing a
+corner ask about the same point and get the same answer, so there is nothing for
+a seam to be. Keep it that way — anything decided per cell will tile, and it
+will look like a texture problem rather than like a data-flow one.
+
+**The bare `rnd()` in the terrain loop is not dead code.** The per-cell jitter it
+replaced drew exactly one random number per quad, and the trees are placed from
+the same sequence immediately afterwards. Deleting that line shifts every draw
+after it and silently re-grows every map on every existing seed.
+`tools/terrain.mjs` counts the draws for this reason.
+
 **Nothing sits at a fixed height.** `gy(x,z)` returns the terrain height and
 every draw site uses it. `PLAT` is the plateau constant, not the ground. Hard-
 coding `PLAT` is how the nests ended up floating half a unit in the air across
@@ -424,6 +448,13 @@ without talking to Jarrod first.
 - **Selling is only ever a hotbar button** with a structure selected. It is
   never a click on the world, because a misclick that deletes a tower mid-wave
   is unforgivable.
+- **The ground is a field, not a floor.** Its shape comes from the height
+  function and its colour from where you are standing, not from which square
+  you are in. Rock is how steep it is, dry grass is how far out it is, and both
+  arrive as gradients — there is no tile, no boundary and no threshold anywhere
+  in it that a player could learn to see. The low-poly identity lives in the
+  things standing on the ground, which are faceted and outlined; the ground
+  itself is smooth and takes no outline at all.
 - **An indicator is light on the ground, not paint on it.** Selection, range,
   rally, the move marker: all of them are marks the world could plausibly carry,
   laid on the terrain, following it over a slope, fading out instead of ending.

@@ -198,6 +198,31 @@ at it from the platform and from the same spot on the ground. 18 arrows against
 0. Measuring "it shot something" from up top alone would pass with the bonus set
 to zero.
 
+**`terrain.mjs`** — whether the ground is a field or a chequerboard. The map is
+40,000 quads of 1.2 units and every one of them used to take a single colour and
+a single face normal, decided from values two neighbouring quads worked out
+independently. That is a property of the mesh rather than of a picture, so it
+can be measured exactly: every point that more than one quad touches must carry
+one colour and one normal. Reverting to a colour per cell reports 199,216 of
+199,599 shared corners disagreeing; reverting to face normals reports 197,796
+and a 10.8° argument with the height field about which way the ground faces.
+
+The check that took three attempts is "there is still something to look at",
+which exists because smoothing something by erasing it also smooths it. Version
+one measured the spread of colour across the whole map and passed with the grain
+switched off, because the slow green-to-dry gradient from the middle of the map
+to its edge is most of that number. Version two measured within 8x8 patches and
+passed too, because a patch on a hillside varies by how much rock has come
+through. It now measures each point against the average of its four neighbours,
+where a smooth field of any wavelength answers near zero: 0.0032 with the grain,
+0.0007 without.
+
+It also counts random draws, which sounds like a style check and is not. The old
+per-cell jitter drew exactly one number per quad and the trees are placed from
+the same sequence right afterwards, so the bare `rnd()` left behind in the quad
+loop is the only reason existing seeds still grow the same forest. It looks
+exactly like dead code. Deleting it reports 0 draws for 40,000 cells.
+
 **`decals.mjs`** — the marks on the ground, and the one bug in them that no
 instance count could ever have caught. Every ring in the game was geometrically
 perfect and looked wrong anyway: the chips were opaque, so the ink pass found a
