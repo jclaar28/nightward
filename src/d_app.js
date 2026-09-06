@@ -686,15 +686,22 @@ function minimap(dt){
   // now, and nothing over what you merely remember. Unexplored ground gets no
   // mark of any kind, which is what makes the shape of what you have walked
   // legible at a glance.
+  // One path, one fill. A fillRect per cell overlaps its neighbours by the
+  // 0.6px seam-closer, and at 8% alpha every overlap darkens twice — which at
+  // 2.3 screen pixels per cell reads as a moiré of dots rather than a lit
+  // region. Collecting the cells into a single path applies the alpha to the
+  // union once.
   var mask=HFGAME.visionMask(S.me), gn=HF.GN, cell=HF.CELL*k;
-  MM.fillStyle="rgba(150,190,180,.085)";
+  MM.fillStyle="rgba(150,190,180,.10)";
+  MM.beginPath();
   for(var mz=0;mz<gn;mz++){
     for(var mx=0;mx<gn;mx++){
       if(!mask[mz*gn+mx]) continue;
       var mp=px(HF.gx2w(mx),HF.gx2w(mz));
-      MM.fillRect(mp[0]-cell/2,mp[1]-cell/2,cell+0.6,cell+0.6);
+      MM.rect(mp[0]-cell/2,mp[1]-cell/2,cell+0.8,cell+0.8);
     }
   }
+  MM.fill();
   // units and attackers
   MM.fillStyle="rgba(110,200,210,.95)";
   for(i=0;i<S.units.length;i++){
@@ -715,7 +722,12 @@ function minimap(dt){
   }
   // nests last so they sit on top of their own pool
   for(i=0;i<S.nests.length;i++){
-    var n2=S.nests[i], p2=px(n2.x,n2.z);
+    var n2=S.nests[i];
+    // Two loops draw a nest — the tainted pool above and the marker here — and
+    // gating only the first one left the red dots on an unexplored map, which
+    // gave away every objective on the first frame while looking fogged.
+    if(!seen(n2.x,n2.z)) continue;
+    var p2=px(n2.x,n2.z);
     MM.beginPath(); MM.arc(p2[0],p2[1],4,0,6.2832);
     MM.fillStyle=n2.dead?"rgba(96,92,88,.9)":"rgba(255,86,58,1)";
     MM.fill();
@@ -738,10 +750,17 @@ function minimap(dt){
   // North, so a rotating map still has one fixed thing to read it against.
   // North is world -Z; on the minimap that is (cos az, -sin az), the same
   // direction the two axes above put it in.
-  var nr=W/2-15, nx=cx+mc*nr, ny=cy-ms*nr;
-  var ta=Math.atan2(-ms,mc);
+  // It rides the frame, not a circle inside it. The minimap is square, so a
+  // marker at a fixed radius sits well clear of the border on the diagonals and
+  // almost on it at the sides — it looks like it is drifting as the view turns.
+  // Casting the north ray at the actual border keeps it welded to the edge.
+  var dxN=mc, dzN=-ms;
+  var tN=Math.min((W/2-2)/Math.max(1e-4,Math.abs(dxN)),
+                  (H/2-2)/Math.max(1e-4,Math.abs(dzN)));
+  var ta=Math.atan2(dzN,dxN);
   MM.save();
-  MM.translate(nx,ny); MM.rotate(ta);
+  MM.translate(cx+dxN*(tN-7), cy+dzN*(tN-7));   // 7 is the arrow's own length,
+  MM.rotate(ta);                                // so the tip lands on the line
   MM.fillStyle="rgba(232,225,214,.92)";
   MM.beginPath();
   MM.moveTo(7,0); MM.lineTo(-2,-4.2); MM.lineTo(-2,4.2);
@@ -750,7 +769,7 @@ function minimap(dt){
   MM.fillStyle="rgba(232,225,214,.85)";
   MM.font='600 9px "IBM Plex Mono", monospace';
   MM.textAlign="center"; MM.textBaseline="middle";
-  MM.fillText("N", cx+mc*(nr-13), cy-ms*(nr-13));
+  MM.fillText("N", cx+dxN*(tN-19), cy+dzN*(tN-19));
 
   MM.strokeStyle="rgba(237,235,231,.12)"; MM.lineWidth=1;
   MM.strokeRect(0.5,0.5,W-1,H-1);

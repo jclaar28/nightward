@@ -162,5 +162,45 @@ const cost = await page.evaluate(() => {
 check('a frame of fog costs a fraction of a frame', cost.ms < 3,
       `${cost.ms.toFixed(2)}ms over ${cost.cells} cells, ${cost.enemies} attackers on the field`);
 
+// ---- the minimap tells the same story as the world -------------------------
+// The minimap is a 2D canvas, so this reads its pixels rather than counting
+// instances. It is here because the first fog pass gated the nests' tainted
+// ground and not the nest markers drawn in a second loop below it, so every
+// objective was still a red dot on an unexplored map — fogged world, honest-
+// looking minimap, and the one thing the design asks you to go and find given
+// away on the first frame. Two loops draw a nest; both have to ask.
+const mini = await page.evaluate(async () => {
+  const S = __nw.state(), cv = document.getElementById('minimap');
+  // a fresh round so nothing has been explored yet
+  HF.setStat('fog', 'on', 1);
+  __nw.start(4242);
+  const S2 = __nw.state();
+  __hf.show('play');
+  const red = () => {
+    const g = cv.getContext('2d');
+    const d = g.getImageData(0, 0, cv.width, cv.height).data;
+    let n = 0;
+    // the nest marker is rgb(255,86,58); nothing else on the map is that hot
+    for (let i = 0; i < d.length; i += 4)
+      if (d[i] > 200 && d[i + 1] < 140 && d[i + 2] < 110) n++;
+    return n;
+  };
+  const paint = () => new Promise(r => requestAnimationFrame(() => r()));
+  await paint(); await paint();
+  const dark = red();
+  // walk a unit onto a nest, the way finding one works
+  const u = S2.units[0], nest = S2.nests[0];
+  for (let i = 0; i <= 40; i++) {
+    u.x = nest.x * i / 40; u.z = nest.z * i / 40; HFGAME.fogStep();
+  }
+  await paint(); await paint();
+  return { dark, found: red(), nests: S2.nests.length };
+});
+check('an undiscovered nest is not on the minimap either',
+      mini.dark === 0 && mini.nests > 0,
+      `${mini.nests} nests, ${mini.dark} marker pixels before anybody has been`);
+check('...and appears once somebody walks to it', mini.found > 0,
+      `${mini.found} marker pixels after`);
+
 await close();
 done(errors);
