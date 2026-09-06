@@ -261,3 +261,21 @@ never appeared" — so search for a legal cell with `HFGAME.canPlace(t,gx,gz,p)`
 and assert you found one, rather than hard-coding an offset and inheriting a
 flake that only shows up on a seed you never ran. This cost two rounds of
 chasing the wrong thing in `net.mjs`, once for a cottage and once for a hall.
+
+## Not a check
+
+**`roster.mjs`** — writes `ROSTER.md`, every unit and structure with the
+numbers the game actually resolves, split into yours and theirs. It exists as a
+generator rather than a document because a hand-written roster is a second copy
+of every value in `STAT_DEFS`, which is the one duplication this codebase is
+strict about: the in-game library edits those while a round runs and a copy does
+not follow. Re-run it after any balance change. The prose in it comes from the
+assets' own `note` fields, which were already written to say what each thing is
+for — the first draft printed the derived figures underneath those notes as
+well, and a table row followed by the same numbers in a lowercase fragment reads
+like a leak, so everything derived now lives in a table column instead.
+
+```sh
+node tools/roster.mjs            # rewrites ROSTER.md
+node tools/roster.mjs --print    # to stdout
+```

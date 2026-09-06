@@ -9,6 +9,7 @@
     "instances": "node tools/instances.mjs",
     "balance": "node tools/balance.mjs",
     "net": "node tools/net.mjs",
+    "roster": "node tools/roster.mjs",
     "check": "python3 src/build.py && node tools/smoke.mjs && node tools/instances.mjs"
   },
   "devDependencies": {
