@@ -149,7 +149,10 @@ only on those flags.
 `rd` road. A
 new player action that changes the world needs an intent, a case in
 `applyIntent`, and an ownership check — every case there re-verifies that the
-target belongs to the sending player. Intents added since: `rx` cancel road.
+target belongs to the sending player. `tools/net.mjs` runs two real browsers
+over a real peer connection and aims a guest's intent at the host's hall; add
+your new intent to it, because nothing else in the repo will notice when this
+breaks. Intents added since: `rx` cancel road.
 
 **A road is named by its two node ids, never by an index or an object.** The
 guest rebuilds `S.roadN` / `S.roadE` wholesale out of every snapshot, so an edge
@@ -199,7 +202,8 @@ bug found here was found by reading numbers out of the running game.
 anything that puts words on screen, `node tools/roads.mjs` and
 `node tools/pathing.mjs` for anything touching roads, movement or worker jobs,
 `node tools/economy.mjs` for
-anything touching salvage, workers or the map,
+anything touching salvage, workers or the map, `node tools/net.mjs` for anything
+touching intents, the snapshot or the two-player screen,
 and `node tools/balance.mjs --ab id.key=value` for anything touching difficulty.
 `tools/README.md` explains them; read it before writing a new one.
 

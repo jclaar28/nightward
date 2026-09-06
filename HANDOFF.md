@@ -139,8 +139,10 @@ screen and fails on a word that no text key owns. `tools/roads.mjs` proves
 snapping joins rather than duplicates, that a road only builds with a worker on
 it, and that the flow field cannot see one. `tools/pathing.mjs` sends a unit
 round a building, through a gate and out of a walled pocket, and checks an open-
-ground order is still a straight line. `tools/README.md` covers writing new ones
-and the traps worth knowing.
+ground order is still a straight line. `tools/net.mjs` runs two browsers over a
+real peer connection, drives the invite screen by its buttons, and proves a
+guest's click reaches the world only by way of the host. `tools/README.md`
+covers writing new ones and the traps worth knowing.
 
 A worked example. "The nests are floating" could have been fixed by nudging a
 constant until it looked right. Instead: terrain height at each nest was −0.17
@@ -177,6 +179,10 @@ over WebRTC with the host and guest in exact agreement — measured drift of zer
 - *Nest count scales with difficulty, and so do the caches.* Hard rings you with
   8 nests, which is both far more danger and 8 x 320 supply of reward. That may
   want a per-difficulty cache; nobody has measured it.
+- *Multiplayer has never been run on two machines.* `tools/net.mjs` covers the
+  logic — handshake, seed agreement, intents, ownership, both worlds agreeing —
+  but it connects two tabs over loopback with STUN unreachable. NAT traversal
+  and a real link are still unproven, and that is the part most likely to bite.
 - *The multiplayer invite code is ~855 characters.* It is the WebRTC session
   description itself, so a short code would need a rendezvous server. Jarrod
   decided to leave it alone rather than take on infrastructure — worth knowing

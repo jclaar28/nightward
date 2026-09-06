@@ -249,10 +249,15 @@ after that has proven out.
   run A* per order, which is affordable because orders are rare (twenty units
   routed round a wall on one frame costs ~4ms, measured in `tools/pathing.mjs`)
   but scales with army size rather than wave size. A persistent map grows both.
-- **The two-player path has no automated cover at all**, and every string on
-  that screen moved into the text table recently. `tools/text.mjs` proves the
-  words resolve; nothing proves a peer still connects. Worth one real
-  two-machine test before either of us builds on top of it.
+- **The two-player path is covered now, up to a point.** `tools/net.mjs` runs
+  two browsers over a real peer connection and proves the handshake, the seed
+  agreement, the intent round trip, the ownership checks and that both worlds
+  hold the same units in the same places. What it does not cover is two
+  machines on two networks: it connects over loopback with STUN unreachable, so
+  NAT traversal, a relay-less hairpin and a flaky link are all still untested,
+  and the ~855-character invite code has never been carried by a human through
+  a chat client that might wrap it. Worth one real two-machine run before
+  either of us builds on top of it.
 - **Cross-map meta-progression.** Explicitly out of scope until one
   persistent map is proven.
 

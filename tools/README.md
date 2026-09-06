@@ -121,6 +121,40 @@ soldiers had not, so an ordered squad still could not leave a walled yard. The
 check had been passing the wrong thing and failing for the wrong reason at the
 same time.
 
+**`net.mjs`** — the two-player path, which had no cover at all and is the
+riskiest thing to leave that way: a regression here is silent. Nothing throws,
+no frame looks wrong, and it is only discoverable by two people at two machines
+failing to start a game. It runs two pages in one browser and drives the real
+screen — presses Create invite, carries the code across by hand the way a player
+carries it over chat, pastes the reply back, presses Connect and then Set out —
+because the buttons and their disabled states are half of what has broken here
+before. Then: both sides built the same ground from the seed, a guest click
+changes nothing on the guest and reaches the world by way of the host, a guest
+cannot pull down the host's hall, a road dragged and called off by the guest
+travels both ways, and the two worlds hold the same units in the same places.
+
+Three things it needs that are not obvious. Chrome hides local IPs behind
+`.local` mDNS candidates, which never resolve in a sandbox, so two pages gather
+candidates neither can use and the handshake times out looking healthy —
+`openMany(2, {webrtc:true})` turns that off. Only one of two tabs is frontmost
+and Chrome throttles the other's frame loop to about 1fps, which stalls whichever
+side is the host; the same launch adds the three backgrounding flags. And every
+round trip polls rather than sleeping, because a fixed wait that works here is a
+flake on a busier machine.
+
+It was checked by breaking the netcode three ways and confirming each break
+fails the right line: stop the host shipping snapshots (7 failures), let a guest
+mutate its own world (1), drop the invite-id guard (1). Worth repeating on any
+test you add here — the first version of "host and guest hold the same units"
+compared counts, and the guest builds the same starting world from the same seed
+whether or not a single packet arrives, so a dead channel passed it. It compares
+positions now, and separately asserts they are not where the guest first drew
+them.
+
+```sh
+node tools/net.mjs        # ~40s, two browsers, a real peer connection
+```
+
 **`audio.mjs`** — renders every sound offline and measures it. "It did not
 throw" is not a test for a sound: it has a level, a length, a weight and a
 stereo position, and every one is a number you can be wrong about. Checks that
@@ -186,7 +220,8 @@ answers the wrong question — it measured 3 nights where a growing one measures
 
 `harness.mjs` gives you `open()`, `check(label, ok, detail)` and `done(errors)`,
 plus a `window.__nw` helper inside the page on top of the build's own `__hf`
-surface:
+surface. `openMany(n, {webrtc})` is the same thing with several pages that can
+reach each other — see `net.mjs` for what that costs in launch flags.
 
 | call | what it does |
 |---|---|
@@ -218,3 +253,11 @@ version compared two blocked ones and reported no change as success.
 everything after that measures a frozen world. Call `__nw.invincible()` when
 survival isn't what you're testing. And never capture `S` before `start()` — it
 is a different object afterwards.
+
+**Do not assume a spot is buildable.** The seed changes every run, and a cell
+that is fine on one map is inside a nest's exclusion zone on the next. A refused
+placement and a broken feature look identical from the outside — "the building
+never appeared" — so search for a legal cell with `HFGAME.canPlace(t,gx,gz,p)`
+and assert you found one, rather than hard-coding an offset and inheriting a
+flake that only shows up on a seed you never ran. This cost two rounds of
+chasing the wrong thing in `net.mjs`, once for a cottage and once for a hall.

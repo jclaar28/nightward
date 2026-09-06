@@ -131,12 +131,52 @@ function pageHelpers() {
   };
 }
 
+const GL_ARGS = ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--no-sandbox'];
+
+// Two pages that can reach each other over WebRTC, sharing one server and one
+// browser. Chrome hides local IPs behind .local mDNS candidates by default,
+// which never resolve in a sandbox, so two pages in one browser gather
+// candidates neither of them can use and the handshake times out looking
+// perfectly healthy. Turning that off is the whole reason this is a separate
+// entry point rather than two calls to open().
+export async function openMany(n = 2, { width = 1300, height = 820, webrtc = false } = {}) {
+  const { srv, port } = await serve();
+  const target = `http://127.0.0.1:${port}/nightward.html`;
+  // Only one of two pages can be frontmost, and Chrome throttles a background
+  // tab's rAF to about once a second. The host is the side that simulates and
+  // ships snapshots, so whichever page loses that race quietly stops being a
+  // game — snapshots trickle, every round trip takes seconds, and the failure
+  // reads as "the netcode is slow" rather than "the tab is asleep".
+  const browser = await chromium.launch({
+    args: GL_ARGS.concat(
+      ['--disable-background-timer-throttling', '--disable-renderer-backgrounding',
+       '--disable-backgrounding-occluded-windows'],
+      webrtc ? ['--disable-features=WebRtcHideLocalIpsWithMdns'] : []),
+  });
+  const errors = [], pages = [];
+  for (let i = 0; i < n; i++) {
+    const page = await browser.newPage({ viewport: { width, height } });
+    const tag = n > 1 ? `[${i === 0 ? 'host' : 'guest'}] ` : '';
+    page.on('pageerror', e => errors.push(tag + 'pageerror: ' + e.message));
+    page.on('console', m => {
+      const t = m.text();
+      if (m.type() === 'error' && !/Failed to load resource/.test(t)) errors.push(tag + t);
+    });
+    await page.goto(target);
+    await page.waitForFunction(() => window.__hf && window.__hf.game, null, { timeout: 30000 });
+    await page.evaluate(pageHelpers);
+    pages.push(page);
+  }
+  return {
+    browser, pages, errors, url: target,
+    close: async () => { await browser.close(); srv.close(); },
+  };
+}
+
 export async function open({ url, width = 1300, height = 820 } = {}) {
   const { srv, port } = url ? { srv: null, port: 0 } : await serve();
   const target = url || `http://127.0.0.1:${port}/nightward.html`;
-  const browser = await chromium.launch({
-    args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--no-sandbox'],
-  });
+  const browser = await chromium.launch({ args: GL_ARGS });
   const page = await browser.newPage({ viewport: { width, height } });
   const errors = [];
   page.on('pageerror', e => errors.push('pageerror: ' + e.message));
