@@ -104,6 +104,15 @@ the whole network would boil — which looks deliberate in a screenshot and awfu
 in motion. The same rule holds for anything else decorative drawn per frame.
 `tools/roads.mjs` compares two frames three seconds apart.
 
+**A queued road is a promise you can see, pick and take back.** The whole run
+is staked from the moment it is ordered, not just the part that is finished —
+staking only as far as the progress mark meant a road you had just ordered drew
+a single dot, and you could tell something had happened but not what you had
+asked for. The marks are chalk-pale on purpose: an earlier pass drew them in the
+same dark grey as the stones already scattered on the grass, so every mark was
+in the buffer and none of them could be seen. Anything drawn flat on the ground
+here has to beat the ground litter on value, not just exist.
+
 **Road work is the only construction that needs a worker.** Every other site is
 `prog += dt` and finishes whether anyone came; a road edge advances only while
 a worker stands on it. That asymmetry is the feature — it is what makes the
@@ -140,7 +149,14 @@ only on those flags.
 `rd` road. A
 new player action that changes the world needs an intent, a case in
 `applyIntent`, and an ownership check — every case there re-verifies that the
-target belongs to the sending player.
+target belongs to the sending player. Intents added since: `rx` cancel road.
+
+**A road is named by its two node ids, never by an index or an object.** The
+guest rebuilds `S.roadN` / `S.roadE` wholesale out of every snapshot, so an edge
+object held anywhere outside those arrays points at a discarded object one
+packet later — which is why `S.rsel` and `S.rhover` store `{a,b}` and resolve
+through `edgeAB()`. An index is worse: it would mean a guest cancelling whatever
+road happened to slide into that slot.
 
 ---
 

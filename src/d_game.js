@@ -348,6 +348,12 @@ function newGame(seed,map,opt){
     // NOT in S.cells — that is keyed by grid position and would quantise away
     // the only thing roads have that buildings do not.
     roadN:[], roadE:[], roadSeq:0, roadVer:0, roadDirty:true,
+    // Which road is picked, and which one the cursor is over. Both are stored
+    // as the pair of node ids rather than as the edge object: a guest rebuilds
+    // S.roadE wholesale out of every snapshot, so a held reference would point
+    // at a discarded object one packet later and the selection would vanish
+    // for no visible reason.
+    rsel:null, rhover:null,
     pathVer:0,                     // bumped whenever the walkable layout moves
     nodes:makeNodes(seed,map), gathered:0,
     dayLeft:dayLen, dayLen:dayLen,
@@ -1861,6 +1867,91 @@ function addRoad(ax,az,bx,bz,own){
   S.roadDirty=true; S.roadVer++;
   return mk;
 }
+// ---- picking a road, and calling it off ------------------------------------
+// An edge is named by its endpoints everywhere outside S.roadE itself. See the
+// note on S.rsel: the guest throws its edge objects away every snapshot.
+function edgeAB(a,b){
+  for(var i=0;i<S.roadE.length;i++){
+    var e=S.roadE[i];
+    if((e.a===a&&e.b===b)||(e.a===b&&e.b===a)) return e;
+  }
+  return null;
+}
+function selRoad(){ return (S&&S.rsel)?edgeAB(S.rsel.a,S.rsel.b):null; }
+// The edge under a world point, yours only. The pick radius is wider than the
+// road because a staked-out road is a dotted line on open ground, and asking a
+// player to hit a line with a mouse in an isometric view is asking too much.
+function roadAt(x,z){
+  var R=ROAD(), w=(R.width===undefined?1.1:R.width)+0.7;
+  var best=null, bd=w;
+  for(var i=0;i<S.roadE.length;i++){
+    var e=S.roadE[i];
+    if((e.own|0)!==(S.me|0)) continue;
+    var a=nodeById(e.a), b=nodeById(e.b);
+    if(!a||!b) continue;
+    var q=segNear(x,z,a.x,a.z,b.x,b.z);
+    if(q.d<bd){ bd=q.d; best=e; }
+  }
+  return best;
+}
+function selectRoad(e){
+  if(!S) return null;
+  S.rsel=(e&&(e.own|0)===(S.me|0))?{a:e.a,b:e.b}:null;
+  if(S.rsel) S.bsel=null;             // one subject at a time; they share a panel
+  if(UI.building) UI.building();
+  return selRoad();
+}
+// How many of your workers are actually on this edge right now. The player is
+// deciding whether to call it off, and "three workers are on it" is the fact
+// that decides it — a road nobody has reached is free to abandon.
+// Counted off position rather than off u.mode, which is not in the snapshot:
+// reading the mode would make this correct on the host and permanently zero on
+// the guest. Standing on an unbuilt edge is what makes it advance anyway, so
+// the position IS the answer to "who is laying this".
+function roadCrew(e){
+  if(!e||e.done) return 0;
+  var a=nodeById(e.a), b=nodeById(e.b), n=0;
+  if(!a||!b) return 0;
+  for(var i=0;i<S.units.length;i++){
+    var u=S.units[i];
+    if(!UNITS[u.t].civil||(u.own|0)!==(e.own|0)||u.inside) continue;
+    if(segNear(u.x,u.z,a.x,a.z,b.x,b.z).d<0.9) n++;
+  }
+  return n;
+}
+// The counterpart to queueRoad, and the same act whether the stakes are fresh
+// or the surface is laid: a road costs no supply, so there is nothing to refund
+// and nothing to weigh up. What it cost was worker hours, and those are spent
+// either way — which is exactly why calling one off has to be possible without
+// a confirmation dance.
+function cancelRoad(a,b,pid){
+  if(!playable()) return false;
+  if((pid===undefined||pid===null)&&guest()) return intent({m:"rx",a:a|0,b:b|0});
+  var e=edgeAB(a|0,b|0);
+  if(!e) return false;
+  var who=(pid===undefined||pid===null)?S.me:pid;
+  if((e.own|0)!==(who|0)) return false;                  // not yours
+  var na=nodeById(e.a), nb=nodeById(e.b);
+  S.roadE.splice(S.roadE.indexOf(e),1);
+  pruneRoadNodes();
+  if(S.rsel&&edgeAB(S.rsel.a,S.rsel.b)===null) S.rsel=null;
+  S.rhover=null;
+  // Any worker who was laying it needs a new job this frame, and every cached
+  // route was costed against a network that no longer contains this.
+  for(var i=0;i<S.units.length;i++) if(S.units[i].mode==="road") S.units[i].mode="idle";
+  S.roadDirty=true; S.roadVer++; S.pathVer=(S.pathVer|0)+1;
+  if(SND&&na&&nb&&who===S.me) SND.remove((na.x+nb.x)/2,(na.z+nb.z)/2);
+  if(UI.building) UI.building();
+  return true;
+}
+// A node only means anything as the end of an edge. One with nothing left on it
+// is not just litter — it still snaps, so the next road you drew would be
+// quietly dragged to a junction that is no longer there.
+function pruneRoadNodes(){
+  var used={};
+  for(var i=0;i<S.roadE.length;i++){ used[S.roadE[i].a]=1; used[S.roadE[i].b]=1; }
+  for(var j=S.roadN.length-1;j>=0;j--) if(!used[S.roadN[j].id]) S.roadN.splice(j,1);
+}
 // Distance from a point to a segment, and how far along it that lands. Used
 // both for "am I on a road" and for finding the nearest point to walk to.
 function segNear(px,pz,ax,az,bx,bz){
@@ -2599,6 +2690,10 @@ function applyIntent(msg,pid){
     // trusting the ones sent: the two sides can disagree about what existed
     // when the drag started, and only one of them is authoritative.
     case "rd": queueRoad(msg.ax,msg.az,msg.bx,msg.bz,pid); break;
+    // Named by node id, not by index: the two sides agree on ids because the
+    // host authors them and the snapshot carries them, and an index would mean
+    // a guest cancelling whichever road happened to slide into that slot.
+    case "rx": cancelRoad(msg.a|0,msg.b|0,pid); break;
     case "or": orderTo(byUid(msg.u||[],pid),msg.x,msg.z,true); break;
     case "jb":
       var nd=S.nodes[msg.n|0];
@@ -3169,18 +3264,52 @@ function pack(){
     var f=re.done?1:Math.max(0,Math.min(1,re.prog/Math.max(0.001,re.need)));
     var ph=padHash(re.a,re.b,0,7)*6.283, wav=5.0+padHash(re.a,re.b,0,8)*7.0;
 
+    // 0 plain, 1 under the cursor, 2 picked. The picked colour is the same
+    // over-bright cyan the building ring uses, so "this is selected" looks the
+    // same whatever kind of thing is selected.
+    var lit=(S.rsel&&((S.rsel.a===re.a&&S.rsel.b===re.b)||(S.rsel.a===re.b&&S.rsel.b===re.a)))?2
+           :(S.rhover&&((S.rhover.a===re.a&&S.rhover.b===re.b)||(S.rhover.a===re.b&&S.rhover.b===re.a)))?1:0;
+    var LITC=[0.55,2.10,2.20];
+
     if(!re.done){
       // Stakes: tidy, on the line, sparse. A marked-out route should read as
       // intent rather than as a badly made road.
-      var scnt=Math.max(1,Math.floor(rL/(pad*3.0)));
+      //
+      // The whole run is staked, not just the part that is finished. It used to
+      // stop at the progress mark, which meant a road you had only just ordered
+      // drew a single dot — you could see that something had happened and not
+      // what you had asked for. The laid part is the brighter half, so the pair
+      // still reads as a progress bar lying on the ground.
+      // Pale, and close enough together to read as a dashed line. The first
+      // version of this was a dark grey pad at a third of this spacing, which
+      // is indistinguishable from the stones already scattered on the grass —
+      // the marks were all being drawn and none of them could be seen. A route
+      // somebody paced out and marked is chalk-coloured, not earth-coloured.
+      var STAKE=[0.74,0.72,0.60], LAID=[0.46,0.40,0.30];
+      var scnt=Math.max(1,Math.floor(rL/(pad*1.5)));
       for(var sq=0;sq<=scnt;sq++){
-        var st2=sq/scnt;
-        if(st2>f+0.02) continue;
+        var st2=sq/scnt, laid=(st2<=f+0.02), end=(sq===0||sq===scnt);
         var sx=ra.x+rdx*st2, sz=ra.z+rdz*st2;
-        n.road=put(buf.road,n.road,sx,gy(sx,sz)+0.03,sz,yaw,[0.30,0.30,0.28],
-                   0.42,[0.30,0.30,0.28]);
+        var base=laid?LAID:STAKE, sk=(lit===1?1.25:1);
+        var scol=(lit===2)?LITC:[base[0]*sk,base[1]*sk,base[2]*sk];
+        // The ends carry a heavier mark: what a road connects is the thing you
+        // are checking when you look at one you have not built yet.
+        n.road=put(buf.road,n.road,sx,gy(sx,sz)+0.03,sz,yaw,scol,
+                   (end?0.62:(laid?0.44:0.34))*(lit?1.15:1),scol);
       }
       continue;
+    }
+    // A finished road has no stakes left, so picking one puts them back as an
+    // overlay: same marks, same spacing, sitting just above the surface. It is
+    // the one drawing that says "this edge, not the junction next to it".
+    if(lit){
+      var hcnt=Math.max(1,Math.floor(rL/(pad*1.5)));   // the staking spacing
+      var hcol=(lit===2)?LITC:[0.74,0.72,0.60];
+      for(var hq=0;hq<=hcnt;hq++){
+        var ht=hq/hcnt, hx=ra.x+rdx*ht, hz=ra.z+rdz*ht;
+        n.road=put(buf.road,n.road,hx,gy(hx,hz)+0.055,hz,yaw,hcol,
+                   (hq===0||hq===hcnt)?0.58:0.34,hcol);
+      }
     }
 
     // Half-spacing: consecutive pads overlap by more than half their length, so
@@ -3479,14 +3608,15 @@ function clearSel(){
   if(!S) return false;
   if(S.sel){ S.sel=null; if(UI.hotbar) UI.hotbar(); return true; }
   if(S.bsel){ selectBuilding(null); return true; }
+  if(S.rsel){ selectRoad(null); return true; }
   return false;
 }
 // Ctrl+D lets go of everything at once — what you are holding, the building
 // you picked, and whoever is selected. Escape belongs to the pause menu now.
 function deselectAll(){
   if(!S) return false;
-  var had=!!(S.sel||S.bsel||selectedUnits().length);
-  S.sel=null; S.bsel=null;
+  var had=!!(S.sel||S.bsel||S.rsel||selectedUnits().length);
+  S.sel=null; S.bsel=null; S.rsel=null;
   clearSelection();
   if(UI.hotbar) UI.hotbar();
   if(UI.building) UI.building();
@@ -3500,6 +3630,7 @@ function selectBuilding(b){
   // the hall's is not, because there is nothing to fall back to if you scrap it.
   var pick=b&&(b.own|0)===S.me&&!(b.site&&b.type==="hall");
   S.bsel=pick?b:null;
+  if(S.bsel) S.rsel=null;             // one subject at a time; they share a panel
   if(UI.building) UI.building();
   return S.bsel;
 }
@@ -3580,6 +3711,11 @@ function wireInput(){
       if(p&&(S.sel==="wall"||S.sel==="gate")) place(S.sel,p.gx,p.gz);
       return;
     }
+    // Roads light up under an empty cursor. Not while you are holding
+    // something: the ghost is the answer to "what happens if I click here" and
+    // a second thing glowing under it is noise.
+    var rh=(p&&!S.sel&&playable())?roadAt(p.x,p.z):null;
+    S.rhover=rh?{a:rh.a,b:rh.b}:null;
     if(mode==="maybe" &&
        Math.abs(ev.clientX-downX)+Math.abs(ev.clientY-downY)>DRAG_PX) mode="marquee";
     if(mode==="marquee"){
@@ -3615,10 +3751,14 @@ function wireInput(){
             selectBuilding(hit);
             if(!addSel) selectOnly([]);
           } else if(!hit){
-            selectBuilding(null);
+            // Nothing built here — but a road might run through it. Roads are
+            // not cells, so they are invisible to the hit test above and have
+            // to be asked for separately.
+            var rp=p?roadAt(p.x,p.z):null;
+            if(rp) selectRoad(rp); else selectBuilding(null);
             if(!addSel) selectOnly([]);
           }
-        } else { selectBuilding(null); if(!addSel) selectOnly([]); }
+        } else { selectBuilding(null); selectRoad(null); if(!addSel) selectOnly([]); }
       } else if(mode==="order"&&downBtn===2){
         // Right-click is an order, full stop — there is no right-drag gesture
         // left for it to compete with. Requiring the mouse to be still first
@@ -3726,6 +3866,8 @@ return {
   // so a test exercises the real snapping rather than a back channel.
   queueRoad:queueRoad, roadSpeed:roadSpeed, roadAnchor:roadAnchor,
   roadRefusal:roadRefusal, stepVia:stepVia,
+  cancelRoad:cancelRoad, roadAt:roadAt, selectRoad:selectRoad,
+  rsel:selRoad, roadCrew:roadCrew, edgeLen:edgeLen,
   // pathfinding, for the tools: findPath is the search, stepPath the follower
   findPath:findPath, stepPath:stepPath, losClear:losClear,
   walkableCell:function(gx,gz){ return walkableCell(gx,gz); },

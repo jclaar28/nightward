@@ -238,5 +238,128 @@ check('a network far bigger than anyone would build still fits',
       dense.pads > 0 && dense.pads < 5200,
       `${dense.edges} edges drew ${dense.pads} pads against a 5200 cap`);
 
+// ---- a queued road is a thing you can see, pick and call off ---------------
+// Ordering a road used to produce almost nothing on screen: the stakes stopped
+// at the progress mark, so a road with no work done drew a single dot. You
+// could tell something had happened and not what you had asked for.
+const staked = await page.evaluate(() => {
+  const G = __hf.game, S = __nw.state();
+  S.roadN.length = 0; S.roadE.length = 0; S.roadSeq = 0; S.rsel = null; S.rhover = null;
+  S.roadVer++;
+  G.queueRoad(-20, 14, 0, 14);
+  const e = S.roadE[0];
+  const pads = () => __nw.frame().rows.filter(r => r.b === 'road').length;
+  const marks = () => __nw.frame().rows.filter(r => r.b === 'road');
+  const fresh = pads();                       // nothing done yet
+  const lum = rs => rs.reduce((m, r) => Math.max(m, (r.ca[0] + r.ca[1] + r.ca[2]) / 3), 0);
+  const stakeLum = lum(marks());
+  e.prog = e.need * 0.5; S.roadVer++;
+  const half = pads();
+  // ...against the surface a finished road actually has
+  e.done = true; e.prog = e.need; S.roadVer++;
+  const dirtLum = lum(marks());
+  e.done = false; e.prog = 0; S.roadVer++;
+  return { fresh, half, stakeLum, dirtLum };
+});
+// The full run is staked whether or not any of it is laid, so the two counts
+// match. Before this they were 1 and about half the run.
+check('a road you have just ordered is staked out end to end',
+      staked.fresh > 8 && staked.fresh === staked.half,
+      `${staked.fresh} marks across 20u, unchanged at half built`);
+// Drawing the marks is not the same as being able to see them. The first
+// version of this staked the whole run in a dark grey the same value as the
+// stones already scattered on the grass: every mark was in the buffer and none
+// of them was visible, and a count-only check passed the whole way through.
+check('...in something you can actually pick out of the grass',
+      staked.stakeLum > staked.dirtLum * 1.6,
+      `stakes at ${staked.stakeLum.toFixed(2)} against a laid road at ${staked.dirtLum.toFixed(2)}`);
+
+const pickables = await page.evaluate(() => {
+  const G = __hf.game, S = __nw.state();
+  const e = S.roadE[0];
+  const on = G.roadAt(-10, 14), beside = G.roadAt(-10, 18), past = G.roadAt(9, 14);
+  // Selecting a road and selecting a building are the same act on one panel,
+  // so each has to put the other down.
+  __nw.place('cottage', 12, 12); __nw.run(8);
+  G.selectRoad(e);
+  const roadPicked = !!G.rsel(), bClear = !G.bsel();
+  G.selectBuilding(__nw.at(12, 12));
+  const bPicked = !!G.bsel(), rClear = !G.rsel();
+  G.selectBuilding(null);
+  return { on: on === e, beside: !beside, past: !past,
+           roadPicked, bClear, bPicked, rClear };
+});
+check('a click on the line picks the road, one off it picks nothing',
+      pickables.on && pickables.beside && pickables.past,
+      `on ${pickables.on}, 4u off ${pickables.beside}, past the end ${pickables.past}`);
+check('picking a road and picking a building put each other down',
+      pickables.roadPicked && pickables.bClear && pickables.bPicked && pickables.rClear);
+
+// Selection has to change what is drawn or it is not selection.
+const litUp = await page.evaluate(() => {
+  const G = __hf.game, S = __nw.state();
+  const sig = () => __nw.frame().rows.filter(r => r.b === 'road')
+                      .map(r => r.ca.concat([r.sc]).map(v => Math.round(v * 100)).join(':')).join(',');
+  S.rsel = null; const plain = sig();
+  G.selectRoad(S.roadE[0]); const picked = sig();
+  S.rsel = null; S.rhover = { a: S.roadE[0].a, b: S.roadE[0].b }; const hovered = sig();
+  S.rhover = null;
+  return { changedOnPick: plain !== picked, changedOnHover: plain !== hovered };
+});
+check('a picked road looks different from an idle one',
+      litUp.changedOnPick && litUp.changedOnHover,
+      `pick ${litUp.changedOnPick}, hover ${litUp.changedOnHover}`);
+
+const called = await page.evaluate(() => {
+  const G = __hf.game, S = __nw.state();
+  const e = S.roadE[0], before = { edges: S.roadE.length, nodes: S.roadN.length,
+                                   pv: S.pathVer | 0, rv: S.roadVer | 0 };
+  G.selectRoad(e);
+  const ok = G.cancelRoad(e.a, e.b);
+  return { ok, before, edges: S.roadE.length, nodes: S.roadN.length,
+           stillSel: !!G.rsel(), pv: S.pathVer | 0, rv: S.roadVer | 0,
+           pads: __nw.frame().rows.filter(r => r.b === 'road').length };
+});
+check('calling off a queued road takes the road with it',
+      called.ok && called.edges === 0 && called.pads === 0 && !called.stillSel,
+      `${called.before.edges} edges → ${called.edges}, ${called.pads} pads left`);
+// A node is only the end of an edge. One left behind is not merely litter: it
+// still snaps, so the next road drawn nearby would be quietly dragged onto a
+// junction that no longer exists.
+check('...and takes its orphaned nodes with it',
+      called.nodes === 0, `${called.before.nodes} nodes → ${called.nodes}`);
+check('...and tells the routing that the network moved',
+      called.pv > called.before.pv && called.rv > called.before.rv,
+      `pathVer ${called.before.pv}→${called.pv}, roadVer ${called.before.rv}→${called.rv}`);
+
+// A finished road comes up too, and the speed it was worth goes with it.
+const tornUp = await page.evaluate(() => {
+  const G = __hf.game, S = __nw.state();
+  G.queueRoad(-18, -14, 2, -14);
+  const e = S.roadE[0];
+  e.done = true; e.prog = e.need; S.roadVer++;
+  const before = G.roadSpeed(-8, -14);
+  const ok = G.cancelRoad(e.a, e.b);
+  return { ok, before, after: G.roadSpeed(-8, -14), edges: S.roadE.length };
+});
+check('a finished road can be torn up, and the bonus goes with it',
+      tornUp.ok && tornUp.before > 1.01 && tornUp.after === 1 && tornUp.edges === 0,
+      `speed ${tornUp.before} → ${tornUp.after}`);
+
+// The ownership check is the one that matters: applyIntent runs the same
+// function a local click runs, so without it a guest could scrap the host's
+// network. Seat 1 is not the owner of a road seat 0 laid.
+const notYours = await page.evaluate(() => {
+  const G = __hf.game, S = __nw.state();
+  G.queueRoad(-16, 20, 0, 20);
+  const e = S.roadE[0];
+  const refused = G.cancelRoad(e.a, e.b, 1);          // a different seat asking
+  const mine = G.cancelRoad(e.a, e.b, 0);             // the owner asking
+  return { refused: !refused, survived: refused === false, mine, edges: S.roadE.length };
+});
+check('another seat cannot call off a road that is not theirs',
+      notYours.refused && notYours.mine && notYours.edges === 0,
+      `refused for seat 1, removed for seat 0`);
+
 await close();
 done(errors);

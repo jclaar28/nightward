@@ -71,6 +71,22 @@ Roads are the only thing whose instance count is set by how much the player
 decides to build, and "miss the cap and it silently truncates" is a documented
 failure mode here, so the headroom is measured rather than assumed.
 
+A queued road is a thing the player can see, pick and call off, so the second
+half checks that: the whole run is staked from the moment it is ordered rather
+than only as far as it is built, a click on the line picks it and one beside it
+does not, picking a road and picking a building put each other down, and calling
+one off takes the edge, its orphaned nodes and its speed bonus with it while
+telling the routing the network moved. A separate seat is refused, because
+`applyIntent` runs the same function a local click runs and without the
+ownership check a guest could scrap the host's network.
+
+One of those checks is there because the other one was not enough. "The marks
+are drawn" and "the marks can be seen" are different claims: the first pass
+staked the whole run in a dark grey the same value as the stones scattered on
+the grass, every mark reached the buffer, and a count-only check passed while
+the feature was invisible on screen. So the stakes are also measured against the
+surface of a laid road, and a screenshot was read before it was called done.
+
 It also compares two frames three seconds apart: the worn look of a road is
 scatter, and scatter drawn from `Math.random()` inside `pack()` would be redrawn
 every frame and the road would boil. Hashing the noise off position is the fix

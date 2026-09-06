@@ -224,6 +224,8 @@ HFGAME.UI.building=function(){
   var S=HFGAME.state(), box=el("bldPanel");
   if(!box) return;
   var b=S&&HFGAME.bsel();
+  var rd=S&&HFGAME.rsel();
+  if(S&&rd&&S.phase!=="won"&&S.phase!=="lost"){ roadPanel(box,rd); return; }
   if(!b||S.phase==="won"||S.phase==="lost"){ box.hidden=true; dockActs(null); return; }
   box.hidden=false;
   // While it is still a heap of materials the bar answers "how far along", not
@@ -251,6 +253,33 @@ HFGAME.UI.building=function(){
   el("bldHint").textContent=housed.length?M.t("sel.hint.send"):"";
   dockActs(b,T,housed);
 };
+// A road borrows the same panel. It has the same four things to say — what it
+// is, how far along, who is on it, and the one verb — so giving it a second
+// panel would be two layouts to keep in step for no gain.
+function roadPanel(box,e){
+  var T=HFGAME.TYPES.road, done=!!e.done;
+  var f=done?1:Math.max(0,Math.min(1,e.prog/Math.max(0.001,e.need)));
+  box.hidden=false;
+  el("bldName").textContent=T.name+(done?"":M.t("sel.road.staked"));
+  // Unbuilt, the number is what is left to do — which is the question the
+  // player is asking when they are thinking about calling it off. Built, it is
+  // how much road they got.
+  el("bldHp").textContent=done
+    ? M.t("sel.road.len",{n:Math.round(HFGAME.edgeLen(e))})
+    : M.t("sel.road.left",{n:Math.max(0,Math.ceil(e.need-e.prog))});
+  el("bldBar").style.width=(f*100).toFixed(1)+"%";
+  el("bldBar").classList.toggle("crit",false);
+  var crew=done?0:HFGAME.roadCrew(e);
+  el("bldHouse").hidden=done;
+  if(!done){
+    el("bldHoused").textContent=crew
+      ? M.t("sel.road.crew",{n:crew, noun:M.t(crew===1?"sel.worker.one":"sel.worker.many")})
+      : M.t("sel.road.nocrew");
+    el("bldIn").textContent="";
+  }
+  el("bldHint").textContent=M.t("sel.road.hint");
+  dockActs(e,T,[],true);
+}
 // ---- what a selected unit is worth ----------------------------------------
 // The numbers come straight out of the balance table, so a value edited in the
 // library shows up here without a second copy to keep in step. Damage is quoted
@@ -344,22 +373,29 @@ function dockMode(){
 // The same verbs again, down where the cursor already is. The dock is where a
 // player's hand lives during a round, so an action they need mid-fight belongs
 // there as well as in the rail.
-function dockActs(b,T,housed){
+function dockActs(b,T,housed,road){
   var box=el("dockActs");
   if(!box) return;
   if(!b){ box.hidden=true; dockMode(); return; }
   box.hidden=false;
   el("dockWhat").textContent=T.name;
   var ds=el("dockShelter");
-  ds.hidden=!housed.length;
-  if(housed.length){
+  ds.hidden=road||!housed.length;
+  if(!road&&housed.length){
     var on=HFGAME.sheltering(b);
     ds.textContent=M.t(on?"sel.shelter.out":"sel.shelter.in");
     ds.setAttribute("aria-pressed",on?"true":"false");
   }
   // Same button, same refund — but scrapping something that was never built is
   // calling off work, not tearing a building down, and the word has to say so.
+  // A road carries no figure at all: it never cost supply, so a "+0" on the
+  // button would be answering a question nobody asked.
   var dsell=el("dockSell");
+  if(road){
+    dsell.hidden=false;
+    dsell.textContent=M.t(b.done?"sel.road.tearup":"sel.road.calloff");
+    return;
+  }
   dsell.hidden=(b.type==="hall");
   dsell.textContent=M.t(b.site?"sel.cancel":"sel.selldown",{n:Math.round(T.cost*0.8)});
 }
@@ -978,6 +1014,10 @@ el("dockShelter").addEventListener("click",function(){
   HFGAME.UI.building();
 });
 el("dockSell").addEventListener("click",function(){
+  // One button, two subjects. The road check comes first because selecting a
+  // road clears the building selection, so the two can never both be live.
+  var rd=HFGAME.rsel();
+  if(rd){ HFGAME.cancelRoad(rd.a,rd.b); HFGAME.selectRoad(null); return; }
   var b=HFGAME.bsel(); if(!b||b.type==="hall") return;
   HFGAME.removeAt(b.gx,b.gz);
   HFGAME.selectBuilding(null);
