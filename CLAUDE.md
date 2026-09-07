@@ -476,6 +476,12 @@ without talking to Jarrod first.
   ends only when every hall is gone or every nest is, and each night you leave
   the nests standing the next one is bigger by a widening margin. Holding
   forever is not a strategy the game will let you have.
+- **The opening is one decision made in two files.** What a first day pays sits
+  in `STAT_DEFS.salvage`; what a first night sends sits in `DIFF` in
+  `d_game.js`. They are a ratio, not two numbers, and moving either alone is how
+  an opening ends up frantic or free. `tools/economy.mjs` checks the ratio for
+  normal and the ordering across all three, which is what stopped a 42% cut to
+  the economy from quietly making the first night 42% harder.
 - **Difficulty changes the shape, not the numbers.** It sets how many nests ring
   you — 3 easy, 5 normal, 8 hard — and how many each sends on the first night.
   The wave is the sum of what the living nests send, so pulling one down is a
@@ -579,7 +585,7 @@ Three things follow from that:
   "Set out", not "Start the round". "Tear down", not "Sell". "Call it off" when
   the thing was never built, because cancelling work and demolishing a building
   are different acts and the word has to know which one it is.
-- **A readout names the thing, not the data.** "Massing 520" and "Still coming
+- **A readout names the thing, not the data.** "Massing 290" and "Still coming
   47" are the same numbers as "Coming" and "Enemies left" and cost nothing to
   read, but they say what the number *is*. Anything the player scans mid-fight
   still has to parse in one glance — that constraint wins over flavour every

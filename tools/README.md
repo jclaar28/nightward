@@ -447,7 +447,18 @@ crossings across a whole buffer measured the noise under a decayed tail, and an
 absolute end-threshold made a quiet distant sound look shorter than the loud
 near one it came from. Both are now relative to the sound's own peak.
 
-**`economy.mjs`** — how much a day pays and how long the map lasts. Plays a
+**`economy.mjs`** — how much a day pays, how long the map lasts, and whether the
+first night is sized against the first day. That last one is a ratio held in two
+different files — what the piles give is in `STAT_DEFS.salvage`, what a nest
+sends is in `DIFF` in `d_game.js` — and moving either alone is how an opening
+ends up frantic or free. It is checked as a band around *normal* rather than one
+band for all three, because a band wide enough to hold easy at 0.13 and hard at
+0.31 would guard nothing; the other two are checked for their order instead,
+which is the property that actually defines them. Broken three ways: the old
+wave against the new economy (0.36), the new wave against the old piles (0.14),
+and hard made lighter than normal (the order check).
+
+The rest of it: Plays a
 settlement out day by day with workers on the nearest live pile and cottages
 bought as they become affordable, then reports income per day, when the piles
 run dry, and what the nest caches add. Use it whenever you touch salvage,

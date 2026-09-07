@@ -228,11 +228,11 @@ function syncStats(){
 // every night after — which is the whole reason to leave the walls.
 // `send` is per nest per night one; `nests` is how many the map seeds.
 var DIFF={
-  easy  :{supply:60, nests:3, send:112, hp:36,
+  easy  :{supply:60, nests:3, send:62, hp:36,
           mix:{shambler:0.76, runner:0.20, brute:0.04}},
-  normal:{supply:45, nests:5, send:104, hp:42,
+  normal:{supply:45, nests:5, send:58, hp:42,
           mix:{shambler:0.66, runner:0.25, brute:0.09}},
-  hard  :{supply:30, nests:8, send:98,  hp:46,
+  hard  :{supply:30, nests:8, send:54, hp:46,
           mix:{shambler:0.58, runner:0.28, brute:0.14}}
 };
 // After DIFF, not before: syncText() names the difficulties out of the text
@@ -380,7 +380,7 @@ function newGame(seed,map,opt){
     me:Math.max(0,Math.min(pn-1,(opt.me|0)||0)),
     multi:pn>1,
     phase:"build", supply:RD.supply||C.supply, ehp:RD.hp||C.hp, wave:0,
-    send:RD.send||C.send||104,     // what one nest sends on the first night
+    send:RD.send||C.send||58,      // what one nest sends on the first night
     cells:{}, hall:null, enemies:[], bolts:[], parts:[], corpses:[], queue:[],
     units:[], markers:[], stance:"hold", marquee:null,
     // Roads are a graph in world space, not cells: nodes sit wherever the

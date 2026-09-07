@@ -68,15 +68,21 @@ function runEconomy({ seed, days, diff }) {
     gathered: Math.round(S.gathered),
     left: Math.round(G.salvageLeft()), dryOn,
     nests: S.nests.length, cache: HF.statsOf('nest').cache,
+    send: S.send, wave1: S.nests.length * S.send,
   };
 }
 
+// What the first day pays and what the first night sends are one decision, not
+// two, and they live in different files — the piles are in STAT_DEFS and the
+// send is in DIFF. Moving either alone is how an opening ends up frantic or
+// free, so the ratio between them is what gets checked.
+const PER = {};
 const { page, errors, close } = await open();
 await page.evaluate(`window.__econ = ${runEconomy.toString()}`);
 
 for (const diff of DIFFS) {
   console.log(`\n--- ${diff} ---`);
-  let dry = [], shares = [], tapers = [];
+  let dry = [], shares = [], tapers = [], day1 = [], wave1 = 0;
   for (const seed of SEEDS) {
     const r = await page.evaluate(a => window.__econ(a), { seed, days: DAYS, diff });
     if (r.error) { console.log(`seed ${seed}: ${r.error}`); continue; }
@@ -84,6 +90,7 @@ for (const diff of DIFFS) {
     shares.push(Math.max(...r.perDay) / r.total);
     const working = r.perDay.filter(d => d > 0);
     tapers.push(working.length > 1 ? working[working.length - 1] / working[0] : 1);
+    day1.push(r.perDay[0]); wave1 = r.wave1;
     console.log(`seed ${String(seed).padEnd(6)} ` +
       `map ${String(r.total).padStart(5)}  gathered ${String(r.gathered).padStart(5)}` +
       `  left ${String(r.left).padStart(5)}  dry on day ${r.dryOn === null ? '-' : r.dryOn}` +
@@ -105,6 +112,29 @@ for (const diff of DIFFS) {
   check(`${diff}: income tapers as the near piles empty`,
         tapers.every(t => t < 0.75),
         `last working day was ${(Math.max(...tapers) * 100).toFixed(0)}% of the first`);
+  day1.sort((a, b) => a - b);
+  PER[diff] = { wave: wave1, day: day1[Math.floor(day1.length / 2)] || 1 };
+  PER[diff].per = PER[diff].wave / PER[diff].day;
+  console.log(`  first night ${PER[diff].wave} against ${PER[diff].day} supply on day one` +
+              ` — ${PER[diff].per.toFixed(2)} of an attacker per supply`);
+}
+
+// A band around normal, because normal is the difficulty everything else is
+// tuned against; a single band wide enough to hold all three would have to span
+// 0.13 to 0.31 and would guard nothing. The other two are checked for their
+// order instead, which is the property that actually defines them.
+if (PER.normal) {
+  check('normal: the first night is sized against what the first day pays',
+        PER.normal.per > 0.16 && PER.normal.per < 0.30,
+        `${PER.normal.wave} attackers against ${PER.normal.day} supply on day one — ` +
+        `${PER.normal.per.toFixed(2)} of an attacker per supply gathered`);
+}
+if (PER.easy && PER.normal && PER.hard) {
+  check('and the difficulties are in the order they claim',
+        PER.easy.per < PER.normal.per && PER.normal.per < PER.hard.per,
+        `${PER.easy.per.toFixed(2)} easy, ${PER.normal.per.toFixed(2)} normal, ` +
+        `${PER.hard.per.toFixed(2)} hard — each one a heavier first night against the ` +
+        `same day's work`);
 }
 
 await close();

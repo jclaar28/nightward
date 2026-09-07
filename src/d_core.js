@@ -1799,12 +1799,12 @@ var STAT_DEFS={
   // for days now, so a pile has to outlast several of them while paying little
   // enough per trip that it never funds a defence on its own.
   salvage:{ note:"How much is out there, and how it is spread.", fields:[
-    {k:"nearN",   label:"Piles · inside", def:3,  lo:0,  hi:12,  step:1, int:true,
+    {k:"nearN",   label:"Piles · inside", def:2,  lo:0,  hi:12,  step:1, int:true,
      hint:"close to the plateau, safe to work"},
     {k:"farN",    label:"Piles · outside",def:7,  lo:0,  hi:20,  step:1, int:true,
      hint:"out in the open ground between you and the nests"},
     {k:"amt",     label:"Yield · inside", def:340,lo:5,  hi:4000,step:10,int:true, unit:"supply"},
-    {k:"farK",    label:"Yield · outside",def:1.9,lo:0.2,hi:6,   step:0.05,
+    {k:"farK",    label:"Yield · outside",def:2.1,lo:0.2,hi:6,   step:0.05,
      hint:"× the inside yield"}
   ]},
 

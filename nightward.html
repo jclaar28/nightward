@@ -2964,12 +2964,12 @@ var STAT_DEFS={
   // for days now, so a pile has to outlast several of them while paying little
   // enough per trip that it never funds a defence on its own.
   salvage:{ note:"How much is out there, and how it is spread.", fields:[
-    {k:"nearN",   label:"Piles · inside", def:3,  lo:0,  hi:12,  step:1, int:true,
+    {k:"nearN",   label:"Piles · inside", def:2,  lo:0,  hi:12,  step:1, int:true,
      hint:"close to the plateau, safe to work"},
     {k:"farN",    label:"Piles · outside",def:7,  lo:0,  hi:20,  step:1, int:true,
      hint:"out in the open ground between you and the nests"},
     {k:"amt",     label:"Yield · inside", def:340,lo:5,  hi:4000,step:10,int:true, unit:"supply"},
-    {k:"farK",    label:"Yield · outside",def:1.9,lo:0.2,hi:6,   step:0.05,
+    {k:"farK",    label:"Yield · outside",def:2.1,lo:0.2,hi:6,   step:0.05,
      hint:"× the inside yield"}
   ]},
 
@@ -5271,11 +5271,11 @@ function syncStats(){
 // every night after — which is the whole reason to leave the walls.
 // `send` is per nest per night one; `nests` is how many the map seeds.
 var DIFF={
-  easy  :{supply:60, nests:3, send:112, hp:36,
+  easy  :{supply:60, nests:3, send:62, hp:36,
           mix:{shambler:0.76, runner:0.20, brute:0.04}},
-  normal:{supply:45, nests:5, send:104, hp:42,
+  normal:{supply:45, nests:5, send:58, hp:42,
           mix:{shambler:0.66, runner:0.25, brute:0.09}},
-  hard  :{supply:30, nests:8, send:98,  hp:46,
+  hard  :{supply:30, nests:8, send:54, hp:46,
           mix:{shambler:0.58, runner:0.28, brute:0.14}}
 };
 // After DIFF, not before: syncText() names the difficulties out of the text
@@ -5423,7 +5423,7 @@ function newGame(seed,map,opt){
     me:Math.max(0,Math.min(pn-1,(opt.me|0)||0)),
     multi:pn>1,
     phase:"build", supply:RD.supply||C.supply, ehp:RD.hp||C.hp, wave:0,
-    send:RD.send||C.send||104,     // what one nest sends on the first night
+    send:RD.send||C.send||58,      // what one nest sends on the first night
     cells:{}, hall:null, enemies:[], bolts:[], parts:[], corpses:[], queue:[],
     units:[], markers:[], stance:"hold", marquee:null,
     // Roads are a graph in world space, not cells: nodes sit wherever the

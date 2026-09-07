@@ -117,16 +117,16 @@ difficulty and rises 5% each night. Night one:
 
 | | |
 |---|---|
-| piles | 3 near, 7 far |
-| worth | 340 near, 646 far (×1.9) |
-| on the map | 5542 in piles, plus 960 on easy / 1600 on normal / 2560 on hard in caches |
+| piles | 2 near, 7 far |
+| worth | 340 near, 714 far (×2.1) |
+| on the map | 5678 in piles, plus 960 on easy / 1600 on normal / 2560 on hard in caches |
 
 ### Difficulty
 
 | | starting supply | nests | each sends | base health | shambler / runner / brute |
 |---|---|---|---|---|---|
-| **Easy** | 60 | 3 | 112 | 36 | 76% / 20% / 4% |
-| **Normal** | 45 | 5 | 104 | 42 | 66% / 25% / 9% |
-| **Hard** | 30 | 8 | 98 | 46 | 58% / 28% / 14% |
+| **Easy** | 60 | 3 | 62 | 36 | 76% / 20% / 4% |
+| **Normal** | 45 | 5 | 58 | 42 | 66% / 25% / 9% |
+| **Hard** | 30 | 8 | 54 | 46 | 58% / 28% / 14% |
 
-The first night is every living nest's send added together — 336 on easy, 520 on normal, 784 on hard. Pulling one down is a permanent cut to every night after it.
+The first night is every living nest's send added together — 186 on easy, 290 on normal, 432 on hard. Pulling one down is a permanent cut to every night after it.
