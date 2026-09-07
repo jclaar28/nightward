@@ -120,8 +120,49 @@ const m = await page.evaluate(() => {
   const openRings = ringsAtGate();
   HFGAME.setGate(gate, true);
 
+  // ---- the leaves ----------------------------------------------------------
+  // The frame and the doors are separate assets, because the doors move and the
+  // frame does not. Each leaf hinges at its own mesh origin and runs out along
+  // +x, so the instance yaw every batch already carries IS the angle the door
+  // stands at — no bone, no pitch slot, no shader. What that buys has to be
+  // measured on the instances the renderer is handed, since a leaf drawn at the
+  // wrong yaw is still a leaf and still counts.
+  function leaves(cx, cz) {
+    return __nw.frame().rows
+      .filter(r => r.b === 'gatedoor' && Math.hypot(r.x - cx, r.z - cz) < 2)
+      .map(r => ({ off: +Math.hypot(r.x - cx, r.z - cz).toFixed(3),
+                   ax: +(r.x - cx).toFixed(3), az: +(r.z - cz).toFixed(3),
+                   yaw: r.yaw }));
+  }
+  const gxw = HF.gx2w(GX), gzw = HF.gx2w(GZ);
+  HFGAME.setGate(gate, true);
+  __nw.run(2);
+  const lShut = leaves(gxw, gzw);
+  HFGAME.setGate(gate, false);
+  const mid = [];
+  for (let i = 0; i < 5; i++) { __nw.run(0.1, 0.05); mid.push(leaves(gxw, gzw)[0].yaw); }
+  __nw.run(2);
+  const lOpen = leaves(gxw, gzw);
+  HFGAME.setGate(gate, true);
+  __nw.run(2);
+
+  // A second gate at a right angle to the first, because hinge offsets written
+  // in world axes instead of the gate's own would sit correctly on one run and
+  // inside the sill on the other. It needs a run of its own to align to: a lone
+  // gate takes the default rotation, which is the first gate's, and the check
+  // then compares a thing with itself and passes.
+  const GZ2 = HF.w2gx(0);
+  for (let gx = HF.w2gx(-13); gx <= HF.w2gx(-5); gx++)
+    HFGAME.place(gx === HF.w2gx(-9) ? 'gate' : 'wall', gx, GZ2);
+  __nw.run(12);
+  const g2 = __nw.at(-9, 0);
+  const g2x = HF.gx2w(HF.w2gx(-9)), g2z = HF.gx2w(HF.w2gx(0));
+  const l2 = leaves(g2x, g2z);
+
   return { cellsBuilt, wanted: line.length, isGate: gate && gate.type === 'gate',
-           shut, open: open_, reshut, shutRings, openRings };
+           shut, open: open_, reshut, shutRings, openRings,
+           lShut, lOpen, mid, l2,
+           rot: gate.rot, rot2: g2 ? g2.rot : null };
 });
 
 check('the wall under test actually got built',
@@ -173,6 +214,49 @@ check('an open gate is marked on the ground and a shut one is not',
       `${m.openRings} ring segments under an open gate, ${m.shutRings} under a shut ` +
       `one — the player has to be able to see which of their gates are standing open ` +
       `without clicking every one of them`);
+
+// ---- the leaves swing ------------------------------------------------------
+const deg = r => r * 180 / Math.PI;
+const sep = (a, b) => {
+  let d = deg(a - b) % 360;
+  if (d > 180) d -= 360;
+  if (d < -180) d += 360;
+  return d;
+};
+
+check('a gate draws two leaves, hinged at its jambs',
+      m.lShut.length === 2 &&
+      m.lShut.every(l => Math.abs(l.off - 0.525) < 0.01),
+      `two instances ${m.lShut.map(l => l.off).join(' and ')} from the gate's centre. ` +
+      `The frame and the doors are separate assets because the doors move and the ` +
+      `frame does not`);
+
+check('...and the hinges turn with the frame',
+      Math.abs(m.lShut[0].ax) < 0.01 && Math.abs(m.lShut[0].az - 0.525) < 0.01 &&
+      Math.abs(m.l2[0].az) < 0.01 && Math.abs(Math.abs(m.l2[0].ax) - 0.525) < 0.01,
+      `a gate in a north-south run hangs its leaves along z (${m.lShut[0].ax}, ` +
+      `${m.lShut[0].az}) and one in an east-west run along x (${m.l2[0].ax}, ` +
+      `${m.l2[0].az}) — hinge offsets written in world axes would sit correctly on ` +
+      `one run and inside the sill on the other`);
+
+const swing = m.lShut.map((l, i) => sep(m.lOpen[i].yaw, l.yaw));
+check('opening swings both leaves clear of the doorway',
+      swing.every(d => Math.abs(d) > 70 && Math.abs(d) < 95),
+      `${swing.map(d => d.toFixed(0)).join('° and ')}° from shut. Far enough that the ` +
+      `leaf stands proud of the wall line and breaks its silhouette, which is what ` +
+      `reads at play zoom; folded flat against the wall at 110° it was invisible from ` +
+      `an isometric camera and the whole change bought nothing`);
+check('...and they swing opposite ways, like a door rather than a turnstile',
+      (swing[0] > 0) !== (swing[1] > 0),
+      `${swing.map(d => d.toFixed(0)).join('° and ')}° — two leaves rotating the same ` +
+      `way is a revolving door`);
+
+check('the leaves swing rather than snapping',
+      new Set(m.mid.map(y => y.toFixed(3))).size >= 4 &&
+      Math.abs(sep(m.mid[m.mid.length - 1], m.mid[0])) > 20,
+      `${m.mid.map(y => deg(y).toFixed(0)).join('°, ')}° over half a second of frames. ` +
+      `It is driven from the shut flag the snapshot already carries, so both sides of ` +
+      `a net game animate the same door without a number on the wire`);
 
 await close();
 done(errors);

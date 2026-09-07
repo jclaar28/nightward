@@ -61,8 +61,8 @@ reports 29 of 52 segments below ground against the flat version.
 **`campaign.mjs`** — the round loop. A night is not the end of anything, so
 these drive several full day/night cycles: dawn hands you the next day, the
 night counter advances, each wave is bigger than the last by a margin that
-widens, losing every hall ends it, clearing every nest wins it and pays its cache, and
-the nest garrisons chase what comes close without leaving home or eating your
+widens, losing every hall ends it, clearing every nest wins it and pays its
+cache, and the nest garrisons chase what comes close without leaving home or eating your
 workers during the day.
 
 The widening margin is measured over nights 1, 4, 7 and 10 rather than over the
@@ -443,6 +443,14 @@ unit walking confidently into a door and grinding there, or an attacker crossing
 the map to queue at a gate that is barred. So every check runs against a closed
 gate *and* an open one: "it blocks" and "it lets things through" are two claims,
 and passing one of them is how you ship half a door.
+
+The leaves are checked on the instances the renderer is handed rather than on
+the state, because a leaf drawn at the wrong yaw is still a leaf and still
+counts: two per gate, hinged 0.525 from its centre, offsets that rotate with the
+frame, and a swing of 80 degrees in opposite directions sampled across half a
+second of frames so a snap fails. The second gate needs a wall run of its own —
+the first version placed a lone one, which takes the default rotation, so the
+check compared the first gate with itself and passed.
 
 Two measurements here were wrong before they were right, and both are the same
 mistake — comparing things that were never comparable. The path check read

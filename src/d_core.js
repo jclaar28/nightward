@@ -1039,7 +1039,7 @@ var ASSETS=[
 
 { id:"gate", name:"Gate", group:"Structures",
   colA:PAL.timberL, colB:PAL.iron, scale:1.0,
-  note:"Path cost 2 — cheaper than open ground, so the swarm prefers to walk through it.",
+  note:"A door, not a hole. Barred, nothing walks through it — yours included. Open, its path cost of 2 is below open ground, so the swarm prefers to come through it, which is the whole trade. The leaves are a separate asset (Gate Door) because they swing.",
   slots:["A — timberL (frame)","B — iron (hood, plating)"],
   parts:[
     {id:"sill",  name:"Sill",   prim:"box", p:[0,0,0],       s:[1.50,0.22,1.10], shade:0.58},
@@ -1047,8 +1047,28 @@ var ASSETS=[
        rep:{mode:"mirrorX"}},
     {id:"lintel",name:"Lintel", prim:"box", p:[0,2.53,0],    s:[1.70,0.28,0.58], shade:0.95},
     {id:"hood",  name:"Hood",   prim:"box", p:[0,2.81,0],    s:[1.95,0.22,0.85], tint:1},
-    {id:"doors", name:"Doors",  prim:"box", p:[0,0.18,0],    s:[1.05,1.85,0.16], shade:0.66},
-    {id:"brace", name:"Brace",  prim:"box", p:[0,0.95,0.10], s:[1.05,0.14,0.06], shade:0.45}
+    {id:"jamb",  name:"Jambs",  prim:"box", p:[0.50,0.18,0], s:[0.10,1.85,0.20], shade:0.50,
+       rep:{mode:"mirrorX"}}
+  ]},
+
+// The leaf, on its own, because it has to move and the frame does not. Its
+// hinge is the MESH ORIGIN and it extends along +x from there, so the instance
+// yaw that every batch already carries swings it about its own hinge — no bone,
+// no pitch slot, no shader. Two of these make a gate: one placed at each jamb,
+// the right-hand one yawed half a turn so it reaches back to the middle.
+//
+// Half of 1.05, because the pair of them close on the gap the doors part used
+// to fill in one piece. Anything wider and the leaves overlap when they shut.
+{ id:"gatedoor", name:"Gate Door", group:"Structures",
+  colA:PAL.timberL, colB:PAL.iron, scale:1.0,
+  note:"One leaf of a gate. Drawn separately from the frame so it can swing: the hinge is at the mesh origin and the leaf runs out along +x, so an instance yaw is the angle it stands open at.",
+  slots:["A — timberL (leaf)","B — iron (band, hinge)"],
+  parts:[
+    {id:"hinge", name:"Hinge",  prim:"cyl", p:[0,0.18,0],     s:[0.075,1.85], seg:6, cap:false,
+       tint:1, shade:0.95},
+    {id:"leaf",  name:"Leaf",   prim:"box", p:[0.27,0.18,0],  s:[0.525,1.82,0.15], shade:0.66},
+    {id:"band",  name:"Banding",prim:"box", p:[0.27,0.86,0.085],s:[0.50,0.13,0.05], tint:1, shade:0.90},
+    {id:"band2", name:"Banding · low",prim:"box", p:[0.27,0.30,0.085],s:[0.50,0.13,0.05], tint:1, shade:0.90}
   ]},
 
 { id:"ballista", name:"Ballista", group:"Structures",

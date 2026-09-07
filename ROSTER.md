@@ -66,7 +66,7 @@ a second copy would stop following the values the in-game library edits.*
 
 **Palisade.** Half a cell, growing from the centre toward +X. A wall cell emits one run per connected neighbour, so corners, tees and crossings build themselves.
 
-**Gate.** Path cost 2 — cheaper than open ground, so the swarm prefers to walk through it.
+**Gate.** A door, not a hole. Barred, nothing walks through it — yours included. Open, its path cost of 2 is below open ground, so the swarm prefers to come through it, which is the whole trade. The leaves are a separate asset (Gate Door) because they swing.
 
 **Turret.** Timber, like the wall it stands in — a ring of staves banded with iron rather than a stone drum, so it reads as the same builders' work at a glance. It joins a wall run the way a gate does, the neighbouring cells growing their arms into it, and stands a head taller than the posts so the platform reads as somewhere you could put an archer. It shoots nothing on its own: the range belongs to whoever is standing on it.
 

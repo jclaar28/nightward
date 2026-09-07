@@ -278,6 +278,7 @@ function init(renderer, cv, settings, endCb){
     hall :R.makeBatch(M.buildAsset("hall")),  tower:R.makeBatch(M.buildAsset("tower")),
     wall :R.makeBatch(M.buildAsset("wall")),  gate :R.makeBatch(M.buildAsset("gate")),
     wpost:R.makeBatch(M.buildAsset("wallpost")),
+    gatedoor:R.makeBatch(M.buildAsset("gatedoor")),
     ballista:R.makeBatch(M.buildAsset("ballista")), brazier:R.makeBatch(M.buildAsset("brazier")),
     barracks:R.makeBatch(M.buildAsset("barracks")), archery:R.makeBatch(M.buildAsset("archery")),
     turret:R.makeBatch(M.buildAsset("turret")),
@@ -311,7 +312,7 @@ function init(renderer, cv, settings, endCb){
   // ground clutter, so it sits with the salvage rather than with the buildings
   BATCHES=[B.road,B.corpse,B.salvage,B.site,B.hall,B.tower,B.ballista,B.brazier,
            B.barracks,B.archery,B.cottage,
-           B.wall,B.wpost,B.gate,B.turret,
+           B.wall,B.wpost,B.gate,B.gatedoor,B.turret,
            B.nest,B.soldier,B.archer,B.worker,B.scout,B.commander,
            B.bolt,B.arrow,B.spark,B.debris,B.tile];
   // Drawn after everything solid, blended, and in this order: the shade is
@@ -334,9 +335,10 @@ function init(renderer, cv, settings, endCb){
            bolt:400,arrow:300,wall:1400,turret:200,soldier:120,archer:120,worker:120,
            scout:40, commander:8,
            marker:24,salvage:24,cottage:120,nest:24,site:600,road:5200,
+           gatedoor:400,
            rchip:9000,dshade:3200,mist:120};
   ["hall","tower","ballista","brazier","barracks","archery","cottage",
-   "wall","wpost","gate","turret",
+   "wall","wpost","gate","gatedoor","turret",
    "soldier","archer","worker","scout","commander","salvage","nest",
    "corpse","bolt","arrow","spark","debris","rchip","dshade","mist","marker","tile","grid","site",
    "road"].forEach(function(k){
@@ -485,6 +487,7 @@ function rebuildAssets(){
   // here shipped a crash that only fires when the Library rebuilds assets,
   // which is a path only tools/text.mjs walks.
   [["hall","hall"],["tower","tower"],["wall","wall"],["gate","gate"],
+   ["gatedoor","gatedoor"],
    ["turret","turret"],
    ["bolt","tracer"],["rchip","ringchip"],["grid","grid"],["debris","spark"],
    ["wpost","wallpost"],["ballista","ballista"],["brazier","brazier"],
@@ -2479,6 +2482,27 @@ function damageBuilding(b,amt){
   }
 }
 
+// How far each gate's leaves have swung, 0 shut to 1 open. Cosmetic and local:
+// it is driven entirely from `shut`, which the snapshot already carries, so both
+// sides animate the same door from the same fact without a number on the wire.
+// It runs above the guest early-out for that reason.
+//
+// A gate first seen mid-swing does not get an animation — a guest joining a
+// game in progress would otherwise watch every open gate on the map swing wide
+// at once, which reads as an event rather than as a state.
+var GATE_OPEN_RATE=1/0.55;               // a little over half a second, either way
+function stepGates(dt){
+  for(var k in S.cells){
+    var c=S.cells[k];
+    if(c.ref||c.type!=="gate") continue;
+    var want=c.shut?0:1;
+    if(c.sw===undefined){ c.sw=want; continue; }
+    if(c.sw===want) continue;
+    var step=GATE_OPEN_RATE*dt;
+    c.sw=(Math.abs(want-c.sw)<=step)?want:(c.sw+(want>c.sw?step:-step));
+  }
+}
+
 // Local-only motion on the guest: particles fall, corpses settle, gaits keep
 // walking, and every entity eases toward the last position the host sent.
 function guestStep(dt){
@@ -2761,6 +2785,7 @@ function update(dt){
   S.tt=(S.tt||0)+dt;
   stepPan(dt);
   stepTurn(dt);
+  stepGates(dt);
   // The guest owns nothing: the host decides every position and hit point, and
   // this side only advances the cosmetic parts so the picture stays smooth
   // between snapshots.
@@ -3685,9 +3710,36 @@ function contactShade(n,x,z,r,k){
   groundRing(n,x,z,r,k===undefined?SHADE_COL:[SHADE_COL[0]*k,SHADE_COL[1]*k,SHADE_COL[2]*k],
              0.022,"dshade");
 }
+// The two leaves of a gate, drawn as their own instances so they can move.
+//
+// The leaf mesh hinges at its own origin and runs out along +x, so all this has
+// to do is put one instance at each jamb and yaw it: shut is the pair reaching
+// in to meet in the middle, open is the pair folded back against the wall. No
+// bone and no pitch slot — the yaw every instance already carries is the angle
+// the door stands at, which is the whole reason the leaf is a separate asset
+// rather than a part of the frame.
+//
+// The right leaf carries half a turn so it reaches back toward the middle from
+// its own side, and its swing is negated to match: a double door opens away
+// from its own centre line, and two leaves rotating the same way is a
+// turnstile.
+var GATE_HINGE=0.525, GATE_SWING=1.40;
+function gateLeaves(n,c,x,y,z,rt,ca,cb){
+  var k=(c.sw===undefined)?(c.shut?0:1):c.sw;
+  k=k*k*(3-2*k);                         // eased here, not stored: a linear store stays readable
+  var a=GATE_SWING*k;
+  var cs=Math.cos(rt), sn=Math.sin(rt);
+  // Hinge offsets are in the gate's own frame, so they turn with it. A gate in
+  // a north-south run and one in an east-west run are the same asset at
+  // different yaws, and hinges written in world axes would sit in the sill.
+  var hx=GATE_HINGE*cs, hz=-GATE_HINGE*sn;
+  n=put(buf.gatedoor,n, x-hx, y, z-hz, rt-a,          ca,1,cb);
+  n=put(buf.gatedoor,n, x+hx, y, z+hz, rt+Math.PI+a,  ca,1,cb);
+  return n;
+}
 function pack(){
   var n={hall:0,tower:0,ballista:0,brazier:0,barracks:0,archery:0,cottage:0,
-         wall:0,wpost:0,gate:0,turret:0,salvage:0,
+         wall:0,wpost:0,gate:0,gatedoor:0,turret:0,salvage:0,
          soldier:0,archer:0,worker:0,scout:0,commander:0,nest:0,
          corpse:0,bolt:0,arrow:0,spark:0,debris:0,rchip:0,dshade:0,mist:0,marker:0,tile:0,grid:0,site:0,
          road:0};
@@ -3744,7 +3796,10 @@ function pack(){
     else if(c.type==="barracks") n.barracks=put(buf.barracks,n.barracks,x,by,z,rt,ca,ty.scale,cb);
     else if(c.type==="archery") n.archery=put(buf.archery,n.archery,x,by,z,rt,ca,ty.scale,cb);
     else if(c.type==="cottage") n.cottage=put(buf.cottage,n.cottage,x,by,z,rt,ca,ty.scale,cb);
-    else if(c.type==="gate") n.gate=put(buf.gate,n.gate,x,by,z,rt,ca,ty.scale,cb);
+    else if(c.type==="gate"){
+      n.gate=put(buf.gate,n.gate,x,by,z,rt,ca,ty.scale,cb);
+      n.gatedoor=gateLeaves(n.gatedoor,c,x,by,z,rt,ca,cb);
+    }
     else if(c.type==="turret"){
       n.turret=put(buf.turret,n.turret,x,by,z,rt,ca,ty.scale,cb);
       // A turret emits the same arms a palisade does, into whichever sides have

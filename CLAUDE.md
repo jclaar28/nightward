@@ -604,6 +604,20 @@ without talking to Jarrod first.
   which meant a soldier could step out to swing and step back — `tools/gate.mjs`
   runs every one of these against both states, because "it blocks" and "it lets
   things through" are two claims and passing one is how you ship half a door.
+- **A gate's leaves are their own asset, and the yaw slot is the hinge.** The
+  frame moves and the doors do, so they are separate batches. `gatedoor` hinges
+  at its own mesh ORIGIN and runs out along +x, which means the per-instance yaw
+  every batch already carries is the angle the leaf stands at: two instances at
+  the jambs, the right one half a turn round to reach back to the middle, and
+  the swing negated on it so a double door opens rather than revolving. No bone,
+  no pitch slot, no shader change. The hinge offsets are rotated into the gate's
+  own frame, or they sit correctly on a north-south run and inside the sill on
+  an east-west one. `c.sw` eases 0 to 1 in `stepGates()`, above the guest
+  early-out, driven entirely from the `shut` flag the snapshot already carries —
+  so both sides animate the same door with no number on the wire. The swing is
+  80 degrees on purpose: at 110 the leaves fold flat against the wall and vanish
+  from an isometric camera, and what actually reads at play zoom is a leaf
+  standing proud of the wall line and breaking its silhouette.
 - **The horde does not path, and defenders do not flow.** Two separate systems
   on purpose. The horde runs a Dijkstra flow field, so a wall's high path cost
   pushes them elsewhere and a gate's low cost invites them in — that is the
