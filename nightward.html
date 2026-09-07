@@ -6686,20 +6686,37 @@ function pathTo(u,tx,tz){
 // corner it is rounding — so it ran a full A* per unit per frame and the game
 // stopped. Re-plan on three things only: the destination moved, the layout
 // changed under the route, or the unit has genuinely stopped making progress.
+var WEDGE_R=0.40;                  // ground a walking unit clears in well under
+var WEDGE_T=1.00;                  // this long; anything slower is not walking
+var NOROUTE_CD=2.5;                // stand this long before asking again
 function stepPath(u,U,tx,tz,stop){
   var ver=(S.roadVer|0)^((S.pathVer|0)<<8);
   var moved=!u.pathTo||Math.abs(u.pathTo[0]-tx)>0.5||Math.abs(u.pathTo[1]-tz)>0.5;
   if(u.pathCd>0) u.pathCd-=dt_;
-  // progress watchdog: local steering handles a corner, but a unit that has not
-  // moved in three quarters of a second is wedged and wants a new route
-  var d2=(u.ppx===undefined)?1:((u.x-u.ppx)*(u.x-u.ppx)+(u.z-u.ppz)*(u.z-u.ppz));
-  u.ppx=u.x; u.ppz=u.z;
-  u.pathStuck = (d2<1e-6) ? (u.pathStuck||0)+dt_ : 0;
-  var wedged=u.pathStuck>0.75;
-  if(moved || u.pathVer!==ver || (wedged&&!(u.pathCd>0))){
+  if(u.noRoute>0) u.noRoute-=dt_;
+  var far=Math.hypot(tx-u.x,tz-u.z)>stop+0.02;
+  // Progress, not motion. The old watchdog asked whether the unit had moved
+  // since the last frame — and a unit rocking against the corner of a building
+  // moves plenty, it just never gets anywhere. Measured, one rocked inside a
+  // tenth of a unit for the whole run with its stuck timer pinned at zero, so
+  // it never re-planned and never arrived. Keep a checkpoint instead and ask
+  // whether the unit has LEFT it: real walking clears WEDGE_R in a fraction of
+  // a second, milling never clears it at all.
+  if(!far || u.pgx===undefined || Math.hypot(u.x-u.pgx,u.z-u.pgz)>WEDGE_R){
+    u.pgx=u.x; u.pgz=u.z; u.pathStuck=0;
+  } else u.pathStuck=(u.pathStuck||0)+dt_;
+  var wedged=u.pathStuck>WEDGE_T;
+  if(moved || u.pathVer!==ver){ u.noRoute=0; }
+  if(moved || u.pathVer!==ver || (wedged&&!(u.pathCd>0)&&!(u.noRoute>0))){
     pathTo(u,tx,tz);
-    u.pathCd=0.5; u.pathStuck=0;
+    u.pathCd=0.5; u.pathStuck=0; u.pgx=u.x; u.pgz=u.z;
+    // Wedged, no route, and the straight line is blocked too: it cannot get
+    // there from here. Walking at it only grinds — a shut gate had workers
+    // juddering against the wall with a full load. Stand, and ask again in a
+    // moment, because a gate opens and a wall falls.
+    if(wedged && far && !u.path && !losClear(u.x,u.z,tx,tz)) u.noRoute=NOROUTE_CD;
   }
+  if(u.noRoute>0) return false;             // nowhere to go: hold rather than grind
   var p=u.path;
   if(!p||u.pathI>=p.length) return stepToward(u,U,tx,tz,stop);
   var w=p[u.pathI];
@@ -6798,10 +6815,45 @@ function updateRoadwork(u,U,dt,op){
 
 // Walk at a building until you are standing against it. Collision keeps the
 // unit out of the walls, so aiming straight at the middle is safe.
+// The nearest cell you can actually stand on next to a building. A building's
+// own cells are not walkable, so A* refuses them as a destination — which is
+// why walking to one was a straight line at its centre and nothing else.
+function approachPoint(b,x,z){
+  var cs=footCells(b.type,b.gx,b.gz,bRot(b)), seen={}, best=null, bd=1e9, i;
+  for(i=0;i<cs.length;i++) seen[cs[i][0]+","+cs[i][1]]=1;
+  for(i=0;i<cs.length;i++) for(var ox=-1;ox<=1;ox++) for(var oz=-1;oz<=1;oz++){
+    var gx=cs[i][0]+ox, gz=cs[i][1]+oz;
+    if(seen[gx+","+gz]) continue;
+    seen[gx+","+gz]=1;
+    if(!walkableCell(gx,gz)) continue;
+    var wx=M.gx2w(gx), wz=M.gx2w(gz), d=Math.hypot(wx-x,wz-z);
+    if(d<bd){ bd=d; best=[wx,wz]; }
+  }
+  return best;
+}
+// Walk to a building. This used to steer straight at the centre and lean on
+// local avoidance, and that is fine in a yard and hopeless anywhere else: a
+// loaded worker coming home from outside your own wall walked into the wall and
+// stayed there with a full load, because the deposit leg had no route at all
+// unless the map happened to have roads on it. Route to the nearest cell beside
+// the building instead, and close the last step directly — the doorway is a
+// thing you stand next to, not a cell you enter.
 function stepToBuilding(u,U,b,margin){
   margin=(margin===undefined)?TOUCH:margin;
   if(boxDist(u.x,u.z,b)<=margin) return true;
   var bx=bwx(b), bz=bwz(b);
+  // The approach cell is cached because it is the destination stepPath compares
+  // against: recomputed every frame it wobbles by a cell, which reads as "the
+  // destination moved" and runs a full A* per unit per frame.
+  if(u.apB!==b || !u.ap || !walkableCell(M.w2gx(u.ap[0]),M.w2gx(u.ap[1])) ||
+     (u.apT|0)<=0){
+    u.ap=approachPoint(b,u.x,u.z); u.apB=b; u.apT=30;
+  } else u.apT--;
+  var ap=u.ap;
+  if(ap && Math.hypot(ap[0]-u.x,ap[1]-u.z)>margin+CELL*0.5){
+    stepPath(u,U,ap[0],ap[1],0.15);
+    return boxDist(u.x,u.z,b)<=margin;
+  }
   var dx=bx-u.x, dz=bz-u.z, L=Math.hypot(dx,dz)||1;
   var sp=U.speed*roadSpeed(u.x,u.z)*dt_;
   moveUnit(u,u.x+dx/L*sp,u.z+dz/L*sp);

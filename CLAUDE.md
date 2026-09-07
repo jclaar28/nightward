@@ -513,8 +513,8 @@ bug found here was found by reading numbers out of the running game.
 
 **Run `node tools/smoke.mjs`, `node tools/instances.mjs` and
 `node tools/campaign.mjs` after any change**, plus `node tools/text.mjs` for
-anything that puts words on screen, `node tools/roads.mjs` and
-`node tools/pathing.mjs` for anything touching roads, movement or worker jobs,
+anything that puts words on screen, `node tools/roads.mjs`,
+`node tools/pathing.mjs` and `node tools/stuck.mjs` for anything touching roads, movement or worker jobs,
 `node tools/economy.mjs` for
 anything touching salvage, workers or the map, `node tools/scout.mjs` and `node tools/fog.mjs` for
 anything touching sight, fog or the minimap, `node tools/turret.mjs` for
@@ -651,6 +651,27 @@ without talking to Jarrod first.
   across a road corridor the unit crosses it rather than turning down it, and
   breaking *that* during a night, when someone points at a gap in the wall, is
   what the rule exists to prevent. `tools/pathing.mjs` measures both halves.
+- **Stuck is measured as progress, never as motion.** A unit rocking against the
+  corner of a building moves every frame — it just moves back. The wedge
+  watchdog in `stepPath()` used to compare this frame's position with last
+  frame's, so a unit vibrating inside a tenth of a unit had its stuck timer
+  pinned at zero and never re-planned; it did that for the whole run. It now
+  keeps a checkpoint and asks whether the unit has *left* it, because real
+  walking clears `WEDGE_R` in a fraction of a second and milling never clears it
+  at all. When a re-plan does come back with nothing and the straight line is
+  blocked too, the unit stands (`noRoute`) instead of grinding, and asks again
+  in a couple of seconds — a shut gate opens, a wall falls. Standing is a hold,
+  not a hang, and `tools/stuck.mjs` asserts the errand resumes.
+- **Every leg routes, including the walk to a building.** `stepToBuilding()`
+  steered straight at the centre and leant on local avoidance, which is fine in
+  a yard and hopeless anywhere else: the deposit leg only ran A* if the map
+  happened to have roads on it, so a loaded worker coming home from outside your
+  own wall walked into the wall and stayed there. A building's own cells are not
+  walkable and A* rightly refuses them as a destination, so route to
+  `approachPoint()` — the nearest standable cell beside the footprint — and
+  close the last step directly. Cache that point on the unit: recomputed every
+  frame it wobbles by a cell, which reads to `stepPath()` as "the destination
+  moved" and buys a full A* per unit per frame.
 - **A gate is a door, and `gateBlocks()` is the only place that knows it.**
   Three systems decide where a body can go and they are not the same code: the
   collision in `moveUnit()`, the A* your orders run over (`walkableCell`), and

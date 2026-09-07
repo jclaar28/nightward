@@ -157,6 +157,32 @@ soldiers had not, so an ordered squad still could not leave a walled yard. The
 check had been passing the wrong thing and failing for the wrong reason at the
 same time.
 
+**`stuck.mjs`** — the same subject from the other end. `pathing.mjs` asks
+whether one unit can solve one shaped obstacle; that is not what a player sees.
+A player builds a town, right-clicks a pile, and watches a dozen workers do the
+same round trip a hundred times, and what they report is "units get stuck". So
+this one poses no case at all: it builds a town, puts the crew on the piles,
+runs the clock, and watches every unit whose own mode says it is on its way
+somewhere.
+
+The distinction it draws is the whole tool. **Milling** is moving the whole time
+and getting nowhere — rocking against a corner inside a tenth of a unit — and is
+the bug. **Holding** is standing still on purpose because there is genuinely no
+route, which a shut gate is supposed to cause; grinding at it would be the bug.
+Nothing here caught milling before, because the watchdog it was testing asked
+whether the unit had *moved*, and a milling unit moves plenty.
+
+Two setup traps, both of which produced a fix that read as working:
+
+- A ring wall with an arc-shaped gap and a gate dropped into it is **not
+  sealed**. The gate is two cells wide, the gap is not, and the crew walks
+  through the leftover sliver rather than the door. Cut the gate into a finished
+  ring with `removeAt` instead.
+- Twelve workers doing round trips is far more game time than a day holds, so
+  the round reaches nightfall, loses, and stops simulating — after which every
+  unit on the map reads as a unit that never moved. Pin `S.dayLeft` and the
+  hall's HP.
+
 **`scout.mjs`** — the scout, and the vision rule that gives it a job. The scout
 is the first unit whose whole value is information, and information is the
 easiest kind of feature to ship broken: it looks finished because the unit walks
