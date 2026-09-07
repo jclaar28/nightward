@@ -3979,7 +3979,8 @@ var FS_POST="#version 300 es\nprecision highp float;\n"+
 // It is what separates a thing from a speck — the map is strewn with pebbles
 // and tufts, and lighting every edge indiscriminately turned the night into a
 // wireframe with a bright line around every stone.
-"    gap=max(gap, smoothstep(0.0035,0.0090,abs(d-d2)));\n"+
+"    float dz=abs(d-d2);\n"+
+"    gap=max(gap, smoothstep(0.0035,0.0075,dz)*(1.0-smoothstep(0.0085,0.0130,dz)));\n"+
 "  }\n"+
 // The ink pass would happily draw a crisp outline around a building sitting in
 // unexplored ground: the edge comes from depth and normals, neither of which

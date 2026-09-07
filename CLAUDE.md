@@ -108,27 +108,30 @@ the same sequence immediately afterwards. Deleting that line shifts every draw
 after it and silently re-grows every map on every existing seed.
 `tools/terrain.mjs` counts the draws for this reason.
 
-**Nothing sits at a fixed height.** `gy(x,z)` returns the terrain height and
-every draw site — and every *spawn* site — uses it. Seventeen effect sites in
-`d_game.js` were still anchored to `PLAT` long after the rule was written: melee
-sparks, impact flashes, a tower's muzzle, the height a bolt flies at, the height
-a corpse stops falling. All of them are correct on the plateau, which is where
-most of a night is fought, and all of them are wrong the moment anything happens
-out where the ground rolls. `tools/combat.mjs` stages a fight at a nest for
-exactly that reason.
+**Nothing sits at a fixed height.** `gy(x,z)` returns the terrain height.
+`PLAT` is the plateau constant, not the ground, and hard-coding it is how the
+nests ended up floating half a unit in the air across the whole map. The rule
+covers three kinds of site, and the last two were found long after it was
+written, because the plateau is where the settlement stands and where most of a
+night is fought — every one of these is exactly right there, and wrong the
+moment anything happens out where the ground rolls.
 
-The same constant was under the cursor, too. `pick()` used to intersect the
-camera's ray with a plane at `PLAT`; it walks the ray down onto the height field
-now (`groundHit`), because the plane answer is out by 4.1 units for every 3 it
-is wrong about the height — a road laid where you did not point. Unit picking
-and marquee selection projected from `PLAT` as well, which meant a unit standing
-off the plateau could not be clicked at all. `tools/hud.mjs` holds all three. `PLAT` is the plateau constant, not the ground. Hard-
-coding `PLAT` is how the nests ended up floating half a unit in the air across
-the whole map — and `packLamps` was still doing it long after, hanging every
-fire in the game at the plateau's height, which is right exactly until somebody
-builds a brazier off the flat. `tools/lighting.mjs` stands two braziers on
-ground at different heights and compares what each hangs above its own; with one
-brazier it cannot tell the two answers apart and passes either way.
+*Where a thing is drawn.* The original case, and the one everybody remembers.
+
+*Where a thing is spawned.* Seventeen effect sites in `d_game.js`: melee sparks,
+impact flashes, a tower's muzzle, the height a bolt flies at, the height a corpse
+stops falling — plus `packLamps`, which hung every fire in the game at the
+plateau's height. `tools/combat.mjs` stages a fight at a nest for this, and
+`tools/lighting.mjs` stands two braziers on ground at different heights and
+compares what each hangs above its own; with one brazier it cannot tell the two
+answers apart and passes either way.
+
+*Where the cursor is.* `pick()` intersected the camera's ray with a plane at
+`PLAT`; it walks the ray down onto the height field now (`groundHit`), because
+the plane answer is out by 4.1 units for every 3 it is wrong about the height —
+a road laid where you did not point. Unit picking and marquee selection projected
+from `PLAT` as well, so a unit standing off the plateau could not be clicked at
+all. `tools/hud.mjs` holds those three.
 
 **Darkness is not the same as legibility.** A silhouette reads by its outline,
 and a dark outline around a dark shape on dark ground does not separate the two
@@ -139,8 +142,13 @@ face is either edge-on and one pixel wide or facing you and takes none. What
 works here is the sky's own colour added at glancing angles (`uRim`, sharp
 enough that flat ground takes a two-hundredth of it) and the ink pass turning
 pale where the picture is dark (`uInk`). Both are per-hour numbers in the `SKY`
-table. The moonlit ink is gated on how far the depth jumps, because the map is
-strewn with pebbles and lighting every edge turns a night into a wireframe.
+table. The moonlit ink is gated on how far the depth jumps, and the gate is a BAND
+rather than a threshold: it rises at about a unit of standing height and falls
+away again above roughly two and a half. Below it are the pebbles and grass
+tufts the map is strewn with, and lighting those turns a night into a wireframe.
+Above it are the trees, which clear any threshold set for a unit by a mile —
+three to five units against 1.7 — and a forest wearing blue lines is the effect
+landing on everything except the thing it was built for.
 
 **The emissive channel carries three things.** `aEmit` packs the emissive level
 (0-2), the finish in the next two bits (`mat*8`), and — for the static mesh only

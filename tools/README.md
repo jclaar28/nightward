@@ -323,12 +323,20 @@ gait phase advances with distance walked, so two runs measured two different
 stances and disagreed by twelve levels on an unchanged build. It stops the loop
 and freezes the pose. Any tool here that reads pixels should do the same.
 
-Checked by breaking the change six ways: no sky rim (13.0 at night), no moonlit
-outline (the outline sits 9.1 off its body instead of 15.2), the fire stops
-moving (0% swing), lamps pinned to the plateau again (2.35 and 1.79 above their
-own ground), the night lit until it is day (the brightest half-percent reaches
-199), and the depth gate dropped so every pebble is outlined (19,772 cold marks
-against 10,550).
+Checked by breaking the change five ways: no sky rim (13.6 at night against
+17.7), the fire stops moving (0% swing), lamps pinned to the plateau again (2.35
+and 1.79 above their own ground), the night lit until it is day (the brightest
+half-percent reaches 199), and the depth gate dropped so every pebble is
+outlined (19,772 cold marks against 9,087).
+
+The gate on that outline is a band rather than a threshold, and the check for it
+is separate because it needs a different measurement. A tree clears any
+threshold set for a unit by a mile, so the first version lit every pine on the
+map; the band falls away again above roughly two and a half units of standing
+height. Telling the two apart needs a strict definition of a mark — at the loose
+setting the band reads 80% of the threshold, which decides nothing, and at
+24/22 it reads 64%. Both numbers were measured on both builds before the bar was
+put between them.
 
 **`decals.mjs`** — the marks on the ground, and the one bug in them that no
 instance count could ever have caught. Every ring in the game was geometrically
