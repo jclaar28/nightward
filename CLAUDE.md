@@ -194,6 +194,20 @@ at a gentler `fog.dark` it is plainly readable. `tools/fog.mjs` counts instances
 rather than sampling pixels for exactly this reason: "it went dark" and "it is
 not in the buffer" are different claims and only one of them is hiding.
 
+**Fog is weather, not nightfall.** Hidden ground is blended toward the hour's
+own fog colour (`uWarFog`, the `SKY` table's `fog` scaled by its `hz`), not
+scaled toward black. Scaling toward black was the first answer and it made a
+midday map read as midnight with one lit patch in it — three quarters of the
+screen was a night scene at noon, and raising `fog.dark` could not fix it,
+because a dark grey field is still a dark field. The hour's fog colour is a pale
+blue-grey at noon and near black at two in the morning, so one blend gives haze
+by day and darkness by night. `hz` exists because that colour faces the sky and
+the ground does not: at dusk the raw fog colour sits at twice the brightness of
+the terrain under it, and the map glows. What separates fog from ground now is
+flatness and lost colour rather than lost light — half the local detail and half
+the chroma — and `tools/fog.mjs` measures all three against the same patch of
+the same map in plain sight.
+
 **Your own units are never fogged.** They are the eyes. A unit that vanished
 because it walked out of its own sight would be a bug wearing a rule's clothes.
 

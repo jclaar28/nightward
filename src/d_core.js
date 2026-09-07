@@ -1854,12 +1854,15 @@ var STAT_DEFS={
   // Fog is presentation, not simulation: these change what the player is shown
   // and nothing about what the world does. `dark` and `dim` are the two levels
   // the shader lerps between, so they are also the two numbers to drag in the
-  // Library when deciding how black "never seen" should be.
+  // Library when deciding how much weather sits over ground nobody is watching.
+  // They used to scale the ground toward black, which made a midday map look
+  // like midnight; the ground goes behind the hour's fog colour now, so 0 is a
+  // solid bank of it rather than a black hole.
   fog:{ note:"What the map looks like where you have not been, and where you are no longer.", fields:[
     {k:"on",    label:"Fog of war",    def:1,   lo:0, hi:1,  step:1, int:true,
      hint:"0 shows the whole map, as it was before"},
     {k:"dark",  label:"Never seen",    def:0.06,lo:0, hi:1,  step:0.01,
-     hint:"how much light unexplored ground keeps — 0 is black"},
+     hint:"how much of unexplored ground shows through the weather — 0 is solid fog"},
     {k:"dim",   label:"Seen before",   def:0.42,lo:0, hi:1,  step:0.01,
      hint:"explored but not in sight now: terrain and buildings you remember"},
     {k:"grace", label:"Opening reveal",def:0,   lo:0, hi:40, step:1,

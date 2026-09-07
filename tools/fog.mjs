@@ -202,5 +202,65 @@ check('an undiscovered nest is not on the minimap either',
 check('...and appears once somebody walks to it', mini.found > 0,
       `${mini.found} marker pixels after`);
 
+// ---- fog is weather, not nightfall ------------------------------------------
+// Fog used to scale the ground's colour toward black, and at noon that made
+// three quarters of the screen a night scene with one lit patch in it — the
+// complaint was that the game looked like midnight in the middle of the day.
+// It blends toward the hour's own fog colour now, so the same code gives haze
+// by day and darkness by night.
+//
+// The reading has to be a comparison, not a level: the same patch of the same
+// map at the same hour, once hidden and once in plain sight. A threshold on
+// brightness alone would pass a build that had simply turned every light up.
+// And brightness alone is not the whole claim either — a fog bank that sits at
+// the terrain's own brightness is still obviously fog, because it is flat and
+// grey where the ground is grainy and green. So this measures all three.
+const tone = await page.evaluate(() => {
+  window.requestAnimationFrame = function () { return 0; };
+  const S = __nw.state();
+  const cv = document.querySelector('canvas'), gl = cv.getContext('webgl2');
+  const c = HFGAME.cam(); c.tx = 0; c.tz = 0; c.zoom = 30;
+  const L = (F, i) => 0.299 * F.b[i] + 0.587 * F.b[i + 1] + 0.114 * F.b[i + 2];
+  function read() {
+    __nw.frame();
+    const w = cv.width, h = cv.height, b = new Uint8Array(w * h * 4), F = { w, h, b };
+    gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, b);
+    // A corner of the frame, far from the commander and never walked to.
+    let lum = 0, det = 0, chr = 0, n = 0;
+    for (let y = 1; y < h * 0.35; y++) for (let x = 1; x < w * 0.3; x++) {
+      const i = (y * w + x) * 4;
+      lum += L(F, i);
+      det += Math.abs(L(F, i) - L(F, i - 4)) + Math.abs(L(F, i) - L(F, i - w * 4));
+      chr += Math.max(b[i], b[i + 1], b[i + 2]) - Math.min(b[i], b[i + 1], b[i + 2]);
+      n++;
+    }
+    return { lum: +(lum / n).toFixed(1), detail: +(det / n).toFixed(2), chroma: +(chr / n).toFixed(1) };
+  }
+  const out = {};
+  for (const [name, p] of [['day', 0.0], ['night', 1.0]]) {
+    S.dayP = p;
+    HF.setStat('fog', 'on', 1); const hid = read();
+    HF.setStat('fog', 'on', 0); const vis = read();
+    out[name] = { hid, vis };
+  }
+  HF.setStat('fog', 'on', 1);
+  return out;
+});
+check('unexplored ground at noon is weather, not nightfall',
+      tone.day.hid.lum > tone.day.vis.lum * 0.75,
+      `hidden ground reads ${tone.day.hid.lum}/255 against ${tone.day.vis.lum} for the same ` +
+      `ground in plain sight; scaling toward black instead of toward the hour's fog colour ` +
+      `puts it at 2.3, which is what "the fog makes it look like night" was`);
+check('...and is still plainly hidden, by being flat and grey rather than dark',
+      tone.day.hid.detail < tone.day.vis.detail * 0.72 &&
+      tone.day.hid.chroma < tone.day.vis.chroma * 0.75,
+      `half the local detail (${tone.day.hid.detail} against ${tone.day.vis.detail}) and half ` +
+      `the colour (${tone.day.hid.chroma} against ${tone.day.vis.chroma}) — what reads as fog ` +
+      `when the brightness matches`);
+check('...while at night the hidden ground is darker than the lit ground, not brighter',
+      tone.night.hid.lum < tone.night.vis.lum,
+      `${tone.night.hid.lum} against ${tone.night.vis.lum} — the hour's fog colour is near ` +
+      `black at 2am, so the one blend covers both ends of the day`);
+
 await close();
 done(errors);

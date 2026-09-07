@@ -3019,12 +3019,15 @@ var STAT_DEFS={
   // Fog is presentation, not simulation: these change what the player is shown
   // and nothing about what the world does. `dark` and `dim` are the two levels
   // the shader lerps between, so they are also the two numbers to drag in the
-  // Library when deciding how black "never seen" should be.
+  // Library when deciding how much weather sits over ground nobody is watching.
+  // They used to scale the ground toward black, which made a midday map look
+  // like midnight; the ground goes behind the hour's fog colour now, so 0 is a
+  // solid bank of it rather than a black hole.
   fog:{ note:"What the map looks like where you have not been, and where you are no longer.", fields:[
     {k:"on",    label:"Fog of war",    def:1,   lo:0, hi:1,  step:1, int:true,
      hint:"0 shows the whole map, as it was before"},
     {k:"dark",  label:"Never seen",    def:0.06,lo:0, hi:1,  step:0.01,
-     hint:"how much light unexplored ground keeps — 0 is black"},
+     hint:"how much of unexplored ground shows through the weather — 0 is solid fog"},
     {k:"dim",   label:"Seen before",   def:0.42,lo:0, hi:1,  step:0.01,
      hint:"explored but not in sight now: terrain and buildings you remember"},
     {k:"grace", label:"Opening reveal",def:0,   lo:0, hi:40, step:1,
@@ -3778,6 +3781,7 @@ var FS_COMMON=
 "uniform sampler2D uWarTex;\n"+
 "uniform vec3 uWarK;\n"+      // x on/off, y unexplored level, z explored level
 "uniform vec2 uWarSO;\n"+     // world XZ -> uv: scale, offset
+"uniform vec3 uWarFog;\n"+    // what unseen ground turns into, this hour
 "layout(location=0) out vec4 oColor;\n"+
 "layout(location=1) out vec4 oNormal;\n"+
 "float warLevel(){\n"+
@@ -3785,12 +3789,26 @@ var FS_COMMON=
 "  float v=texture(uWarTex, vW.xz*uWarSO.x+uWarSO.y).r;\n"+
 "  return (v<0.5) ? mix(uWarK.y,uWarK.z,v*2.0) : mix(uWarK.z,1.0,(v-0.5)*2.0);\n"+
 "}\n"+
+// Two things happen to ground you cannot see, and they are not the same thing.
+//
 // Colour drains before brightness does: what you remember is grey, what you are
 // looking at is not. Dimming alone reads as night rather than as memory.
+//
+// Then it goes BEHIND something rather than out. Scaling the colour toward
+// black was the first answer and it made a midday map look like midnight —
+// three quarters of the screen at noon was a night scene with a lit patch in
+// it, and no amount of raising `dark` fixed that, because a dark grey field is
+// still a dark field. Blending toward the hour's own fog colour instead costs
+// the same one mix and reads correctly at every hour for free: that colour is a
+// pale blue-grey at noon and near black at two in the morning, so the same code
+// gives haze by day and darkness by night. `dark` and `dim` stop meaning "how
+// much light it keeps" and start meaning how much of the ground shows through
+// the weather, which is the same knob pointed at the right quantity.
 "vec3 warApply(vec3 col,float f){\n"+
 "  if(uWarK.x<0.5) return col;\n"+
 "  float g=dot(col,vec3(0.299,0.587,0.114));\n"+
-"  return mix(vec3(g),col,clamp((f-uWarK.y)/max(0.001,1.0-uWarK.y)*1.25,0.0,1.0))*f;\n"+
+"  vec3 mem=mix(vec3(g),col,clamp((f-uWarK.y)/max(0.001,1.0-uWarK.y)*1.25,0.0,1.0));\n"+
+"  return mix(uWarFog,mem,f);\n"+
 "}\n"+
 "float shadowAt(){\n"+
 "  vec3 N=normalize(vN);\n"+
@@ -4161,19 +4179,19 @@ function create(canvas){
   var SKY=[
    {p:0.00, az:108, el:54, sun:[1.36,1.28,1.14], sky:[0.360,0.420,0.530], bnc:[0.225,0.222,0.220],
     fog:[0.400,0.430,0.470], top:[0.255,0.335,0.455], bot:[0.560,0.575,0.585], em:0.30,
-    rim:[0.62,0.68,0.82], rk:0.10},
+    rim:[0.62,0.68,0.82], rk:0.10, hz:0.80},
    {p:0.50, az:122, el:15, sun:[1.42,1.02,0.66], sky:[0.330,0.352,0.430], bnc:[0.200,0.180,0.180],
     fog:[0.360,0.300,0.290], top:[0.150,0.180,0.265], bot:[0.520,0.395,0.320], em:0.85,
-    rim:[0.92,0.62,0.42], rk:0.85},
+    rim:[0.92,0.62,0.42], rk:0.85, hz:0.55},
    {p:1.00, az:152, el:40, sun:[0.470,0.560,0.760], sky:[0.205,0.252,0.372], bnc:[0.112,0.124,0.158],
     fog:[0.105,0.128,0.192], top:[0.032,0.044,0.078], bot:[0.086,0.100,0.152], em:1.45,
-    rim:[0.46,0.60,0.92], rk:1.15},
+    rim:[0.46,0.60,0.92], rk:1.15, hz:0.65},
    {p:1.50, az:62,  el:13, sun:[1.14,0.86,0.70], sky:[0.262,0.292,0.400], bnc:[0.132,0.126,0.140],
     fog:[0.330,0.322,0.332], top:[0.150,0.170,0.250], bot:[0.470,0.392,0.352], em:0.90,
-    rim:[0.86,0.66,0.50], rk:0.80},
+    rim:[0.86,0.66,0.50], rk:0.80, hz:0.55},
    {p:2.00, az:108, el:54, sun:[1.36,1.28,1.14], sky:[0.360,0.420,0.530], bnc:[0.225,0.222,0.220],
     fog:[0.400,0.430,0.470], top:[0.255,0.335,0.455], bot:[0.560,0.575,0.585], em:0.30,
-    rim:[0.62,0.68,0.82], rk:0.10}
+    rim:[0.62,0.68,0.82], rk:0.10, hz:0.80}
   ];
   // Lamp pools: unshadowed point lights so the settlement stays legible
   // after dark. Scaled by uEmit, so they fade out in daylight for free.
@@ -4194,7 +4212,7 @@ function create(canvas){
 
   function lerp3(a,b,t){ return [a[0]+(b[0]-a[0])*t, a[1]+(b[1]-a[1])*t, a[2]+(b[2]-a[2])*t]; }
   var SKYNOW={sun:[1,1,1], sky:[0,0,0], bnc:[0,0,0], fog:[0,0,0], top:[0,0,0], bot:[0,0,0],
-              rim:[0,0,0], rk:0, em:1};
+              rim:[0,0,0], rk:0, hz:1, em:1};
   var SM_HALF=34;                       // light frustum half-extent, world units
   var SM_WORLD=(SM_HALF*2)/SM;         // world units per shadow texel
   var lightDir, lightVP, dayPhase=0.5;
@@ -4220,6 +4238,7 @@ function create(canvas){
     SKYNOW.rim=lerp3(a.rim,b.rim,t);
     SKYNOW.rk =a.rk+(b.rk-a.rk)*t;
     SKYNOW.em =a.em+(b.em-a.em)*t;
+    SKYNOW.hz =a.hz+(b.hz-a.hz)*t;
     var az=(a.az+(b.az-a.az)*t)*Math.PI/180, el=(a.el+(b.el-a.el)*t)*Math.PI/180;
     lightDir=M.nz([Math.cos(el)*Math.cos(az),Math.sin(el),Math.cos(el)*Math.sin(az)]);
     var LV=M.lookAt([lightDir[0]*70,lightDir[1]*70,lightDir[2]*70],[0,0,0],[0,1,0]);
@@ -4286,6 +4305,7 @@ function create(canvas){
       gl.uniform1i(u(p,"uWarTex"),1);
       gl.uniform3f(u(p,"uWarK"),warN?warK[0]:0,warK[1],warK[2]);
       gl.uniform2f(u(p,"uWarSO"),warSO[0],warSO[1]);
+      gl.uniform3f(u(p,"uWarFog"),SKYNOW.fog[0]*SKYNOW.hz,SKYNOW.fog[1]*SKYNOW.hz,SKYNOW.fog[2]*SKYNOW.hz);
       gl.activeTexture(gl.TEXTURE0);
     }
     gl.useProgram(pStatic); common(pStatic);

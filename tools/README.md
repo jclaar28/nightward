@@ -176,6 +176,18 @@ bug rather than a rule — your own units are drawn wherever they are, because
 they are the eyes — and that the `fog.on` switch actually restores the map,
 since a feature with a broken off-switch is one nobody can bisect against.
 
+Three checks at the end do sample pixels, and they are the exception that proves
+the rule above: they are about the *place*, which is dimmed rather than culled,
+so pixels are the only evidence there is. Fog used to scale hidden ground toward
+black, which made a midday map look like midnight, and it now blends toward the
+hour's own fog colour. The reading has to be a comparison — the same corner of
+the same map at the same hour, once hidden and once in plain sight — because a
+threshold on brightness alone would pass a build that had simply turned every
+light up. Hidden ground at noon reads 75/255 against 71 visible, and 2.3 on the
+old code. Brightness is not the whole claim either: it still has to look hidden,
+which it does by carrying a third of the local detail and half the colour of the
+same ground in sight.
+
 Note that `instances.mjs` turns fog off for its whole run. Everything that tool
 asserts is geometry, and fog answers a different question; leaving it on did not
 make those checks stricter, it emptied them — the nest-grounding checks started
