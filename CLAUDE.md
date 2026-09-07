@@ -140,15 +140,18 @@ attackers you could pick out ten of, and why a fresnel rim was the wrong first
 answer: on boxes and cones there is no curvature for a rim to sweep across, so a
 face is either edge-on and one pixel wide or facing you and takes none. What
 works here is the sky's own colour added at glancing angles (`uRim`, sharp
-enough that flat ground takes a two-hundredth of it) and the ink pass turning
-pale where the picture is dark (`uInk`). Both are per-hour numbers in the `SKY`
-table. The moonlit ink is gated on how far the depth jumps, and the gate is a BAND
-rather than a threshold: it rises at about a unit of standing height and falls
-away again above roughly two and a half. Below it are the pebbles and grass
-tufts the map is strewn with, and lighting those turns a night into a wireframe.
-Above it are the trees, which clear any threshold set for a unit by a mile —
-three to five units against 1.7 — and a forest wearing blue lines is the effect
-landing on everything except the thing it was built for.
+enough that flat ground takes a two-hundredth of it; a per-hour number in the
+`SKY` table). It carries the whole gain: a body at the treeline reads 17 levels
+off its background at night with it and 13.6 without, and `tools/lighting.mjs`
+holds that number.
+
+A screen-space companion was tried and removed. It drew a pale line wherever the
+depth buffer jumped, gated on the size of the jump so that pebbles fell below the
+band and trees above it. The gate was never the real problem: a depth edge cannot
+tell a silhouette from a fold, so the effect landed on canopy interiors, roof
+ridges and rock faces, and what the player saw was a blue wireframe over the
+world. Do not reach for a post-pass edge to make things legible — it does not
+know what a thing is. The rim does, because it runs on the geometry's normals.
 
 **The emissive channel carries three things.** `aEmit` packs the emissive level
 (0-2), the finish in the next two bits (`mat*8`), and — for the static mesh only

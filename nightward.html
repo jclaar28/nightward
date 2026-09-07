@@ -3955,8 +3955,6 @@ var FS_POST="#version 300 es\nprecision highp float;\n"+
 "uniform sampler2D uColor,uNormal,uDepth;\n"+
 "uniform vec2 uTexel; uniform float uOutline; uniform vec3 uFlash;\n"+
 "uniform vec3 uFog,uSkyTop,uSkyBot;\n"+
-// how much of the outline turns pale where the picture is dark
-"uniform float uInk;\n"+
 "out vec4 o;\n"+
 "float lum(vec3 c){ return dot(c,vec3(0.299,0.587,0.114)); }\n"+
 "void main(){\n"+
@@ -3965,7 +3963,7 @@ var FS_POST="#version 300 es\nprecision highp float;\n"+
 "  vec3 n=texture(uNormal,vUv).rgb*2.0-1.0;\n"+
 "  float sky=step(0.99995,d);\n"+
 "  c=mix(c,mix(uSkyBot,uSkyTop,pow(clamp(vUv.y,0.,1.),0.75)),sky);\n"+
-"  float e=0.0, gap=0.0;\n"+
+"  float e=0.0;\n"+
 "  for(int i=0;i<4;i++){\n"+
 "    vec2 off = i==0?vec2(1.,0.): i==1?vec2(-1.,0.): i==2?vec2(0.,1.):vec2(0.,-1.);\n"+
 "    vec2 uv2=vUv+off*uTexel*1.35;\n"+
@@ -3973,33 +3971,18 @@ var FS_POST="#version 300 es\nprecision highp float;\n"+
 "    vec3 n2=texture(uNormal,uv2).rgb*2.0-1.0;\n"+
 "    e=max(e, smoothstep(0.00028,0.0016,abs(d-d2)));\n"+
 "    e=max(e, smoothstep(0.42,0.86,1.0-dot(n,n2))*0.85);\n"+
-// How far the depth jumps, on a much coarser scale than the outline uses. The
-// camera is orthographic, so this is linear in world units: the band below
-// starts at about a unit of standing height and saturates near two and a half.
-// It is what separates a thing from a speck — the map is strewn with pebbles
-// and tufts, and lighting every edge indiscriminately turned the night into a
-// wireframe with a bright line around every stone.
-"    float dz=abs(d-d2);\n"+
-"    gap=max(gap, smoothstep(0.0035,0.0075,dz)*(1.0-smoothstep(0.0085,0.0130,dz)));\n"+
 "  }\n"+
 // The ink pass would happily draw a crisp outline around a building sitting in
 // unexplored ground: the edge comes from depth and normals, neither of which
 // knows about fog. That is what the alpha written above is for.
 "  float wf=texture(uNormal,vUv).a;\n"+
 "  e*=(1.0-sky)*uOutline*wf;\n"+
-// The outline is drawn in ink by day and in moonlight at night. A dark line
-// around a dark shape on dark ground is not an outline, it is nothing, which is
-// why a night wave was 88 attackers you could pick out ten of. A fresnel rim
-// was tried first and does almost nothing here: these are boxes and cones, so
-// there is no curvature for a rim to sweep across — a face is either edge-on
-// and one pixel wide or it faces you and takes none. The edge the eye actually
-// reads is the one the depth-and-normal pass already finds, so that is the one
-// to light. Only pixels that are themselves dark switch over, so a lamp-lit
-// wall keeps its ink and the horde in the field outside it does not.
-"  float l0=lum(c);\n"+
-"  vec3 inkD=mix(vec3(0.055,0.045,0.055),c*0.16,0.35);\n"+
-"  float ik=uInk*gap*(1.0-smoothstep(0.05,0.26,l0));\n"+
-"  c=mix(c,mix(inkD,vec3(0.50,0.60,0.86),ik),clamp(e,0.0,1.0)*0.92);\n"+
+// The outline is always ink. A pale moonlit version of it was tried, to keep a
+// night wave legible, and it read as a blue wireframe over everything that
+// stood up — a screen-space edge cannot tell a silhouette from a fold. What
+// carries legibility at night now is the sky rim in the lit pass, which follows
+// the geometry instead of the depth buffer.
+"  c=mix(c,mix(vec3(0.055,0.045,0.055),c*0.16,0.35),clamp(e,0.0,1.0)*0.92);\n"+
 "  float fogT=smoothstep(0.28,0.80,d)*(1.0-sky);\n"+
 "  c=mix(c,uFog,fogT*0.88);\n"+
 "  c=pow(max(c,0.0),vec3(0.95));\n"+
@@ -4178,19 +4161,19 @@ function create(canvas){
   var SKY=[
    {p:0.00, az:108, el:54, sun:[1.36,1.28,1.14], sky:[0.360,0.420,0.530], bnc:[0.225,0.222,0.220],
     fog:[0.400,0.430,0.470], top:[0.255,0.335,0.455], bot:[0.560,0.575,0.585], em:0.30,
-    rim:[0.62,0.68,0.82], rk:0.10, ink:0.00},
+    rim:[0.62,0.68,0.82], rk:0.10},
    {p:0.50, az:122, el:15, sun:[1.42,1.02,0.66], sky:[0.330,0.352,0.430], bnc:[0.200,0.180,0.180],
     fog:[0.360,0.300,0.290], top:[0.150,0.180,0.265], bot:[0.520,0.395,0.320], em:0.85,
-    rim:[0.92,0.62,0.42], rk:0.85, ink:0.42},
+    rim:[0.92,0.62,0.42], rk:0.85},
    {p:1.00, az:152, el:40, sun:[0.470,0.560,0.760], sky:[0.205,0.252,0.372], bnc:[0.112,0.124,0.158],
     fog:[0.105,0.128,0.192], top:[0.032,0.044,0.078], bot:[0.086,0.100,0.152], em:1.45,
-    rim:[0.46,0.60,0.92], rk:1.15, ink:0.80},
+    rim:[0.46,0.60,0.92], rk:1.15},
    {p:1.50, az:62,  el:13, sun:[1.14,0.86,0.70], sky:[0.262,0.292,0.400], bnc:[0.132,0.126,0.140],
     fog:[0.330,0.322,0.332], top:[0.150,0.170,0.250], bot:[0.470,0.392,0.352], em:0.90,
-    rim:[0.86,0.66,0.50], rk:0.80, ink:0.38},
+    rim:[0.86,0.66,0.50], rk:0.80},
    {p:2.00, az:108, el:54, sun:[1.36,1.28,1.14], sky:[0.360,0.420,0.530], bnc:[0.225,0.222,0.220],
     fog:[0.400,0.430,0.470], top:[0.255,0.335,0.455], bot:[0.560,0.575,0.585], em:0.30,
-    rim:[0.62,0.68,0.82], rk:0.10, ink:0.00}
+    rim:[0.62,0.68,0.82], rk:0.10}
   ];
   // Lamp pools: unshadowed point lights so the settlement stays legible
   // after dark. Scaled by uEmit, so they fade out in daylight for free.
@@ -4211,7 +4194,7 @@ function create(canvas){
 
   function lerp3(a,b,t){ return [a[0]+(b[0]-a[0])*t, a[1]+(b[1]-a[1])*t, a[2]+(b[2]-a[2])*t]; }
   var SKYNOW={sun:[1,1,1], sky:[0,0,0], bnc:[0,0,0], fog:[0,0,0], top:[0,0,0], bot:[0,0,0],
-              rim:[0,0,0], rk:0, ink:0, em:1};
+              rim:[0,0,0], rk:0, em:1};
   var SM_HALF=34;                       // light frustum half-extent, world units
   var SM_WORLD=(SM_HALF*2)/SM;         // world units per shadow texel
   var lightDir, lightVP, dayPhase=0.5;
@@ -4236,7 +4219,6 @@ function create(canvas){
     SKYNOW.bot=lerp3(a.bot,b.bot,t);
     SKYNOW.rim=lerp3(a.rim,b.rim,t);
     SKYNOW.rk =a.rk+(b.rk-a.rk)*t;
-    SKYNOW.ink=a.ink+(b.ink-a.ink)*t;
     SKYNOW.em =a.em+(b.em-a.em)*t;
     var az=(a.az+(b.az-a.az)*t)*Math.PI/180, el=(a.el+(b.el-a.el)*t)*Math.PI/180;
     lightDir=M.nz([Math.cos(el)*Math.cos(az),Math.sin(el),Math.cos(el)*Math.sin(az)]);
@@ -4383,7 +4365,6 @@ function create(canvas){
     gl.uniform1i(u(pPost,"uDepth"),2);
     gl.uniform2f(u(pPost,"uTexel"),1/W,1/H);
     gl.uniform1f(u(pPost,"uOutline"),OPT.outline);
-    gl.uniform1f(u(pPost,"uInk"),SKYNOW.ink);
     gl.uniform3f(u(pPost,"uFlash"),flash?flash[0]:0,flash?flash[1]:0,flash?flash[2]:0);
     gl.uniform3fv(u(pPost,"uFog"),SKYNOW.fog);
     gl.uniform3fv(u(pPost,"uSkyTop"),SKYNOW.top);

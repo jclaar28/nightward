@@ -15,14 +15,12 @@
 // reported dusk as the hardest hour to see a body when what it had measured was
 // the contrast of a shadow.
 //
-// One check has been taken out rather than left in green. It measured how far
-// the outline sat from the BODY it belonged to, which is the one reading that
-// tells a pale outline from a dark one, and it worked: 15.2 against 9.1 with
-// the moonlit ink removed. Then the wind shipped, a canopy came to rest behind
-// the unit, and against leaves rather than grass it read 21.1 against 21.7 —
-// no separation, and the wrong way round. A check that cannot fail is worse
-// than no check, so it is gone; what defends that feature now is the count of
-// cold marks below, which separates 8,936 against 19,772.
+// What defends the night now is the sky's edge light in the lit pass — a rim
+// that follows the geometry's own normals. A screen-space version was tried
+// alongside it, a pale line drawn wherever the depth buffer jumped, and it was
+// abandoned: a depth edge cannot tell a silhouette from a fold, so it drew a
+// blue wireframe over every tree and stone. The checks that measured it went
+// with it; the edge contrast below is what covers the feature that remains.
 //
 //   node tools/lighting.mjs
 // ---------------------------------------------------------------------------
@@ -123,51 +121,6 @@ const m = await page.evaluate(() => {
   // of the frame. The bright tail is what notices.
   let acc = 0, nightTop = 0;
   for (let v = 255; v >= 0; v--) { acc += hist[v]; if (acc >= px * 0.005) { nightTop = v; break; } }
-  // Thin bright marks in that same frame. The moonlit outline is only supposed
-  // to reach things that stand up; the map is strewn with pebbles and tufts,
-  // and lighting every edge turned a night into a wireframe with a line round
-  // every stone. A pebble's outline is a pixel brighter than everything beside
-  // it, so counting local spikes counts exactly what went wrong.
-  const blue = (F, i) => F.b[i + 2] - F.b[i];      // how cold a pixel is
-  // lumT/blueT decide what counts as a mark. Loose (9/6) catches anything lit
-  // at all, which is what the settlement frame wants; strict (24/22) catches
-  // only a hard pale line, which is what separates a canopy wearing the moonlit
-  // ink from a canopy merely catching the sky's rim. Measured across both
-  // settings on both builds: at 9/6 the band reads 80% of the threshold, at
-  // 24/22 it reads 64%, so the strict pair is the one that can tell them apart.
-  function coldSpikes(F, lumT, blueT) {
-    let n = 0;
-    for (let y = 1; y < F.h - 1; y++) for (let x = 1; x < F.w - 1; x++) {
-      const p = y * F.w + x, i = p * 4, v = L(F, i);
-      if (v < 24) continue;
-      const nb = [p - 1, p + 1, p - F.w, p + F.w];
-      const lv = nb.map(q => L(F, q * 4)).sort((a, b) => a - b);
-      if (v - (lv[1] + lv[2]) / 2 < lumT) continue;
-      // and cold with it. Moonlight is blue and the scene is not, so this counts
-      // the outline specifically rather than every lit pebble top — a plain
-      // brightness spike could not tell the two apart and reported thirteen
-      // thousand of them on a frame that looked right.
-      const bv = nb.map(q => blue(F, q * 4)).sort((a, b) => a - b);
-      if (blue(F, i) - (bv[1] + bv[2]) / 2 >= blueT) n++;
-    }
-    return n;
-  }
-  const spikes = coldSpikes(F, 9, 6);
-
-  // ---- a forest at night is not a wireframe --------------------------------
-  // The moonlit outline is aimed at the horde, and a tree clears any threshold
-  // set for a unit by a mile — three to five units of standing height against
-  // 1.7 — so a plain threshold lit every trunk and canopy on the map. The gate
-  // is a band now: it rises at about a unit and falls away again above roughly
-  // two and a half, so a body sits near its peak and a pine sits past it. This
-  // frames trees and nothing else, and counts the cold marks in it.
-  const cam2 = HFGAME.cam();
-  const keepTx = cam2.tx, keepTz = cam2.tz, keepZ = cam2.zoom;
-  cam2.tx = 26; cam2.tz = 26; cam2.zoom = 13;
-  S.dayP = 1.0;
-  const treeFrame = shot();
-  const treeSpikes = coldSpikes(treeFrame, 24, 22);
-  cam2.tx = keepTx; cam2.tz = keepTz; cam2.zoom = keepZ;
 
   // ---- firelight moves -----------------------------------------------------
   // Two braziers, one on the flat plateau and one out on ground that is not
@@ -204,7 +157,7 @@ const m = await page.evaluate(() => {
     }
   }
   return { hour, nightMean, frames: seen.length, swing: +(swing * 100).toFixed(1),
-           lampN: seen.length ? seen[0].length : 0, braz, nightTop, spikes, treeSpikes };
+           lampN: seen.length ? seen[0].length : 0, braz, nightTop };
 });
 
 check('a body reads in daylight',
@@ -223,18 +176,6 @@ check('night is still night',
       `the frame averages ${m.nightMean}/255 with nothing of yours in it and its ` +
       `brightest half-percent reaches ${m.nightTop} — the check that stops "make the ` +
       `night legible" turning into "make the night day"`);
-check('the moonlight only reaches what stands up',
-      m.spikes < 15000,
-      `${m.spikes} cold thin marks in a night frame; the same frame with the depth ` +
-      `gate removed reports 19,772, because then every pebble and tuft on the map ` +
-      `has a lit edge and the night is a wireframe. The gate is a depth jump of ` +
-      `about a unit of standing height`);
-check('a forest at night is not a wireframe',
-      m.treeSpikes < 6700,
-      `${m.treeSpikes} hard pale marks in a frame of nothing but trees; with the gate left ` +
-      `as a plain threshold rather than a band the same frame reports 8,267 and every pine ` +
-      `on the map wears a blue line. A tree clears any threshold set for a unit by a mile — ` +
-      `three to five units of standing height against 1.7`);
 check('firelight moves', m.frames >= 3 && m.swing > 2 && m.swing < 25,
       `${m.lampN} lamps, brightest swings ${m.swing}% over ${m.frames} frames`);
 const rel = m.braz.map(b => b.relief), over = m.braz.map(b => b.over);

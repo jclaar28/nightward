@@ -308,13 +308,19 @@ Three of its measurements were wrong before they were right, and each mistake is
 worth knowing. Averaging the whole silhouette *including the shadow it casts*
 reported dusk as the hardest hour to see a body — a unit's shadow at dusk is ten
 times the area of the unit, so what that number described was the contrast of a
-shadow. Contrast against the ground alone could not tell a dark outline from a
-pale one, because both differ from the grass by about the same amount; it now
-also measures how far the outline stands off the *body*, which is the thing a
-dark line around a dark shape cannot do. And the counterweight check — night
-must still be night — passed with the edge light turned up eight times, because
-edges are a sliver of the frame and the mean barely moves; it reads the bright
-tail as well now.
+shadow. A reading of how far the outline stood off the *body* was added to tell a
+pale outline from a dark one, worked at 15.2 against 9.1, and was then taken out
+rather than left green: the wind shipped, a canopy came to rest behind the unit,
+and against leaves rather than grass it read 21.1 against 21.7 — no separation
+and the wrong way round. And the counterweight check — night must still be night
+— passed with the edge light turned up eight times, because edges are a sliver of
+the frame and the mean barely moves; it reads the bright tail as well now.
+
+What it defends today is the sky rim in the lit pass: 17 levels at the boundary
+at night with it, 13.6 with it removed. It used to also defend a screen-space
+moonlit outline, with two checks counting cold thin marks in a night frame; that
+effect is gone — it read as a blue wireframe over every tree and stone — and its
+checks went with it.
 
 The tool is bit-identical run to run, which took work: the page keeps its own
 frame loop running while a test does its setup, so every reading was taken from
