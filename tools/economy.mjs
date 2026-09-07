@@ -49,8 +49,24 @@ function runEconomy({ seed, days, diff }) {
     for (let t = 0; t < S.dayLen - 12; t += 10) {
       S.dayLeft = S.dayLen;
       assign(); __nw.run(10);
-      while (S.players[0].supply >= 120 && cottages < 8) {
-        const a = cottages * 1.1, r = 5.0 + (cottages % 3) * 1.6;
+      // The same ring of houses round the hall as before, spaced for a building
+      // that is 2x2 now rather than 1x1. WHERE a simulated player puts its
+      // houses turns out to be part of what every number below means, and two
+      // other answers were tried and rejected: the original tighter ring packed
+      // them until `place` simply refused, so the thing limiting the workforce
+      // was the room to put them and the price could be moved without the
+      // reading changing at all; and a widening spiral out to radius 16 kept the
+      // workforce growing all run, which flattened the income taper to 87% and
+      // failed the check that says the near piles empty. Keep it a ring, and
+      // keep it beside the hall.
+      // Buy when a cottage plus a working reserve is affordable, in terms of
+      // what a cottage actually costs. This was a hard 120, which was four
+      // times the price when it was written and one and a half times it after
+      // the cottage was repriced — so the tool's own spending changed shape for
+      // a reason that had nothing to do with the game.
+      const COTT = HFGAME.TYPES.cottage.cost * 1.4;
+      while (S.players[0].supply >= COTT && cottages < 8) {
+        const a = cottages * 1.15, r = 5.6 + (cottages % 3) * 2.4;
         if (!__nw.place('cottage', Math.cos(a) * r, Math.sin(a) * r)) break;
         cottages++;
       }
@@ -78,6 +94,11 @@ function runEconomy({ seed, days, diff }) {
 // free, so the ratio between them is what gets checked.
 const PER = {};
 const { page, errors, close } = await open();
+const HFGAME_TYPES = await page.evaluate(() => {
+  const o = {};
+  for (const t in HFGAME.TYPES) o[t] = { cost: HFGAME.TYPES[t].cost };
+  return o;
+});
 await page.evaluate(`window.__econ = ${runEconomy.toString()}`);
 
 for (const diff of DIFFS) {
@@ -99,10 +120,26 @@ for (const diff of DIFFS) {
   }
   const avgDry = dry.reduce((a, b) => a + b, 0) / dry.length;
   console.log(`  runs dry on day ${avgDry.toFixed(1)} on average` +
-              ` (target: about two-thirds of a ${DAYS}-night game, so ~${Math.round(DAYS * 0.67)})`);
-  check(`${diff}: the map lasts most of the game but not all of it`,
-        avgDry >= DAYS * 0.45 && avgDry <= DAYS * 0.95,
-        `dry on day ${avgDry.toFixed(1)} of ${DAYS}`);
+              ` (a floor only: stripping it early is the failure, lasting the run is not)`);
+  // A floor, and no ceiling any more.
+  //
+  // This used to want the map dry around two thirds of the way through, so that
+  // scarcity pushed you out to the nests for their caches. That stopped being
+  // reachable once the cottage was priced to limit a workforce: a crew that
+  // small cannot strip the map inside a run however long you give it, and
+  // shrinking the piles to compensate makes it WORSE — less supply buys fewer
+  // cottages, which is fewer workers, which is slower extraction. The two ends
+  // pull against each other and the loop closes on itself.
+  //
+  // So the ceiling is gone, deliberately, and Jarrod's call: salvage now lasts
+  // the run and a nest's cache is a bonus rather than a necessity. The floor
+  // stays, because "you can strip the whole map in three days" is still a
+  // failure and it is the one this reading was always best at catching.
+  check(`${diff}: the map is not stripped early in the run`,
+        avgDry >= DAYS * 0.45,
+        `dry on day ${avgDry.toFixed(1)} of ${DAYS}` +
+        (avgDry >= DAYS ? ` — it lasts the whole run, which is the shape a limited ` +
+         `workforce gives you` : ''));
   // The shape that matters is the taper: a strong opening day is fine, a day
   // that strips a third of the map is not, and the last working day should be
   // visibly slower than the first as the near piles empty and the walks grow.
@@ -183,6 +220,60 @@ check('...and the Library cannot step one off it',
       grid.steps.length === 0,
       grid.steps.length ? grid.steps.join(', ')
         : `every supply field moves in fives`);
+
+// ---- what the cottage is for ----------------------------------------------
+// It is the one building that pays for itself, so its price is the only thing
+// that decides how many hands a run ends up with. That makes "it costs more"
+// and "there are fewer workers" the same claim, and the second one is the one
+// worth checking: a price rise that changed nothing about the workforce would
+// have been a tax rather than a limit.
+const hands = await page.evaluate(() => {
+  const was = HFGAME.TYPES.cottage.cost;
+  function run(cost) {
+    HF.setStat('cottage', 'cost', cost);
+    HFGAME.syncStats();
+    __nw.start(4242);
+    const S = __nw.state();
+    __nw.hall(0, 0);
+    __nw.run(26);
+    let cottages = 0;
+    for (let t = 0; t < S.dayLen - 12; t += 10) {
+      S.dayLeft = S.dayLen;
+      S.units.filter(u => u.t === 'worker').forEach(u => {
+        let best = null, bd = 1e9;
+        S.nodes.forEach(n => { if (n.amt <= 1) return;
+          const d = Math.hypot(n.x - u.x, n.z - u.z); if (d < bd) { bd = d; best = n; } });
+        if (best) HFGAME.assignJob([u], best);
+      });
+      __nw.run(10);
+      while (S.players[0].supply >= HFGAME.TYPES.cottage.cost * 1.4 && cottages < 8) {
+        const a = cottages * 1.15, r = 5.6 + (cottages % 3) * 2.4;
+        if (!__nw.place('cottage', Math.cos(a) * r, Math.sin(a) * r)) break;
+        cottages++;
+      }
+    }
+    return { cottages, workers: S.units.filter(u => u.t === 'worker').length,
+             gathered: Math.round(S.gathered) };
+  }
+  const dear = run(HF.statDefs('cottage').fields.filter(f => f.k === 'cost')[0].def);
+  const cheap = run(30);
+  HF.setStat('cottage', 'cost', was);
+  HFGAME.syncStats();
+  return { dear, cheap, price: HF.statDefs('cottage').fields.filter(f => f.k === 'cost')[0].def };
+});
+
+check('the cottage price is what limits a workforce',
+      hands.dear.workers < hands.cheap.workers && hands.dear.cottages < hands.cheap.cottages,
+      `${hands.dear.workers} workers off ${hands.dear.cottages} cottages at ` +
+      `${hands.price} supply, against ${hands.cheap.workers} off ${hands.cheap.cottages} ` +
+      `at the old 30 — one day of the same seed. A price rise that left the workforce ` +
+      `where it was would have been a tax rather than a limit`);
+check('...and it is the dearest thing you can put up',
+      Object.keys(HFGAME_TYPES).every(t => t === 'cottage' ||
+        !HFGAME_TYPES[t].cost || HFGAME_TYPES[t].cost <= hands.price),
+      `${hands.price} against ${Object.keys(HFGAME_TYPES).filter(t => HFGAME_TYPES[t].cost)
+        .map(t => t + ' ' + HFGAME_TYPES[t].cost).join(', ')} — how many hands you have is ` +
+      `the whole shape of a run, so it should be the most expensive decision on the bar`);
 
 await close();
 done(errors);

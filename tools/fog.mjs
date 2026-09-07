@@ -371,5 +371,100 @@ check('...and none of them is the off switch',
       `${look.off}% with the fog off against ${look.shipped}% on. Three look knobs and a ` +
       `rule knob in one block is a place to lose an hour wondering why the map is dark`);
 
+// ---- nothing is painted on top of the fog ----------------------------------
+// A decal is BLENDED: what it writes is what it adds. So "hidden" means it adds
+// nothing — and blending one toward the fog COLOUR instead paints that colour on
+// top of ground which is already that colour. The mist lattice covers the whole
+// map, so every patch of it became a pale disc of daylight-grey on the dark, and
+// a night of mist was a field of bright circles. It shipped that way in the
+// commit that made fog weather rather than nightfall.
+//
+// The reading is structure where there should be none. Hidden ground is a flat
+// blend toward one colour, so its brightest pixels should sit close to its mean;
+// a disc added on top is a large local excursion and nothing else is.
+const paint = await page.evaluate(() => {
+  window.requestAnimationFrame = function () { return 0; };
+  // Its own round. This file has started several by the time it gets here and
+  // marched units all over them, so inheriting whatever the last one left meant
+  // the camera sat where nothing had been walked: 14,904 hidden samples and 0
+  // visible ones, and the control half of the check was empty.
+  HF.setStat('fog', 'on', 1);
+  __nw.start(4242);
+  const S = __nw.state();
+  S.players[0].supply = 99999;
+  __nw.hall(0, 0);
+  __nw.run(30);
+  const cv = document.querySelector('#view'), gl = cv.getContext('webgl2');
+  // Close enough that the circle you can actually see is a real share of the
+  // frame: at zoom 30 it was 89 pixels against 14,815 hidden ones, and the
+  // control half of the check had nothing in it to control with.
+  const c = HFGAME.cam(); c.tx = 0; c.tz = 0; c.zoom = 11;
+  const KEYS = ['on', 'dark', 'dim', 'haze', 'keep', 'mist', 'falloff'];
+  for (const k of KEYS)
+    HF.setStat('fog', k, HF.statDefs('fog').fields.filter(f => f.k === k)[0].def);
+  const L = (F, i) => 0.299 * F.b[i] + 0.587 * F.b[i + 1] + 0.114 * F.b[i + 2];
+  // The same frame at the same hour with the mist on and off, which is the only
+  // comparison that isolates it. Absolute thresholds on "how flat is the hidden
+  // ground" were tried twice and both measured the framing instead: a ring
+  // around the whole frame reads a big lift before the mist is even up, because
+  // the top of it is sky, and trimming to the sides below the horizon still
+  // leaves trees, lit grass and the edge of the visible circle in it.
+  function at(p, mist) {
+    HF.setStat('fog', 'mist', mist);
+    HFGAME.syncStats();
+    S.dayP = p;
+    __nw.frame();
+    const w = cv.width, h = cv.height, b = new Uint8Array(w * h * 4), F = { w, h, b };
+    gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, b);
+    return F;
+  }
+  // Split by what the fog says about the ground under each pixel rather than by
+  // where it lands on screen, so nothing about the camera can put a lit pixel in
+  // the hidden bucket. The pixel's world position comes from the same ray the
+  // cursor uses.
+  function split(A, B) {
+    let hidN = 0, hidD = 0, visN = 0, visD = 0;
+    for (let y = A.h * 0.42; y < A.h * 0.92; y += 6) for (let x = 4; x < A.w - 4; x += 6) {
+      const i = ((y | 0) * A.w + (x | 0)) * 4;
+      const g = HFGAME.pickWorld(x, A.h - y);
+      if (!g) continue;
+      const lit = HFGAME.fogAt(HF.w2gx(g.x), HF.w2gx(g.z)) >= 2;
+      const d = Math.abs(L(A, i) - L(B, i));
+      if (lit) { visN++; visD += d; } else { hidN++; hidD += d; }
+    }
+    return { hidden: +(hidD / Math.max(1, hidN)).toFixed(2), hidN,
+             visible: +(visD / Math.max(1, visN)).toFixed(2), visN };
+  }
+  const on = at(0.55, 1), off = at(0.55, 0);
+  const misty = split(on, off);
+  // ...and that the knob is a scale rather than a switch. Without this, taking
+  // the multiply out of mistK() and leaving only its zero guard passes
+  // everything above, because every reading here is on against off.
+  const thick = split(at(0.55, 2), off);
+  const onN = at(1.0, 1), offN = at(1.0, 0);
+  const night = split(onN, offN);
+  for (const k of KEYS)
+    HF.setStat('fog', k, HF.statDefs('fog').fields.filter(f => f.k === k)[0].def);
+  HFGAME.syncStats();
+  return { misty, night, thick };
+});
+
+check('the mist does not paint on ground you cannot see',
+      paint.misty.hidden < paint.misty.visible * 0.25 && paint.misty.visible > 2,
+      `switching the mist off at the same hour changes hidden ground by ` +
+      `${paint.misty.hidden}/255 and the ground you can see by ${paint.misty.visible} ` +
+      `(${paint.misty.hidN} hidden samples, ${paint.misty.visN} visible). A decal is ` +
+      `blended, so hidden has to mean it adds nothing — blended toward the fog COLOUR ` +
+      `instead it paints that colour on top of ground which is already that colour, and ` +
+      `every patch of the lattice becomes a pale disc on the dark`);
+check('...and the mist knob is a dial, not a switch',
+      paint.thick.visible > paint.misty.visible * 1.4,
+      `${paint.thick.visible} of change at 2x against ${paint.misty.visible} at 1x`);
+check('...at any hour of the night',
+      paint.night.hidden < paint.night.visible * 0.25 && paint.night.visible > 2,
+      `${paint.night.hidden} hidden against ${paint.night.visible} visible at two in ` +
+      `the morning — the visible half is the control, and without it this passes by the ` +
+      `mist never being drawn at all`);
+
 await close();
 done(errors);

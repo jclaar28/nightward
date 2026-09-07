@@ -400,6 +400,32 @@ the number is the weight on the ground's own colour, so turning it up keeps
 more. Name a knob for what the code does with it, not for the effect you had in
 mind.
 
+**A decal means something different by "hidden" than a building does.** The
+decal pass shares `FS_COMMON` with everything else, so it runs the same
+`warApply()` — and that blends toward the hour's fog COLOUR, which is right for
+opaque geometry and catastrophic for something blended. An additive decal
+blended toward the fog colour ADDS that colour to ground which is already that
+colour: the mist lattice covers the whole map, so every patch of it became a
+pale disc of daylight-grey on the dark and a night of mist was a field of bright
+circles. `uDecal` says which pass is running, and hidden means `col*f` there —
+fade to the blend's identity, which additive and multiply-darken share. It
+shipped broken in the commit that made fog weather rather than nightfall. When a
+shared shader path gains a new idea of "less", check it against every pass that
+runs through it.
+
+**A decal means something different by "hidden" than a building does.** The
+decal pass shares `FS_COMMON` with everything else, so it runs the same
+`warApply()` — and that blends toward the hour's fog COLOUR, which is right for
+opaque geometry and catastrophic for something blended. An additive decal
+blended toward the fog colour ADDS that colour to ground which is already that
+colour: the mist lattice covers the whole map, so every patch of it became a
+pale disc of daylight-grey on the dark, and a night of mist was a field of
+bright circles. `uDecal` says which pass is running, and hidden means `col*f`
+there — fade to the blend's identity, which additive and multiply-darken share.
+It shipped broken in the commit that made fog weather rather than nightfall.
+When a shared shader path gains a new idea of "less", check it against every
+pass that runs through it.
+
 **Supply is counted in fives.** Every number a player is charged or paid is a
 multiple of 5 — costs, refunds, a nest's cache, starting supply, and what is in
 a pile after its random jitter. The smallest coin in the game is a 5, so nothing

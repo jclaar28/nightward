@@ -1737,8 +1737,13 @@ var STAT_DEFS={
      hint:"how far it puts attackers on your minimap"}
   ]},
 
-  cottage:{ note:"Houses workers. The only building that makes supply instead of spending it.", fields:[
-    {k:"cost",    label:"Cost",          def:30,  lo:1,  hi:300, step:5, int:true, unit:"supply"},
+  // The one building that pays for itself, which is exactly why it cannot be
+  // cheap: at 30 supply a cottage was back in profit inside a day and the only
+  // reason to stop building them was the room to put them. The number is what
+  // limits the size of a workforce, so it is the number that decides whether
+  // there is a decision there at all.
+  cottage:{ note:"Houses workers. The only building that makes supply instead of spending it — and the dearest thing you can put up early, because how many hands you have is the whole shape of a run.", fields:[
+    {k:"cost",    label:"Cost",          def:120,  lo:1,  hi:300, step:5, int:true, unit:"supply"},
     {k:"hp",      label:"Hit points",    def:90,  lo:20, hi:1200,step:5, int:true},
     {k:"cap",     label:"Workers",       def:2,   lo:1,  hi:12,  step:1, int:true},
     {k:"retrain", label:"Rebuild time",  def:14,  lo:1,  hi:90,  step:0.5, unit:"s"},
@@ -1930,6 +1935,8 @@ var STAT_DEFS={
     // reading.
     {k:"keep",  label:"Colour in memory",def:1.25,lo:0, hi:3,   step:0.05,
      hint:"how much of the ground's own colour survives where you are not looking — 0 greys it the moment you turn away, high leaves it as it was"},
+    {k:"mist",  label:"Night mist",    def:1.0, lo:0, hi:2,   step:0.05, unit:"×",
+     hint:"the banks of low cloud that come up after dusk and burn off after dawn — 0 is a clear night"},
     {k:"falloff",label:"Edge",          def:1.0, lo:0.3,hi:3,  step:0.05,
      hint:"how tightly the fog closes at the edge of sight — below 1 it gives way early and reads soft, above 1 it holds on and reads close"},
     {k:"grace", label:"Opening reveal",def:0,   lo:0, hi:40, step:1,

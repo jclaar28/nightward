@@ -34,7 +34,7 @@ var TYPES={
   road : {cat:"core", road:true, foot:0, scale:1.00, cost:0,
           colA:M.PAL.stone, colB:M.PAL.timber,
           blurb:function(t){ return M.t("bld.road.blurb"); }},
-  cottage:{cat:"core", foot:1, scale:0.66, spawns:"worker",
+  cottage:{cat:"core", foot:2, scale:1.42, spawns:"worker",
           colA:M.PAL.plaster, colB:M.PAL.thatch,
           blurb:function(t){ return M.t("bld.cottage.blurb",{cap:t.cap, retrain:t.retrain}); }},
   tower: {cat:"guns", foot:1, scale:0.70,
@@ -65,10 +65,10 @@ var TYPES={
           colA:M.PAL.timber, colB:M.PAL.iron,
           blurb:function(t){ return M.t((t.cap|0)===1?"bld.turret.blurb.one":"bld.turret.blurb",
                                         {cap:t.cap, range:t.range}); }},
-  barracks:{cat:"muster", foot:1, scale:0.72, spawns:"soldier",
+  barracks:{cat:"muster", foot:2, scale:1.28, spawns:"soldier",
           colA:M.PAL.timber, colB:M.PAL.slate,
           blurb:function(t){ return M.t("bld.barracks.blurb",{cap:t.cap, retrain:t.retrain}); }},
-  archery:{cat:"muster", foot:1, scale:0.72, spawns:"archer",
+  archery:{cat:"muster", foot:2, scale:1.20, spawns:"archer",
           colA:M.PAL.timberL, colB:M.PAL.thatch,
           blurb:function(t){ return M.t("bld.archery.blurb",{cap:t.cap, retrain:t.retrain}); }}
 };
@@ -252,11 +252,11 @@ function syncStats(){
 // every night after — which is the whole reason to leave the walls.
 // `send` is per nest per night one; `nests` is how many the map seeds.
 var DIFF={
-  easy  :{supply:60, nests:3, send:45, hp:36,
+  easy  :{supply:60, nests:3, send:30, hp:36,
           mix:{shambler:0.76, runner:0.20, brute:0.04}},
-  normal:{supply:45, nests:5, send:40, hp:42,
+  normal:{supply:45, nests:5, send:28, hp:42,
           mix:{shambler:0.66, runner:0.25, brute:0.09}},
-  hard  :{supply:30, nests:8, send:35, hp:46,
+  hard  :{supply:30, nests:8, send:25, hp:46,
           mix:{shambler:0.58, runner:0.28, brute:0.14}}
 };
 // After DIFF, not before: syncText() names the difficulties out of the text
@@ -554,7 +554,13 @@ function spanStep(rot){
 // east no matter which way the gate is facing.
 function footCells(t,gx,gz,rot){
   var out=[], T=TYPES[t], f=T.foot, r=(f-1)/2;
-  for(var dx=-r;dx<=r;dx++) for(var dz=-r;dz<=r;dz++) out.push([gx+dx,gz+dz]);
+  // An ODD footprint is a block centred on the cell you clicked; an EVEN one
+  // has no centre cell, so it is anchored at that cell and grows out along +x
+  // and +z. That is the whole difference, and it is why `foot` used to be
+  // odd-only: with f=2 the old loop ran dx from -0.5 to 0.5 and produced no
+  // whole cells at all.
+  if(f%2===0){ for(var ax=0;ax<f;ax++) for(var az=0;az<f;az++) out.push([gx+ax,gz+az]); }
+  else for(var dx=-r;dx<=r;dx++) for(var dz=-r;dz<=r;dz++) out.push([gx+dx,gz+dz]);
   if((T.span|0)>1){
     var st=spanStep(rot);
     for(var i=1;i<(T.span|0);i++) out.push([gx+st[0]*i, gz+st[1]*i]);
@@ -565,12 +571,24 @@ function footCells(t,gx,gz,rot){
 // S.cells. A two-cell gate is drawn, picked, ringed and hung with doors from the
 // middle of its pair, not from the corner one of them happens to be indexed by.
 function bCentre(b){
-  var st=spanStep(bRot(b)), n=((TYPES[b.type].span|0)>1)?(TYPES[b.type].span-1)/2:0;
-  return [M.gx2w(b.gx)+st[0]*CELL*n, M.gx2w(b.gz)+st[1]*CELL*n];
+  if(b&&b.ref) b=b.ref;
+  var T=TYPES[b.type];
+  var st=spanStep(bRot(b)), n=((T.span|0)>1)?(T.span-1)/2:0;
+  // An even footprint is anchored at a corner, so the middle of it is half a
+  // cell out along both axes from the cell that indexes it.
+  var e=((T.foot||1)%2===0)?((T.foot-1)/2)*CELL:0;
+  return [M.gx2w(b.gx)+st[0]*CELL*n+e, M.gx2w(b.gz)+st[1]*CELL*n+e];
 }
 // Half-extents per axis, because a spanning building is not square: a gate in a
 // north-south run is a cell wide and two long, and a single radius would either
 // miss half of it or claim the ground beside it.
+// The two halves of bCentre, for the many call sites that want one number.
+// Everything that asks where a building IS has to go through these: a 2x2 is
+// anchored at a corner, so the cell that indexes it is half a cell out from the
+// middle, and 0.75 of a unit is the difference between a door on the wall and a
+// door inside it.
+function bwx(b){ return bCentre(b)[0]; }
+function bwz(b){ return bCentre(b)[1]; }
 function bHalf(b){
   var h=((TYPES[b.type].foot||1)*CELL)/2, sp=(TYPES[b.type].span|0);
   if(sp<2) return [h,h];
@@ -724,7 +742,7 @@ function removeAt(gx,gz,pid){
   if(postCap(b)) clearTurret(b,true);   // nobody is left standing on air
   footCells(b.type,b.gx,b.gz,bRot(b)).forEach(function(cc){ delete S.cells[key(cc[0],cc[1])]; });
   if(p) p.supply+=refundOf(b.type);
-  if(SND) SND.remove(M.gx2w(b.gx),M.gx2w(b.gz));
+  if(SND) SND.remove(bwx(b),bwz(b));
   S.distDirty=true; S.netCellsDirty=true; S.pathVer=(S.pathVer|0)+1;
   if(UI.hotbar) UI.hotbar();
   if(UI.phase) UI.phase();
@@ -813,7 +831,7 @@ function cmdOf(p){
 // Out of the front, clear of the footprint. A hall is three cells across, so
 // the old fixed radius put its workers inside the building.
 function doorOf(b,spread){
-  var bx=M.gx2w(b.gx), bz=M.gx2w(b.gz);
+  var bx=bwx(b), bz=bwz(b);
   var face=bRot(b)+Math.PI/2;             // the side the door is on
   var a=face+(Math.random()-0.5)*(spread===undefined?1.5:spread);
   var r=standOff(b)+0.25+Math.random()*0.35;
@@ -882,7 +900,7 @@ function finishBuild(b){
   if(TYPES[b.type].spawns && !b.garrison){
     b.garrison=[]; b.trainCd=0; musterAll(b);
   }
-  var fx=M.gx2w(b.gx), fz=M.gx2w(b.gz);
+  var fx=bwx(b), fz=bwz(b);
   spark(fx,gy(fx,fz)+0.9,fz,8,[1.05,0.90,0.58],0.9,2.2,0.45,0.9);
   if(SND) SND.built(fx,fz);
   S.distDirty=true; S.netCellsDirty=true; S.pathVer=(S.pathVer|0)+1;
@@ -894,7 +912,7 @@ function finishBuild(b){
 function collapseSite(p){
   var b=p.site;
   if(!b) return;
-  var bx=M.gx2w(b.gx), bz=M.gx2w(b.gz);
+  var bx=bwx(b), bz=bwz(b);
   spark(bx,gy(bx,bz)+0.9,bz,10,[0.85,0.70,0.48],1.1,3.0,0.55,1.0);
   footCells(b.type,b.gx,b.gz,bRot(b)).forEach(function(c){ delete S.cells[key(c[0],c[1])]; });
   p.site=null; p.placed=false;
@@ -909,7 +927,7 @@ function finishHall(p,b){
   p.site=null; p.hall=b;
   b.garrison=[]; b.trainCd=0;
   musterAll(b);
-  var hx=M.gx2w(b.gx), hz=M.gx2w(b.gz);
+  var hx=bwx(b), hz=bwz(b);
   spark(hx,gy(hx,hz)+1.6,hz,14,[1.15,0.98,0.62],1.2,3.2,0.55,1.1);
   if(SND) SND.built(hx,hz);
   S.distDirty=true; S.netCellsDirty=true; S.pathVer=(S.pathVer|0)+1;
@@ -1079,7 +1097,7 @@ function evict(b){
     if(!u.inside||homeOf(u)!==b) continue;
     u.inside=false; u.shelter=false; u.mode="idle";
     var a=Math.random()*Math.PI*2, r=1.3;
-    u.x=M.gx2w(b.gx)+Math.cos(a)*r; u.z=M.gx2w(b.gz)+Math.sin(a)*r;
+    u.x=bwx(b)+Math.cos(a)*r; u.z=bwz(b)+Math.sin(a)*r;
     u.px=u.x; u.pz=u.z;
   }
 }
@@ -1155,7 +1173,7 @@ function updateWorker(u,U,dt){
     if(!h){ u.shelter=false; }
     else {
       u.carry=0; u.job=null; u.fix=null; u.mode="toHome";
-      var hx=M.gx2w(h.gx), hz=M.gx2w(h.gz);
+      var hx=bwx(h), hz=bwz(h);
       if(stepToBuilding(u,U,h)){
         u.inside=true;
         spark(hx,gy(hx,hz)+0.5,hz,3,[1.05,0.95,0.68],0.7,1.4,0.26,0.45);
@@ -1202,7 +1220,7 @@ function updateWorker(u,U,dt){
     if(!op||!op.hall){ u.mode="idle"; return; }
     // The loaded leg routes too — it is the same job, and a road that only
     // helped the empty half would be half a road.
-    var hx2=M.gx2w(op.hall.gx), hz2=M.gx2w(op.hall.gz);
+    var hx2=bwx(op.hall), hz2=bwz(op.hall);
     if(S.roadE.length&&Math.hypot(hx2-u.x,hz2-u.z)>standOff(op.hall)+1.2){
       if(!stepVia(u,U2,hx2,hz2,standOff(op.hall))) return;
     }
@@ -1227,8 +1245,8 @@ function updateWorker(u,U,dt){
 // cottage went up beside the hall.
 function boxDist(x,z,b){
   var half=((TYPES[b.type].foot||1)*CELL)/2;
-  var dx=Math.max(0,Math.abs(x-M.gx2w(b.gx))-half);
-  var dz=Math.max(0,Math.abs(z-M.gx2w(b.gz))-half);
+  var dx=Math.max(0,Math.abs(x-bwx(b))-half);
+  var dz=Math.max(0,Math.abs(z-bwz(b))-half);
   return Math.hypot(dx,dz);
 }
 var TOUCH=0.95;
@@ -1508,7 +1526,7 @@ function nearestHandSite(u,pid){
   for(var k in S.cells){
     var b=S.cells[k];
     if(b.ref||!b.site||(b.own|0)!==(pid|0)||!TYPES[b.type].hand) continue;
-    var bx=M.gx2w(b.gx), bz=M.gx2w(b.gz);
+    var bx=bwx(b), bz=bwz(b);
     var d=Math.hypot(bx-u.x,bz-u.z);
     if(d<bd){ bd=d; best={b:b, x:bx, z:bz, d:d}; }
   }
@@ -1545,7 +1563,7 @@ function updateRoadwork(u,U,dt,op){
 function stepToBuilding(u,U,b,margin){
   margin=(margin===undefined)?TOUCH:margin;
   if(boxDist(u.x,u.z,b)<=margin) return true;
-  var bx=M.gx2w(b.gx), bz=M.gx2w(b.gz);
+  var bx=bwx(b), bz=bwz(b);
   var dx=bx-u.x, dz=bz-u.z, L=Math.hypot(dx,dz)||1;
   var sp=U.speed*roadSpeed(u.x,u.z)*dt_;
   moveUnit(u,u.x+dx/L*sp,u.z+dz/L*sp);
@@ -1562,7 +1580,7 @@ function pickRepair(u,p){
   for(var k in S.cells){
     var b=S.cells[k];
     if(!repairable(b,p)) continue;
-    var d=Math.hypot(M.gx2w(b.gx)-u.x,M.gx2w(b.gz)-u.z);
+    var d=Math.hypot(bwx(b)-u.x,bwz(b)-u.z);
     if(d<bd){ bd=d; best=b; }
   }
   return best;
@@ -1574,7 +1592,7 @@ function updateMender(u,U,dt,op){
   if(U.nerve>0 && nearestEnemy(u.x,u.z,U.nerve)){
     u.fix=null; u.fixOrder=false; u.mode="flee";
     if(op&&op.hall){
-      var fx=M.gx2w(op.hall.gx), fz=M.gx2w(op.hall.gz);
+      var fx=bwx(op.hall), fz=bwz(op.hall);
       u.px=fx+Math.cos(u.rot0)*3.1; u.pz=fz+Math.sin(u.rot0)*3.1;
     }
     stepPath(u,U,u.px,u.pz,0.18);
@@ -1587,13 +1605,13 @@ function updateMender(u,U,dt,op){
   if(!b){                                   // nothing to mend: shelter by the hall
     u.mode="flee";
     if(op&&op.hall){
-      var hx0=M.gx2w(op.hall.gx), hz0=M.gx2w(op.hall.gz);
+      var hx0=bwx(op.hall), hz0=bwz(op.hall);
       u.px=hx0+Math.cos(u.rot0)*3.1; u.pz=hz0+Math.sin(u.rot0)*3.1;
     }
     stepPath(u,U,u.px,u.pz,0.18);
     return;
   }
-  var bx=M.gx2w(b.gx), bz=M.gx2w(b.gz);
+  var bx=bwx(b), bz=bwz(b);
   if(!stepToBuilding(u,U,b)){ u.mode="toFix"; return; }
   u.mode="fixing";
   u.rot=Math.atan2(bz-u.z,bx-u.x);
@@ -1615,7 +1633,7 @@ function assignRepair(list,b,net){
     u.fix=b; u.fixOrder=true; u.job=null; u.mode="toFix"; n++;
   }
   if(n){
-    S.markers.push({x:M.gx2w(b.gx),z:M.gx2w(b.gz),life:0.9,max:0.9});
+    S.markers.push({x:bwx(b),z:bwz(b),life:0.9,max:0.9});
     if(S.markers.length>12) S.markers.shift();
     if(SND) SND.order();
   }
@@ -1754,7 +1772,7 @@ function updateUnits(dt){
     if(u.t==="commander"){
       var op2=S.players[u.own||0], site=op2&&op2.site;
       if(site&&!nearestEnemy(u.x,u.z,U.reach+0.9)){
-        var sx=M.gx2w(site.gx), sz=M.gx2w(site.gz);
+        var sx=bwx(site), sz=bwz(site);
         var sdx=sx-u.x, sdz=sz-u.z;
         dt_=dt;
         if(!stepToBuilding(u,U,site,TOUCH+0.25)){
@@ -1873,7 +1891,7 @@ function updateUnits(dt){
     if(b.trainCd<=0){
       b.trainCd=0;
       muster(b,want);
-      if(SND) SND.muster(M.gx2w(b.gx),M.gx2w(b.gz));
+      if(SND) SND.muster(bwx(b),bwz(b));
       if(UI.units) UI.units();
     }
   }
@@ -1971,7 +1989,7 @@ function visionMask(pid){
     // A site is a heap of materials. It does not shoot, house, light or accept
     // repair, and it does not keep watch either.
     if(c.site) continue;
-    stamp(M.gx2w(c.gx),M.gx2w(c.gz),(M.statsOf(c.type)||{}).sight||0);
+    stamp(bwx(c),bwz(c),(M.statsOf(c.type)||{}).sight||0);
   }
   return seeMask;
 }
@@ -2038,9 +2056,9 @@ function applyAuras(){
   for(k in S.cells){
     var t=S.cells[k];
     if(t.ref||!TYPES[t.type].range) continue;
-    var x=M.gx2w(t.gx), z=M.gx2w(t.gz), n=0;
+    var x=bwx(t), z=bwz(t), n=0;
     for(var i=0;i<braz.length;i++)
-      if(Math.hypot(M.gx2w(braz[i].gx)-x,M.gx2w(braz[i].gz)-z)<=TYPES.brazier.aura) n++;
+      if(Math.hypot(bwx(braz[i])-x,bwz(braz[i])-z)<=TYPES.brazier.aura) n++;
     t.lit=n;
     t.fireMul=Math.pow(TYPES.brazier.auraK,Math.min(2,n));
   }
@@ -2282,7 +2300,7 @@ function roadAnchor(x,z){
   for(var k in S.cells){
     var c=S.cells[k];
     if(c.ref) continue;
-    var bx=M.gx2w(c.gx), bz=M.gx2w(c.gz), db=(bx-x)*(bx-x)+(bz-z)*(bz-z);
+    var bx=bwx(c), bz=bwz(c), db=(bx-x)*(bx-x)+(bz-z)*(bz-z);
     if(db<=bd){ bd=db; best={x:bx,z:bz,kind:"building"}; }
   }
   for(i=0;i<S.nodes.length;i++){
@@ -2717,7 +2735,7 @@ function stepCombat(dt){
     for(var hp2=0;hp2<S.players.length;hp2++){
       var HH=S.players[hp2].hall;
       if(!HH) continue;
-      var ax=M.gx2w(HH.gx), az2=M.gx2w(HH.gz);
+      var ax=bwx(HH), az2=bwz(HH);
       if(Math.hypot(m.x-ax,m.z-az2)<2.35+m.reach){ hitHall=HH; hhx=ax; hhz=az2; break; }
     }
     if(hitHall){
@@ -2768,7 +2786,7 @@ function stepCombat(dt){
     var blocker=rootOf(cellAt(step[0],step[1]));
     var tx=M.gx2w(step[0]), tz=M.gx2w(step[1]);
     if(blocker){
-      var bx=M.gx2w(blocker.gx), bz=M.gx2w(blocker.gz);
+      var bx=bwx(blocker), bz=bwz(blocker);
       if(Math.hypot(m.x-bx,m.z-bz)<(TYPES[blocker.type].foot*CELL)/2+m.reach){
         m.rot=Math.atan2(bz-m.z,bx-m.x);
         var perB=swingTick(m,dt);
@@ -2797,7 +2815,7 @@ function stepCombat(dt){
     if(!tyr.range||c.site) continue;         // a pile of timber does not shoot
     c.cd-=dt;
     if(c.cd>0) continue;
-    var tx2=M.gx2w(c.gx), tz2=M.gx2w(c.gz), best=null, bd=tyr.range;
+    var tx2=bwx(c), tz2=bwz(c), best=null, bd=tyr.range;
     // A ballista is wasted on a straggler: it prefers the heaviest thing in reach.
     var wantHeavy=!!tyr.splash, bestW=-1;
     for(var q=0;q<S.enemies.length;q++){
@@ -3054,7 +3072,7 @@ function eliminate(pid){
   for(var k in S.cells){
     var c=S.cells[k];
     if(c.ref||((c.own||0)!==pid)) continue;
-    var bx=M.gx2w(c.gx), bz=M.gx2w(c.gz);
+    var bx=bwx(c), bz=bwz(c);
     spark(bx,gy(bx,bz)+0.9,bz,7,[0.85,0.62,0.42],1.1,3.4,0.6,1.0);
     if(c.garrison) disband(c);
     footCells(c.type,c.gx,c.gz,bRot(c)).forEach(function(cc){ delete S.cells[key(cc[0],cc[1])]; });
@@ -3177,7 +3195,7 @@ function pick(cx,cy){
     var th=rayBox(O,C.f,[bx-hh[0],base,bz-hh[1]],[bx+hh[0],top,bz+hh[1]]);
     if(th!==null&&th<best){ best=th; hitB=c; }
   }
-  if(hitB) return {x:M.gx2w(hitB.gx), z:M.gx2w(hitB.gz),
+  if(hitB) return {x:bwx(hitB), z:bwz(hitB),
                    gx:hitB.gx, gz:hitB.gz, onBuilding:true};
   var p=[O[0]+C.f[0]*t, 0, O[2]+C.f[2]*t];
   return {x:p[0], z:p[2], gx:M.w2gx(p[0]), gz:M.w2gx(p[2])};
@@ -3638,9 +3656,9 @@ function drawUnit(u,n,ca,cb){
 // Everything that can be hurt reports a world point, a fill fraction and how
 // wide its bar should be. Only damaged things are listed, so an untouched
 // settlement stays clean and a bar always means something is wrong.
-var BAR_Y={hall:4.0, tower:3.2, ballista:2.7, archery:2.9, barracks:2.9,
-           cottage:2.2, brazier:2.3, wall:1.7, gate:2.4};
-var BAR_W={hall:46, wall:22, gate:44, brazier:26, cottage:30};
+var BAR_Y={hall:4.0, tower:3.2, ballista:2.7, archery:3.1, barracks:3.9,
+           cottage:3.9, brazier:2.3, wall:1.7, gate:2.4};
+var BAR_W={hall:46, wall:22, gate:44, brazier:26, cottage:46, barracks:46, archery:46};
 function hpAnchors(){
   var out=[], i;
   if(!S) return out;
@@ -3778,10 +3796,13 @@ function rangeRing(n,x,z,r,col,tick,lift){
 // Mist comes up after dusk and burns off after dawn. It is keyed to the hour
 // rather than to the phase because dawn arrives before the fighting stops.
 function mistK(){
+  var k=FOG().mist;
+  if(k===undefined) k=1;
+  if(!(k>0)) return 0;
   var p=S.dayP;
   if(p<0.36||p>1.72) return 0;
   var up=Math.min(1,(p-0.36)/0.34), dn=Math.min(1,(1.72-p)/0.30);
-  return Math.min(up,dn)*0.85;
+  return Math.min(up,dn)*0.85*k;
 }
 // A stable 0..1 from a lattice point, so a patch of mist is in the same place
 // every frame and no two patches share a drift.
@@ -3866,7 +3887,7 @@ function pack(){
     // in your picture of the map whether or not anybody is looking at it. That
     // is the whole difference between explored and visible, and it is why the
     // other town's walls stay on your map after you have walked past them.
-    if(fogOn&&lookingAt(M.gx2w(c.gx),M.gx2w(c.gz))<1) continue;
+    if(fogOn&&lookingAt(bwx(c),bwz(c))<1) continue;
     var ty=TYPES[c.type], f=c.hp/c.max;
     // Where the building stands, which for a two-cell gate is the middle of its
     // pair rather than the corner cell that indexes it. Everything hung off x/z
@@ -4241,7 +4262,11 @@ function pack(){
         rangeRing(n,gxw,gzw,t2.range,IND.ghost,IND.ghost,0.06);
       }
       else if(S.sel==="barracks"||S.sel==="archery"||S.sel==="cottage"){
-        n[S.sel]=put(buf[S.sel],n[S.sel],gxw,ghy,gzw,rot,gA,t2.scale,gB);
+        // Where it would actually stand: these are 2x2 and anchored at the cell
+        // under the cursor, so the picture sits half a cell out from it in both
+        // axes. A ghost drawn on the anchor is a ghost that moves when you build.
+        var bc0=bCentre({type:S.sel,gx:S.hover.gx,gz:S.hover.gz,rot:rot,rotAuto:false});
+        n[S.sel]=put(buf[S.sel],n[S.sel],bc0[0],gy(bc0[0],bc0[1]),bc0[1],rot,gA,t2.scale,gB);
       }
       else if(S.sel==="brazier"){
         n.brazier=put(buf.brazier,n.brazier,gxw,ghy,gzw,rot,gA,t2.scale,gB);
@@ -4320,11 +4345,11 @@ function packLamps(){
     var pa=(a.type==="brazier")?0:1, pc=(c.type==="brazier")?0:1;
     if(pa!==pc) return pa-pc;
     return (Math.hypot(M.gx2w(a.gx)-hx,M.gx2w(a.gz)-hz)
-          - Math.hypot(M.gx2w(c.gx)-hx,M.gx2w(c.gz)-hz));
+          - Math.hypot(bwx(c)-hx,bwz(c)-hz));
   });
   for(var i=0;i<lit.length&&LAMPS.length<12;i++){
     var t=lit[i], sp=LAMP_SPEC[t.type];
-    var tx=M.gx2w(t.gx), tz=M.gx2w(t.gz);
+    var tx=bwx(t), tz=bwz(t);
     // gy(), not PLAT. Every lamp in the game hung at the plateau's height, which
     // is right only for as long as nothing is ever lit off the plateau — the
     // documented way to float something half a unit in the air.
@@ -4829,6 +4854,12 @@ return {
   // vision and fog, for the minimap and the tools
   visionMask:visionMask, seenAt:seenAt, fogStep:fogStep,
   // 0 never seen, 1 seen before, 2 in sight now
+  // Screen pixel to the ground under it, for tools that need to know what a
+  // pixel is looking at rather than where it is on screen.
+  pickWorld:function(sx,sy){
+    var p=pick(sx,sy);
+    return p?{x:p.x,z:p.z}:null;
+  },
   fogAt:function(gx,gz){
     if(!S||!S.fog||gx<0||gz<0||gx>=M.GN||gz>=M.GN) return 2;
     var i=gz*M.GN+gx;

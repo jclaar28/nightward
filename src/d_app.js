@@ -1384,6 +1384,7 @@ var FOG_ROWS=[
   {id:"fog", k:"dim"},
   {id:"fog", k:"haze"},
   {id:"fog", k:"keep"},
+  {id:"fog", k:"mist"},
   {id:"fog", k:"falloff"}
 ];
 function drawFog(){ drawKnobs(el("fogBody"),FOG_ROWS,drawFogSummary); }

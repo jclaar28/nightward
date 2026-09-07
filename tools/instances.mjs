@@ -125,7 +125,14 @@ const ghost = await page.evaluate(() => {
   const sample = (x, z) => {
     S.sel = 'cottage';
     S.hover = { x, z, gx: HF.w2gx(x), gz: HF.w2gx(z) };
-    const cx = HF.gx2w(HF.w2gx(x)), cz = HF.gx2w(HF.w2gx(z));
+    // Where a cottage ghost is actually drawn, which is NOT the cell under the
+    // cursor: a cottage is 2x2 now, an even footprint is anchored at that cell
+    // and grows along +x and +z, so the picture sits half a cell out in both
+    // axes. Matching the cell centre found no rows at all and this check died
+    // dereferencing the null.
+    const gc = HFGAME.bCentre({ type: 'cottage', gx: HF.w2gx(x), gz: HF.w2gx(z),
+                                rot: 0, rotAuto: false });
+    const cx = gc[0], cz = gc[1];
     const rows = __nw.frame().rows.filter(r =>
       r.b === 'cottage' && Math.hypot(r.x - cx, r.z - cz) < 0.01);
     return rows.length ? rows[rows.length - 1].ca : null;
@@ -274,6 +281,55 @@ const ringCap = await page.evaluate(seed => {
 check('a defence far bigger than anyone builds still fits the ring buffer',
       ringCap.chips > 500 && ringCap.chips < 6000,
       `${ringCap.towers} towers drew ${ringCap.chips} segments against a 6000 cap`);
+
+// ---- a building stands on the cells it occupies ----------------------------
+// Three of them are 2x2, and an even footprint has no centre cell: it is
+// anchored at the cell you clicked and grows out along +x and +z, so the middle
+// of the picture is half a cell from the cell that indexes it. Half a cell is
+// 0.75 of a unit, which is the difference between a door on the wall and a door
+// inside it — and it is invisible until something walks through the half that is
+// only painted on.
+//
+// So this asks the two questions separately: how many cells does it hold, and
+// is it drawn over the middle of them. Reverting a footprint to 1x1 passes every
+// other tool in this repo.
+const foot = await page.evaluate(seed => {
+  __nw.start(seed);
+  const S = __nw.state();
+  S.players[0].supply = 999999;
+  __nw.hall(0, 0); __nw.run(26);
+  const at = { cottage: [7, -4], barracks: [7, 4], archery: [-7, 4], tower: [0, -7] };
+  for (const t in at) __nw.place(t, at[t][0], at[t][1]);
+  __nw.run(40);
+  const rows = __nw.frame().rows;
+  const out = {};
+  for (const t in at) {
+    const b = __nw.at(at[t][0], at[t][1]);
+    if (!b || b.site) { out[t] = { missing: true }; continue; }
+    const cells = Object.keys(S.cells).filter(k => (S.cells[k].ref || S.cells[k]) === b);
+    const own = HFGAME.footCells(t, b.gx, b.gz, b.rot);
+    const mean = [own.reduce((a, c) => a + HF.gx2w(c[0]), 0) / own.length,
+                  own.reduce((a, c) => a + HF.gx2w(c[1]), 0) / own.length];
+    const drawn = rows.filter(r => r.b === t)
+      .map(r => Math.hypot(r.x - mean[0], r.z - mean[1]))
+      .sort((a, b) => a - b)[0];
+    out[t] = { foot: HFGAME.TYPES[t].foot, cells: cells.length,
+               gap: drawn === undefined ? null : +drawn.toFixed(3) };
+  }
+  return out;
+}, SEED);
+
+const big = ['cottage', 'barracks', 'archery'];
+check('a cottage, a barracks and an archery range each stand on four cells',
+      big.every(t => foot[t].foot === 2 && foot[t].cells === 4),
+      big.map(t => `${t} ${foot[t].cells}`).join(', ') + ` (a tower still holds ` +
+      `${foot.tower.cells}). An even footprint has no centre cell — it is anchored at ` +
+      `the cell you clicked and grows along +x and +z`);
+check('...and each is drawn over the middle of them',
+      big.concat('tower').every(t => foot[t].gap !== null && foot[t].gap < 0.02),
+      big.concat('tower').map(t => `${t} ${foot[t].gap}`).join(', ') + ` from the mean of ` +
+      `its own cells. Half a cell out is 0.75 of a unit, which is a door drawn inside a ` +
+      `wall — and nothing else in this repo notices`);
 
 await close();
 done(errors);

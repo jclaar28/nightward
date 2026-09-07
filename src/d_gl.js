@@ -32,6 +32,9 @@ var FS_COMMON=
 "uniform vec2 uWarE;\n"+      // x how much of its own colour memory keeps, y how fast the edge closes
 "uniform vec2 uWarSO;\n"+     // world XZ -> uv: scale, offset
 "uniform vec3 uWarFog;\n"+    // what unseen ground turns into, this hour
+// 1 while the decal pass is running. Fog means two different things to the two
+// passes and the difference is the whole of the bug below.
+"uniform float uDecal;\n"+
 "layout(location=0) out vec4 oColor;\n"+
 "layout(location=1) out vec4 oNormal;\n"+
 "float warLevel(){\n"+
@@ -62,6 +65,14 @@ var FS_COMMON=
 // the weather, which is the same knob pointed at the right quantity.
 "vec3 warApply(vec3 col,float f){\n"+
 "  if(uWarK.x<0.5) return col;\n"+
+// A decal is BLENDED, so what it writes is what it adds — and "hidden" for
+// something that adds is nothing at all, not a screenful of haze. Blending a
+// decal toward the fog colour paints the fog colour ON TOP of ground that is
+// already the fog colour, which is how a night of mist became a field of pale
+// circles: every patch of the lattice added a disc of daylight-grey to the dark.
+// Additive and multiply-darken both have the same identity here, which is why
+// one line covers the pass.
+"  if(uDecal>0.5) return col*f;\n"+
 "  float g=dot(col,vec3(0.299,0.587,0.114));\n"+
 "  vec3 mem=mix(vec3(g),col,clamp((f-uWarK.y)/max(0.001,1.0-uWarK.y)*uWarE.x,0.0,1.0));\n"+
 "  return mix(uWarFog,mem,f);\n"+
@@ -569,6 +580,7 @@ function create(canvas){
       gl.uniform2f(u(p,"uWarSO"),warSO[0],warSO[1]);
       var hzk=SKYNOW.hz*warHaze;
       gl.uniform3f(u(p,"uWarFog"),SKYNOW.fog[0]*hzk,SKYNOW.fog[1]*hzk,SKYNOW.fog[2]*hzk);
+      gl.uniform1f(u(p,"uDecal"),0);
       gl.activeTexture(gl.TEXTURE0);
     }
     gl.useProgram(pStatic); common(pStatic);
@@ -602,6 +614,9 @@ function create(canvas){
       gl.depthMask(false);
       gl.disable(gl.CULL_FACE);           // a decal is one flat face, seen from either side
       gl.drawBuffers([gl.COLOR_ATTACHMENT0,gl.NONE]);
+      // The pass shares its program with the instanced batches above, so the
+      // one thing it has to say for itself is that it is blending.
+      gl.uniform1f(u(pInst,"uDecal"),1);
       var bmode=null;
       for(i=0;i<decals.length;i++){
         var db=decals[i];
@@ -614,6 +629,7 @@ function create(canvas){
         gl.bindVertexArray(db.vao);
         gl.drawArraysInstanced(gl.TRIANGLES,0,db.n,db.count);
       }
+      gl.uniform1f(u(pInst,"uDecal"),0);
       gl.drawBuffers([gl.COLOR_ATTACHMENT0,gl.COLOR_ATTACHMENT1]);
       gl.enable(gl.CULL_FACE);
       gl.depthMask(true);

@@ -36,7 +36,7 @@ a second copy would stop following the values the in-game library edits.*
 |---|---|---|---|---|---|---|---|
 | **Town Hall** | free | 600 | 14s | 999 | 12 | 3×3 | houses 2 and 1 scout, replaced every 18s |
 | **Road** | — | — | 2.6s per unit | — | — | off-grid | +55% speed within 1.1, runs of 2–26, ends snap within 2.4 |
-| **Cottage** | 30 | 90 | 4.5s | 30 | 7 | 1×1 | houses 2, replaced every 14s |
+| **Cottage** | 120 | 90 | 4.5s | 30 | 7 | 2×2 | houses 2, replaced every 14s |
 
 **Town Hall.** The objective. 3×3 footprint (4.5 units), impassable. Timber-framed over a stone base course, with a banded door and shuttered windows — the vocabulary every other building borrows.
 
@@ -74,8 +74,8 @@ a second copy would stop following the values the in-game library edits.*
 
 | | supply | health | goes up in | path cost | sight | footprint | what it does |
 |---|---|---|---|---|---|---|---|
-| **Barracks** | 45 | 220 | 6s | 40 | 8 | 1×1 | houses 3, replaced every 11s |
-| **Archery Range** | 40 | 160 | 5.5s | 40 | 8 | 1×1 | houses 3, replaced every 13s |
+| **Barracks** | 45 | 220 | 6s | 40 | 8 | 2×2 | houses 3, replaced every 11s |
+| **Archery Range** | 40 | 160 | 5.5s | 40 | 8 | 2×2 | houses 3, replaced every 13s |
 
 **Barracks.** Houses three soldiers. They muster the moment you place it, so you can walk them into position during the build phase, and it retrains one loss at a time for as long as it stands.
 
@@ -125,8 +125,8 @@ difficulty and rises 5% each night. Night one:
 
 | | starting supply | nests | each sends | base health | shambler / runner / brute |
 |---|---|---|---|---|---|
-| **Easy** | 60 | 3 | 45 | 36 | 76% / 20% / 4% |
-| **Normal** | 45 | 5 | 40 | 42 | 66% / 25% / 9% |
-| **Hard** | 30 | 8 | 35 | 46 | 58% / 28% / 14% |
+| **Easy** | 60 | 3 | 30 | 36 | 76% / 20% / 4% |
+| **Normal** | 45 | 5 | 28 | 42 | 66% / 25% / 9% |
+| **Hard** | 30 | 8 | 25 | 46 | 58% / 28% / 14% |
 
-The first night is every living nest's send added together — 135 on easy, 200 on normal, 280 on hard. Pulling one down is a permanent cut to every night after it.
+The first night is every living nest's send added together — 90 on easy, 140 on normal, 200 on hard. Pulling one down is a permanent cut to every night after it.

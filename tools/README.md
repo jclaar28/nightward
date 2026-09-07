@@ -58,6 +58,13 @@ commander there. Measured on the flat plateau where the hall usually goes, the
 old code passes and proves nothing — confirmed the other way too, the check
 reports 29 of 52 segments below ground against the flat version.
 
+`instances.mjs` also holds the footprint invariant: three buildings are 2x2, an
+even footprint has no centre cell, and reverting one to 1x1 passes every other
+tool in this repo. It asks the two questions separately — how many cells does it
+hold, and is it drawn over the middle of them — because they fail independently
+and the second one is invisible until something walks through the half that is
+only painted on.
+
 **`campaign.mjs`** — the round loop. A night is not the end of anything, so
 these drive several full day/night cycles: dawn hands you the next day, the
 night counter advances, each wave is bigger than the last by a margin that
@@ -184,6 +191,17 @@ player's units go with the sight. It also checks the one that would read as a
 bug rather than a rule — your own units are drawn wherever they are, because
 they are the eyes — and that the `fog.on` switch actually restores the map,
 since a feature with a broken off-switch is one nobody can bisect against.
+
+Two measure that nothing is painted on top of the fog. A decal is blended, so
+what it writes is what it adds, and hidden has to mean it adds nothing — blend
+one toward the fog COLOUR instead and it paints that colour onto ground which is
+already that colour. The mist lattice covers the map, so a night of mist became
+a field of pale discs, and it shipped. The reading is the same frame at the same
+hour with the mist off, which is the only comparison that isolates it: two
+attempts at an absolute "how flat is the hidden ground" measured the framing
+instead, one reading a big lift before the mist was even up because the top of
+its sample ring was sky. The visible half of the frame is the control, without
+which the check passes by the mist never being drawn at all.
 
 Four more measure the knobs that decide how the fog LOOKS, as against what it
 hides, and each one is measured where it can actually show. The first version
@@ -578,8 +596,25 @@ absolute end-threshold made a quiet distant sound look shorter than the loud
 near one it came from. Both are now relative to the sound's own peak.
 
 **`economy.mjs`** — how much a day pays, how long the map lasts, whether the
-first night is sized against the first day, and whether supply is still counted
-in fives. That last one is a ratio held in two
+first night is sized against the first day, whether supply is still counted in
+fives, and whether the cottage price limits a workforce.
+
+One check lost its ceiling, deliberately. It used to want the map dry around two
+thirds of the way through, so scarcity pushed you out to the nests for their
+caches — and that stopped being reachable once the cottage was priced to limit a
+workforce, because a crew that small cannot strip the map however long you give
+it. Shrinking the piles to compensate makes it WORSE: less supply buys fewer
+cottages, which is fewer workers, which is slower extraction, and the loop closes
+on itself. The floor stays, because "you can strip the whole map in three days"
+is still a failure and it is what this reading was always best at catching.
+
+Where the simulated player puts its houses turns out to be part of what every
+number here means. The original tight ring packed 2x2 cottages until `place`
+simply refused, so the thing limiting the workforce was the room to put them and
+the price could be moved without the reading changing at all; a widening spiral
+out to radius 16 fixed that and kept the workforce growing all run, which
+flattened the income taper to 87% and failed a different check. It is a ring
+beside the hall, spaced for a 2x2. That last one is a ratio held in two
 different files — what the piles give is in `STAT_DEFS.salvage`, what a nest
 sends is in `DIFF` in `d_game.js` — and moving either alone is how an opening
 ends up frantic or free. It is checked as a band around *normal* rather than one
