@@ -49,7 +49,12 @@ var TYPES={
   wall : {cat:"walls", foot:1, scale:1.00, wallish:true,
           colA:M.PAL.timber, colB:M.PAL.iron,
           blurb:function(t){ return M.t("bld.wall.blurb",{hp:t.hp}); }},
-  gate : {cat:"walls", foot:1, scale:1.00, wallish:true,
+  // span:2 rather than foot:2, and the two mean different things. `foot` is a
+  // square block of cells centred on one, so it only has odd answers — and a
+  // gate is two cells in a LINE, whichever line its wall run is on. `foot`
+  // stays 1 because it is also the half-extent every distance in the game is
+  // measured with, and a gate is still one cell deep.
+  gate : {cat:"walls", foot:1, span:2, wallish:true, scale:1.00,
           colA:M.PAL.timberL, colB:M.PAL.iron,
           blurb:function(t){ return M.t("bld.gate.blurb",{hp:t.hp}); }},
   // `wallish` puts it in a wall run: joins() and wallRot() count it as a
@@ -524,10 +529,53 @@ function inBuildZone(gx,gz,p){
   }
   return true;
 }
-function footCells(t,gx,gz){
-  var out=[], f=TYPES[t].foot, r=(f-1)/2;
+// Which way a spanning building's second cell lies. The gate's own +x runs
+// along its wall, and its instance yaw is what puts that somewhere in the
+// world — so the step is that axis rounded to the grid, and the same rotation
+// that draws the gate decides which cells it stands on. There is no other
+// source of truth for it: a step worked out from the neighbouring walls instead
+// would disagree with the drawing the moment a player pressed R.
+function spanStep(rot){
+  // (cos, sin), the mapping the vertex shader uses for a mesh's own +x —
+  // wp=(x*cos - z*sin, y, x*sin + z*cos).
+  //
+  // Which of the two neighbours a gate takes is a free choice: the mesh is
+  // symmetric, so the other sign gives a gate standing on the other side of the
+  // cell you clicked and nothing about it is wrong. What is NOT free is that
+  // bCentre(), bHalf() and footCells() all read it the same way — the picture
+  // has to sit on the cells the building occupies, and a gate drawn half a cell
+  // off from its own footprint looks perfectly fine until something walks
+  // through the half that is only painted on.
+  return [Math.round(Math.cos(rot||0)), Math.round(Math.sin(rot||0))];
+}
+// `rot` is optional and matters only for a spanning type. Every caller that has
+// a rotation must pass it: a gate's cells and a gate's picture come from the
+// same number, and a footprint computed without it lands on the cell to the
+// east no matter which way the gate is facing.
+function footCells(t,gx,gz,rot){
+  var out=[], T=TYPES[t], f=T.foot, r=(f-1)/2;
   for(var dx=-r;dx<=r;dx++) for(var dz=-r;dz<=r;dz++) out.push([gx+dx,gz+dz]);
+  if((T.span|0)>1){
+    var st=spanStep(rot);
+    for(var i=1;i<(T.span|0);i++) out.push([gx+st[0]*i, gz+st[1]*i]);
+  }
   return out;
+}
+// Where a spanning building actually stands, as against which cell holds it in
+// S.cells. A two-cell gate is drawn, picked, ringed and hung with doors from the
+// middle of its pair, not from the corner one of them happens to be indexed by.
+function bCentre(b){
+  var st=spanStep(bRot(b)), n=((TYPES[b.type].span|0)>1)?(TYPES[b.type].span-1)/2:0;
+  return [M.gx2w(b.gx)+st[0]*CELL*n, M.gx2w(b.gz)+st[1]*CELL*n];
+}
+// Half-extents per axis, because a spanning building is not square: a gate in a
+// north-south run is a cell wide and two long, and a single radius would either
+// miss half of it or claim the ground beside it.
+function bHalf(b){
+  var h=((TYPES[b.type].foot||1)*CELL)/2, sp=(TYPES[b.type].span|0);
+  if(sp<2) return [h,h];
+  var st=spanStep(bRot(b));
+  return [h+Math.abs(st[0])*CELL*(sp-1)/2, h+Math.abs(st[1])*CELL*(sp-1)/2];
 }
 // The one cell a building may be placed onto rather than beside.
 function upgradable(c,p){
@@ -542,7 +590,9 @@ function canPlace(t,gx,gz,p){
   if(t==="hall" && !cmdOf(p)) return false;      // nobody left to raise it
   if(t!=="hall" && !p.hall) return false;
   if(TYPES[t].cost>p.supply) return false;
-  var cs=footCells(t,gx,gz);
+  // The rotation the ghost is showing and place() is about to use, so what is
+  // checked and what gets built are the same two cells.
+  var cs=footCells(t,gx,gz,ghostRot(t,gx,gz));
   for(var i=0;i<cs.length;i++){
     if(!inBuildZone(cs[i][0],cs[i][1],p)) return false;
     // A turret is the one thing that may be placed on something already there,
@@ -603,7 +653,7 @@ function place(t,gx,gz,pid,rotOv){
     var oc=cellAt(gx,gz);
     if(oc){
       var ob=rootOf(oc);
-      footCells(ob.type,ob.gx,ob.gz).forEach(function(cc){ delete S.cells[key(cc[0],cc[1])]; });
+      footCells(ob.type,ob.gx,ob.gz,bRot(ob)).forEach(function(cc){ delete S.cells[key(cc[0],cc[1])]; });
     }
   }
   var b={type:t,gx:gx,gz:gz,hp:TYPES[t].hp,max:TYPES[t].hp,cd:Math.random()*0.4,
@@ -615,7 +665,13 @@ function place(t,gx,gz,pid,rotOv){
   // decoration on the one axis it was supposed to matter. A door has two states
   // and this is the one that makes it a door.
   if(t==="gate") b.shut=true;
-  footCells(t,gx,gz).forEach(function(c){
+  // A spanning building's rotation decides which cells it stands on, so it
+  // cannot stay live. Left on auto, wallRot would re-answer from a neighbourhood
+  // that now contains the gate's own cells, and removeAt would delete a
+  // different pair than place() wrote — leaving a ref cell pointing at a
+  // building that is gone.
+  if((TYPES[t].span|0)>1){ b.rot=(rotOv===undefined?ghostRot(t,gx,gz):rotOv); b.rotAuto=false; }
+  footCells(t,gx,gz,bRot(b)).forEach(function(c){
     S.cells[key(c[0],c[1])] = (c[0]===gx&&c[1]===gz) ? b : {ref:b,type:t,own:p.id};
   });
   p.supply-=TYPES[t].cost;
@@ -665,8 +721,8 @@ function removeAt(gx,gz,pid){
   evict(b);
   if(b.garrison) disband(b);
   if(S.bsel===b) S.bsel=null;
-  if(b.type==="turret") clearTurret(b,true);   // nobody is left standing on air
-  footCells(b.type,b.gx,b.gz).forEach(function(cc){ delete S.cells[key(cc[0],cc[1])]; });
+  if(postCap(b)) clearTurret(b,true);   // nobody is left standing on air
+  footCells(b.type,b.gx,b.gz,bRot(b)).forEach(function(cc){ delete S.cells[key(cc[0],cc[1])]; });
   if(p) p.supply+=refundOf(b.type);
   if(SND) SND.remove(M.gx2w(b.gx),M.gx2w(b.gz));
   S.distDirty=true; S.netCellsDirty=true; S.pathVer=(S.pathVer|0)+1;
@@ -840,7 +896,7 @@ function collapseSite(p){
   if(!b) return;
   var bx=M.gx2w(b.gx), bz=M.gx2w(b.gz);
   spark(bx,gy(bx,bz)+0.9,bz,10,[0.85,0.70,0.48],1.1,3.0,0.55,1.0);
-  footCells(b.type,b.gx,b.gz).forEach(function(c){ delete S.cells[key(c[0],c[1])]; });
+  footCells(b.type,b.gx,b.gz,bRot(b)).forEach(function(c){ delete S.cells[key(c[0],c[1])]; });
   p.site=null; p.placed=false;
   S.distDirty=true; S.netCellsDirty=true; S.pathVer=(S.pathVer|0)+1;
   if(UI.hotbar) UI.hotbar();
@@ -935,10 +991,30 @@ function popOut(u){
 function turretOf(u){
   var t=u.tur;
   if(!t) return null;
-  // the turret it remembers may have come down under it
+  // the post it remembers may have come down under it
   var c=S.cells[key(t.gx,t.gz)];
   if(!c||rootOf(c)!==t||t.site){ u.tur=null; return null; }
   return t;
+}
+// A building that can be stood on rather than sheltered in. Two of them, and
+// they take opposite halves of your army for opposite reasons: a turret is
+// height and reach, so it wants the units that shoot; a gate is a gap in your
+// own wall, so it wants the ones that block it with their bodies.
+function postCap(b){
+  if(!b||b.site) return 0;
+  if(b.type==="turret") return M.statsOf("turret").cap|0;
+  if(b.type==="gate")   return M.statsOf("gate").cap|0;
+  return 0;
+}
+// Where one of a post's crew actually stands. On a turret they are spread
+// around the deck; in a gate they are spread ACROSS the opening, on the ground,
+// because the whole point of holding a gate is being in the way.
+function postAt(b,i,n){
+  var c0=bCentre(b);
+  if(b.type!=="gate") return [c0[0],c0[1]];
+  var rt=bRot(b), sp=(n<=1)?0:((i/(n-1))-0.5);
+  var w=GATE_HINGE*1.55;
+  return [c0[0]+Math.cos(rt)*sp*w, c0[1]+Math.sin(rt)*sp*w];
 }
 function crewOf(b){
   var out=[];
@@ -947,15 +1023,18 @@ function crewOf(b){
 }
 // Only ranged units, because the whole benefit is range and a soldier up a
 // tower is a soldier not blocking a lane.
-function canCrew(u){ return !UNITS[u.t].civil && !UNITS[u.t].melee; }
+function canCrew(u,b){
+  if(UNITS[u.t].civil) return false;
+  return (b&&b.type==="gate") ? !!UNITS[u.t].melee : !UNITS[u.t].melee;
+}
 function manTurret(list,b,net){
-  if(!b||b.type!=="turret"||b.site) return 0;
+  if(!b||b.site||!postCap(b)) return 0;
   if(guest()&&!net) return intent({m:"tu",gx:b.gx,gz:b.gz,u:uids(list)});
   if((b.own|0)!==(list.length?(list[0].own|0):-1)) return 0;
-  var cap=(M.statsOf("turret").cap|0), have=crewOf(b).length, n=0;
+  var cap=postCap(b), have=crewOf(b).length, n=0;
   for(var i=0;i<list.length&&have+n<cap;i++){
     var u=list[i];
-    if(!canCrew(u)||(u.own|0)!==(b.own|0)||turretOf(u)===b) continue;
+    if(!canCrew(u,b)||(u.own|0)!==(b.own|0)||turretOf(u)===b) continue;
     u.tur=b; u.job=null; u.target=null; u.shelter=false; u.inside=false;
     n++;
   }
@@ -1703,10 +1782,14 @@ function updateUnits(dt){
     // no post to return to and no leash to run out.
     var TUR=turretOf(u);
     if(TUR){
-      u.x=M.gx2w(TUR.gx); u.z=M.gx2w(TUR.gz); u.px=u.x; u.pz=u.z;
+      // Each of them stands in their own place. Pinning every one of a gate's
+      // crew to the root cell would put three soldiers inside each other and
+      // give the whole group one reach between them.
+      var cw=crewOf(TUR), pp=postAt(TUR,Math.max(0,cw.indexOf(u)),Math.max(1,cw.length));
+      u.x=pp[0]; u.z=pp[1]; u.px=u.x; u.pz=u.z;
       u.shelter=false; u.inside=false;
     }
-    var turBonus = TUR ? (+M.statsOf("turret").range||0) : 0;
+    var turBonus = (TUR&&TUR.type==="turret") ? (+M.statsOf("turret").range||0) : 0;
     // acquire: hold stays near the post, pursue reaches a full leash further
     var lead = TUR ? 0 : ((stanceOf(u.own)==="hold") ? Math.min(U.leash,2.4) : U.leash);
     var scan = U.melee ? (U.reach+lead) : (U.range+turBonus);
@@ -1922,7 +2005,7 @@ function rebuildField(){
   // seeded from every standing hall at once, so the field naturally sends each
   // attacker to the nearer settlement
   halls.forEach(function(H){
-    footCells("hall",H.gx,H.gz).forEach(function(c){
+    footCells("hall",H.gx,H.gz,0).forEach(function(c){
       if(c[0]<0||c[1]<0||c[0]>=N||c[1]>=N) return;
       var i=c[1]*N+c[0]; dist[i]=0; push(i,0);
     });
@@ -2488,9 +2571,9 @@ function damageBuilding(b,amt){
     // The platform is gone, so its archers are on the ground — hurt, in the
     // open, and exactly where the thing that killed the turret is standing.
     // That is the counterplay to a garrison being unreachable.
-    if(b.type==="turret") clearTurret(b,true);
+    if(postCap(b)) clearTurret(b,true);
     if(S.bsel===b) S.bsel=null;
-    footCells(b.type,b.gx,b.gz).forEach(function(c){ delete S.cells[key(c[0],c[1])]; });
+    footCells(b.type,b.gx,b.gz,bRot(b)).forEach(function(c){ delete S.cells[key(c[0],c[1])]; });
     S.distDirty=true; S.netCellsDirty=true; S.pathVer=(S.pathVer|0)+1;
   }
 }
@@ -2974,7 +3057,7 @@ function eliminate(pid){
     var bx=M.gx2w(c.gx), bz=M.gx2w(c.gz);
     spark(bx,gy(bx,bz)+0.9,bz,7,[0.85,0.62,0.42],1.1,3.4,0.6,1.0);
     if(c.garrison) disband(c);
-    footCells(c.type,c.gx,c.gz).forEach(function(cc){ delete S.cells[key(cc[0],cc[1])]; });
+    footCells(c.type,c.gx,c.gz,bRot(c)).forEach(function(cc){ delete S.cells[key(cc[0],cc[1])]; });
   }
   for(var u=S.units.length-1;u>=0;u--){
     if((S.units[u].own||0)!==pid) continue;
@@ -3088,10 +3171,10 @@ function pick(cx,cy){
   for(var k in S.cells){
     var c=S.cells[k];
     if(c.ref) continue;
-    var half=((TYPES[c.type].foot||1)*CELL)/2;
-    var bx=M.gx2w(c.gx), bz=M.gx2w(c.gz);
+    var hh=bHalf(c), cc0=bCentre(c);
+    var bx=cc0[0], bz=cc0[1];
     var base=gy(bx,bz), top=base+(BAR_Y[c.type]||2.4)*0.86;
-    var th=rayBox(O,C.f,[bx-half,base,bz-half],[bx+half,top,bz+half]);
+    var th=rayBox(O,C.f,[bx-hh[0],base,bz-hh[1]],[bx+hh[0],top,bz+hh[1]]);
     if(th!==null&&th<best){ best=th; hitB=c; }
   }
   if(hitB) return {x:M.gx2w(hitB.gx), z:M.gx2w(hitB.gz),
@@ -3295,7 +3378,7 @@ function applySnapshot(sn){
              site:!!r[6], prog:r[7]||0, shut:!!r[8],
              need:Math.max(0.001, (t==="hall") ? (TYPES.hall.raise||14)
                                                : (+TYPES[t].raise||1))};
-      footCells(t,r[1],r[2]).forEach(function(c){
+      footCells(t,r[1],r[2],r[5]).forEach(function(c){
         S.cells[key(c[0],c[1])]=(c[0]===r[1]&&c[1]===r[2])?b:{ref:b,type:t,own:r[4]};
       });
       if(t==="hall"){
@@ -3522,7 +3605,7 @@ function drawUnit(u,n,ca,cb){
   // Standing on the platform rather than on the ground. Crew are spread around
   // the deck so two archers are two figures rather than one in two places.
   var tur=turretOf(u), ox0=0, oz0=0;
-  if(tur){
+  if(tur&&tur.type==="turret"){
     var crew=crewOf(tur), ix=crew.indexOf(u), cn=Math.max(1,crew.length);
     var ang=(ix<0?0:ix)/cn*6.2832;
     ox0=Math.cos(ang)*0.30; oz0=Math.sin(ang)*0.30;
@@ -3556,8 +3639,8 @@ function drawUnit(u,n,ca,cb){
 // wide its bar should be. Only damaged things are listed, so an untouched
 // settlement stays clean and a bar always means something is wrong.
 var BAR_Y={hall:4.0, tower:3.2, ballista:2.7, archery:2.9, barracks:2.9,
-           cottage:2.2, brazier:2.3, wall:1.7, gate:2.1};
-var BAR_W={hall:46, wall:22, gate:26, brazier:26, cottage:30};
+           cottage:2.2, brazier:2.3, wall:1.7, gate:2.4};
+var BAR_W={hall:46, wall:22, gate:44, brazier:26, cottage:30};
 function hpAnchors(){
   var out=[], i;
   if(!S) return out;
@@ -3569,14 +3652,18 @@ function hpAnchors(){
   for(var kk in S.cells){
     var c=S.cells[kk];
     if(c.ref) continue;
+    // Over the middle of what it belongs to, which for a two-cell gate is not
+    // the cell that indexes it — a bar hanging over one half of a gate reads as
+    // belonging to the wall beside it.
+    var bc=bCentre(c);
     if(c.site){
-      out.push({x:M.gx2w(c.gx), y:gy(M.gx2w(c.gx),M.gx2w(c.gz))+(BAR_Y[c.type]||2.6), z:M.gx2w(c.gz),
+      out.push({x:bc[0], y:gy(bc[0],bc[1])+(BAR_Y[c.type]||2.6), z:bc[1],
                 f:Math.max(0,Math.min(1,c.prog/Math.max(0.001,c.need))),
                 w:(BAR_W[c.type]||34), k:"work"});
       continue;
     }
     if(c.hp>=c.max) continue;
-    out.push({x:M.gx2w(c.gx), y:gy(M.gx2w(c.gx),M.gx2w(c.gz))+(BAR_Y[c.type]||2.6), z:M.gx2w(c.gz),
+    out.push({x:bc[0], y:gy(bc[0],bc[1])+(BAR_Y[c.type]||2.6), z:bc[1],
               f:Math.max(0,c.hp/c.max), w:(BAR_W[c.type]||34), k:"own"});
   }
   for(i=0;i<S.units.length;i++){
@@ -3736,7 +3823,7 @@ function contactShade(n,x,z,r,k){
 // its own side, and its swing is negated to match: a double door opens away
 // from its own centre line, and two leaves rotating the same way is a
 // turnstile.
-var GATE_HINGE=0.525, GATE_SWING=1.40;
+var GATE_HINGE=1.06, GATE_SWING=1.40;
 function gateLeaves(n,c,x,y,z,rt,ca,cb){
   var k=(c.sw===undefined)?(c.shut?0:1):c.sw;
   k=k*k*(3-2*k);                         // eased here, not stored: a linear store stays readable
@@ -3745,7 +3832,14 @@ function gateLeaves(n,c,x,y,z,rt,ca,cb){
   // Hinge offsets are in the gate's own frame, so they turn with it. A gate in
   // a north-south run and one in an east-west run are the same asset at
   // different yaws, and hinges written in world axes would sit in the sill.
-  var hx=GATE_HINGE*cs, hz=-GATE_HINGE*sn;
+  // The shader turns a local point by wp=(x*cos-z*sin, y, x*sin+z*cos), so the
+  // mesh's own +x lands on world (cos, sin) — NOT (cos, -sin). Getting that sign
+  // backwards hinges both leaves on the outside of their posts and swings them
+  // away from the doorway, so a shut gate is a hole with two doors standing open
+  // beside it. It shipped that way once, because the checks measured where the
+  // hinges were and how far the yaw moved and never once asked which way a leaf
+  // was pointing.
+  var hx=GATE_HINGE*cs, hz=GATE_HINGE*sn;
   n=put(buf.gatedoor,n, x-hx, y, z-hz, rt-a,          ca,1,cb);
   n=put(buf.gatedoor,n, x+hx, y, z+hz, rt+Math.PI+a,  ca,1,cb);
   return n;
@@ -3774,7 +3868,11 @@ function pack(){
     // other town's walls stay on your map after you have walked past them.
     if(fogOn&&lookingAt(M.gx2w(c.gx),M.gx2w(c.gz))<1) continue;
     var ty=TYPES[c.type], f=c.hp/c.max;
-    var x=M.gx2w(c.gx), z=M.gx2w(c.gz);
+    // Where the building stands, which for a two-cell gate is the middle of its
+    // pair rather than the corner cell that indexes it. Everything hung off x/z
+    // below — the mesh, the health bar, the selection ring, the doors — wants
+    // the same answer, so it is taken once.
+    var ctr=bCentre(c), x=ctr[0], z=ctr[1];
     var pc=(S.multi&&(c.own||0)!==S.me)?S.players[c.own||0].col:null;
     var ca=hurt(pc||ty.colA,f), cb=hurt(pc?[pc[0]*1.25,pc[1]*1.25,pc[2]*1.25]:ty.colB,f);
     var rt=bRot(c), by=gy(x,z);
@@ -3791,7 +3889,7 @@ function pack(){
       // the heaps only settle — there is no rising frame to consume them, and
       // the progress bar is what says how far along the work is
       var msc=(multi?0.86:0.94)*(1.0-0.12*pr2);
-      footCells(c.type,c.gx,c.gz).forEach(function(cc){
+      footCells(c.type,c.gx,c.gz,bRot(c)).forEach(function(cc){
         var tx3=M.gx2w(cc[0]), tz3=M.gx2w(cc[1]), ty3=gy(tx3,tz3);
         n.tile=put(buf.tile,n.tile,tx3,ty3+0.035,tz3,0,
                    [0.42,0.36,0.20],1,[0.42,0.36,0.20]);
@@ -4128,12 +4226,13 @@ function pack(){
     if(S.hover&&S.sel&&!TYPES[S.sel].road){
       var ok=canPlace(S.sel,S.hover.gx,S.hover.gz);
       var tint=ok?[0.24,0.58,0.40]:[0.62,0.20,0.16];
-      footCells(S.sel,S.hover.gx,S.hover.gz).forEach(function(cc){
+      var rot0=ghostRot(S.sel,S.hover.gx,S.hover.gz);
+      footCells(S.sel,S.hover.gx,S.hover.gz,rot0).forEach(function(cc){
         n.tile=put(buf.tile,n.tile,M.gx2w(cc[0]),gy(M.gx2w(cc[0]),M.gx2w(cc[1]))+0.035,M.gx2w(cc[1]),0,tint,1,tint);
       });
       var t2=TYPES[S.sel], gxw=M.gx2w(S.hover.gx), gzw=M.gx2w(S.hover.gz);
       var gA=ghostCol(t2.colA,ok), gB=ghostCol(t2.colB,ok);
-      var rot=ghostRot(S.sel,S.hover.gx,S.hover.gz);
+      var rot=rot0;
       var ghy=gy(gxw,gzw);
       if(S.sel==="hall") n.hall=put(buf.hall,n.hall,gxw,ghy,gzw,rot,gA,t2.scale,gB);
       else if(S.sel==="tower"||S.sel==="ballista"){
@@ -4155,7 +4254,12 @@ function pack(){
         for(var gd=0;gd<4;gd++)
           if(gm&(1<<gd)) n.wall=put(buf.wall,n.wall,gxw,ghy,gzw,gd*Math.PI/2,gA,1,gB);
       }
-      else if(S.sel==="gate") n.gate=put(buf.gate,n.gate,gxw,ghy,gzw,rot,gA,t2.scale,gB);
+      else if(S.sel==="gate"){
+        var gc0={type:"gate",gx:S.hover.gx,gz:S.hover.gz,rot:rot,rotAuto:false,shut:true};
+        var gcc=bCentre(gc0), gcy=gy(gcc[0],gcc[1]);
+        n.gate=put(buf.gate,n.gate,gcc[0],gcy,gcc[1],rot,gA,t2.scale,gB);
+        n.gatedoor=gateLeaves(n.gatedoor,gc0,gcc[0],gcy,gcc[1],rot,gA,gB);
+      }
     }
   }
   for(var kk2 in n){
@@ -4571,8 +4675,8 @@ function wireInput(){
         // there" and "go and stand on that" are the same gesture, and the
         // turret is the more specific reading.
         var turB=g?rootOf(cellAt(g.gx,g.gz)):null;
-        if(turB&&turB.type==="turret"&&!turB.site&&(turB.own|0)===S.me){
-          var crewList=selectedUnits().filter(canCrew);
+        if(turB&&!turB.site&&postCap(turB)&&(turB.own|0)===S.me){
+          var crewList=selectedUnits().filter(function(u){ return canCrew(u,turB); });
           if(crewList.length&&manTurret(crewList,turB)) { mode=null; S.marquee=null; return; }
         }
         if(g&&list.length){
@@ -4735,6 +4839,18 @@ return {
   selectPile:selectPile, pileCrew:pileCrew,
   // pathfinding, for the tools: findPath is the search, stepPath the follower
   findPath:findPath, stepPath:stepPath, losClear:losClear, solidAt:solidAt,
+  // Where a building actually stands and how big it is, for the tools: a
+  // two-cell gate is not at the cell that indexes it.
+  bCentre:bCentre, bHalf:bHalf, footCells:function(t,gx,gz,rot){ return footCells(t,gx,gz,rot); },
+  ghostRot:function(t,gx,gz){ return ghostRot(t,gx,gz); },
+  // World point to page pixels, using the VP the frame was actually drawn with.
+  // A tool that wants to look at one particular part of the picture has no other
+  // honest way to find it: a screen window guessed by eye lands somewhere else
+  // the moment the camera or the geometry moves.
+  project:function(x,y,z){
+    var C=camera(true), rect=canvas.getBoundingClientRect();
+    return projPt(C.vp,x,y,z,rect);
+  },
   // The horde's flow field, rebuilt on demand. A tool that read S.dist straight
   // would get whatever the last frame left there, which is the wrong answer
   // immediately after anything moves the layout.
@@ -4775,6 +4891,7 @@ return {
   setGate:setGate,
   housedBy:housedBy, sheltering:sheltering, shelteredCount:shelteredCount,
   crewOf:crewOf, manTurret:manTurret, clearTurret:clearTurret, canCrew:canCrew,
+  postCap:postCap, postAt:postAt,
   select:function(t){ if(S) S.sel=(S.sel===t)?null:t; },
   held:function(){ return S?S.sel:null; },
   rotate:rotate, rotAuto:rotAuto,

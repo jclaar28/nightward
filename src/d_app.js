@@ -254,10 +254,13 @@ HFGAME.UI.building=function(){
     return;
   }
   if(b.type==="gate"&&!site){
+    var gcrew=HFGAME.crewOf(b).length, gcap=HFGAME.postCap(b);
     el("bldHouse").hidden=false;
     el("bldHoused").textContent=M.t(b.shut?"sel.gate.isshut":"sel.gate.isopen");
-    el("bldIn").textContent="";
-    el("bldHint").textContent=M.t(b.shut?"sel.gate.hint.shut":"sel.gate.hint.open");
+    el("bldIn").textContent=gcrew?(gcrew+"/"+gcap):"";
+    el("bldHint").textContent=gcrew
+      ? M.t("sel.gate.crew",{n:gcrew})
+      : M.t(b.shut?"sel.gate.hint.shut":"sel.gate.crewhint");
     dockActs(b,T,[]);
     return;
   }
@@ -427,6 +430,7 @@ function dockActs(b,T,housed,road){
   box.hidden=false;
   el("dockWhat").textContent=T.name;
   var ds=el("dockShelter");
+  el("dockCrew").hidden=true;
   if(!road&&b.type==="turret"&&!b.site){
     var tc=HFGAME.crewOf(b).length;
     ds.hidden=!tc;
@@ -444,11 +448,19 @@ function dockActs(b,T,housed,road){
     ds.hidden=false;
     ds.textContent=M.t(b.shut?"sel.gate.open":"sel.gate.shut");
     ds.setAttribute("aria-pressed",b.shut?"true":"false");
+    // The second verb only appears once there is somebody to stand down. There
+    // is no "post them" button, because posting them is a right-click with the
+    // troops you want — a button would have to answer "which soldiers" and the
+    // selection already has.
+    var dcrew=el("dockCrew"), gcrew=HFGAME.crewOf(b).length;
+    dcrew.hidden=!gcrew;
+    if(gcrew) dcrew.textContent=M.t("sel.gate.stand");
     var dsell3=el("dockSell");
     dsell3.hidden=false;
     dsell3.textContent=M.t("sel.selldown",{n:HFGAME.refundOf(b.type)});
     return;
   }
+  el("dockCrew").hidden=true;
   ds.hidden=road||!housed.length;
   if(!road&&housed.length){
     var on=HFGAME.sheltering(b);
@@ -1139,6 +1151,11 @@ el("dockShelter").addEventListener("click",function(){
   if(b.type==="turret"){ HFGAME.clearTurret(b); HFGAME.UI.building(); return; }
   if(b.type==="gate"){ HFGAME.setGate(b,!b.shut); HFGAME.UI.building(); return; }
   HFGAME.setShelter(b,!HFGAME.sheltering(b));
+  HFGAME.UI.building();
+});
+el("dockCrew").addEventListener("click",function(){
+  var b=HFGAME.bsel(); if(!b) return;
+  HFGAME.clearTurret(b);
   HFGAME.UI.building();
 });
 el("dockSell").addEventListener("click",function(){

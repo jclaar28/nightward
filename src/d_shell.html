@@ -595,6 +595,7 @@
   #dockActs button[hidden],#dockTroops button[hidden]{display:none}
   #troopStance[aria-pressed="false"]{border-color:var(--accent);color:var(--accent)}
   #dockSell:hover{border-color:var(--bad);color:var(--bad)}
+  #dockCrew[hidden]{display:none}
   #dockShelter[aria-pressed="false"]{background:var(--accent);border-color:var(--accent);
     color:#12161A;font-weight:700}
   #dockShelter[aria-pressed="false"]:hover{filter:brightness(1.09);color:#12161A}
@@ -1131,6 +1132,7 @@
     <div class="panel" id="dockActs" hidden>
       <span id="dockWhat">Watchtower</span>
       <button id="dockShelter" type="button" hidden></button>
+      <button id="dockCrew" type="button" hidden></button>
       <button id="dockSell" type="button"></button>
       <span class="dkHint" data-t="sel.deselect"></span>
     </div>

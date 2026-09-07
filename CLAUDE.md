@@ -625,8 +625,13 @@ without talking to Jarrod first.
   the jambs, the right one half a turn round to reach back to the middle, and
   the swing negated on it so a double door opens rather than revolving. No bone,
   no pitch slot, no shader change. The hinge offsets are rotated into the gate's
-  own frame, or they sit correctly on a north-south run and inside the sill on
-  an east-west one. `c.sw` eases 0 to 1 in `stepGates()`, above the guest
+  own frame by the SHADER's convention — `wp=(x*cos - z*sin, y, x*sin + z*cos)`,
+  so a mesh's own +x lands on world `(cos, sin)`. Getting that sign backwards
+  hangs both leaves outside their posts and swings them away from the doorway,
+  so a shut gate is a hole with two doors standing open beside it. It shipped
+  that way once, because the checks measured where the hinges were and how far
+  the yaw moved and never asked which way a leaf was pointing. Read the tip, not
+  the transform. `c.sw` eases 0 to 1 in `stepGates()`, above the guest
   early-out, driven entirely from the `shut` flag the snapshot already carries —
   so both sides animate the same door with no number on the wire. The swing is
   80 degrees on purpose: at 110 the leaves fold flat against the wall and vanish

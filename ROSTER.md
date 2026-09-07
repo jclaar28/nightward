@@ -61,7 +61,7 @@ a second copy would stop following the values the in-game library edits.*
 | | supply | health | goes up in | path cost | sight | footprint | what it does |
 |---|---|---|---|---|---|---|---|
 | **Palisade** | 5 | 110 | 1s | 14 | 4 | 1×1 | — |
-| **Gate** | 10 | 90 | 1.5s | 2 | 4 | 1×1 | — |
+| **Gate** | 10 | 90 | 1.5s | 2 | 4 | 1×1 | houses 3, replaced every —s |
 | **Turret** | 35 | 280 | 9s of labour | 20 | 11 | 1×1 | one archer may stand on it, shooting 3.4u further |
 
 **Palisade.** Half a cell, growing from the centre toward +X. A wall cell emits one run per connected neighbour, so corners, tees and crossings build themselves.

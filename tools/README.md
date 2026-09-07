@@ -446,11 +446,30 @@ and passing one of them is how you ship half a door.
 
 The leaves are checked on the instances the renderer is handed rather than on
 the state, because a leaf drawn at the wrong yaw is still a leaf and still
-counts: two per gate, hinged 0.525 from its centre, offsets that rotate with the
-frame, and a swing of 80 degrees in opposite directions sampled across half a
-second of frames so a snap fails. The second gate needs a wall run of its own —
-the first version placed a lone one, which takes the default rotation, so the
-check compared the first gate with itself and passed.
+counts. The first version of those checks measured where the hinges sat and how
+far the yaw moved, both of which stayed perfectly correct while the sign on the
+hinge offset was backwards — so both leaves hung on the OUTSIDE of their posts
+and swung away from the doorway, and a shut gate was a hole with two doors
+standing open beside it. It shipped. **Read the result, not the transform**: the
+tip of the leaf is the number that would have caught it, and it is what is read
+now — 0.005 from the gate's centre shut, 1.36 open, against 2.12 with the sign
+flipped.
+
+There is a second reading of the same claim, in pixels, because the tip is a
+model of what the player sees rather than the thing itself. It does not ask what
+colour the doorway is — two attempts at that measured the lighting and reported
+0% in both states, which is a check that cannot fail — but whether the doorway
+CHANGES when the gate shuts: 100% of it moves, against 0% for the same patch
+compared with itself, and 0% with the leaves hinged outside. The patch is found
+by projecting the middle of the opening, since a window guessed as a fraction of
+the screen sat on the lintel.
+
+Two setup traps, both of which made a check pass by having nothing to test. The
+second gate needs a wall run of its own AND has to be placed after it — a lone
+gate takes the default rotation for that patch of map, which for an east-west
+run is a quarter turn out, so it wanted two cells the test never freed and
+`canPlace` refused it silently. And "archers cannot hold a gate" was green with
+no archers on the map; it musters both now.
 
 Two measurements here were wrong before they were right, and both are the same
 mistake — comparing things that were never comparable. The path check read

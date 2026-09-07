@@ -1042,12 +1042,12 @@ var ASSETS=[
   note:"A door, not a hole. Barred, nothing walks through it — yours included. Open, its path cost of 2 is below open ground, so the swarm prefers to come through it, which is the whole trade. The leaves are a separate asset (Gate Door) because they swing.",
   slots:["A — timberL (frame)","B — iron (hood, plating)"],
   parts:[
-    {id:"sill",  name:"Sill",   prim:"box", p:[0,0,0],       s:[1.50,0.22,1.10], shade:0.58},
-    {id:"posts", name:"Posts",  prim:"box", p:[0.62,0.18,0], s:[0.34,2.35,0.44], shade:0.82,
+    {id:"sill",  name:"Sill",   prim:"box", p:[0,0,0],       s:[3.00,0.22,1.10], shade:0.58},
+    {id:"posts", name:"Posts",  prim:"box", p:[1.30,0.18,0], s:[0.34,2.60,0.44], shade:0.82,
        rep:{mode:"mirrorX"}},
-    {id:"lintel",name:"Lintel", prim:"box", p:[0,2.53,0],    s:[1.70,0.28,0.58], shade:0.95},
-    {id:"hood",  name:"Hood",   prim:"box", p:[0,2.81,0],    s:[1.95,0.22,0.85], tint:1},
-    {id:"jamb",  name:"Jambs",  prim:"box", p:[0.50,0.18,0], s:[0.10,1.85,0.20], shade:0.50,
+    {id:"lintel",name:"Lintel", prim:"box", p:[0,2.78,0],    s:[3.20,0.28,0.58], shade:0.95},
+    {id:"hood",  name:"Hood",   prim:"box", p:[0,3.06,0],    s:[3.45,0.22,0.85], tint:1},
+    {id:"jamb",  name:"Jambs",  prim:"box", p:[1.06,0.18,0], s:[0.10,2.05,0.20], shade:0.50,
        rep:{mode:"mirrorX"}}
   ]},
 
@@ -1064,11 +1064,11 @@ var ASSETS=[
   note:"One leaf of a gate. Drawn separately from the frame so it can swing: the hinge is at the mesh origin and the leaf runs out along +x, so an instance yaw is the angle it stands open at.",
   slots:["A — timberL (leaf)","B — iron (band, hinge)"],
   parts:[
-    {id:"hinge", name:"Hinge",  prim:"cyl", p:[0,0.18,0],     s:[0.075,1.85], seg:6, cap:false,
+    {id:"hinge", name:"Hinge",  prim:"cyl", p:[0,0.18,0],     s:[0.085,2.05], seg:6, cap:false,
        tint:1, shade:0.95},
-    {id:"leaf",  name:"Leaf",   prim:"box", p:[0.27,0.18,0],  s:[0.525,1.82,0.15], shade:0.66},
-    {id:"band",  name:"Banding",prim:"box", p:[0.27,0.86,0.085],s:[0.50,0.13,0.05], tint:1, shade:0.90},
-    {id:"band2", name:"Banding · low",prim:"box", p:[0.27,0.30,0.085],s:[0.50,0.13,0.05], tint:1, shade:0.90}
+    {id:"leaf",  name:"Leaf",   prim:"box", p:[0.53,0.18,0],  s:[1.05,2.02,0.15], shade:0.66},
+    {id:"band",  name:"Banding",prim:"box", p:[0.53,0.96,0.085],s:[1.00,0.13,0.05], tint:1, shade:0.90},
+    {id:"band2", name:"Banding · low",prim:"box", p:[0.53,0.32,0.085],s:[1.00,0.13,0.05], tint:1, shade:0.90}
   ]},
 
 { id:"ballista", name:"Ballista", group:"Structures",
@@ -1680,7 +1680,9 @@ var STAT_DEFS={
     {k:"sight",   label:"Sight",         def:4,  lo:0,  hi:40,  step:0.5, unit:"u",
      hint:"how far it puts attackers on your minimap"}
   ]},
-  gate:{ note:"Deliberately inviting — low path cost pulls the swarm in.", fields:[
+  gate:{ note:"Two wall segments wide, and a decision either way: barred it is wall, open it is the cheapest way in for anything out there. A soldier group can hold the gap in person.", fields:[
+    {k:"cap",      label:"Garrison",       def:3,   lo:0,   hi:8,    step:1,  int:true,
+     hint:"soldiers who can stand in the opening and hold it — the counterpart to an archer on a turret"},
     {k:"cost",     label:"Cost",           def:10,   lo:1,   hi:80,   step:5,  int:true, unit:"supply"},
     {k:"hp",       label:"Hit points",     def:90,  lo:10,  hi:900,  step:5,  int:true},
     {k:"raise",    label:"Build time",     def:1.5, lo:0,   hi:120,  step:0.5, unit:"s",
@@ -2142,6 +2144,10 @@ var TEXT_DEFS={
   "sel.road.calloff":{g:"sel",def:"Call it off"},
   "sel.road.tearup":{g:"sel",def:"Tear it up"},
   "sel.road.hint":{g:"sel",def:"a road costs work, not supply — there is nothing back"},
+  "sel.gate.hold":{g:"sel",def:"Hold the gap"},
+  "sel.gate.stand":{g:"sel",def:"Stand them down"},
+  "sel.gate.crew":{g:"sel",def:"{n} holding the gap"},
+  "sel.gate.crewhint":{g:"sel",def:"right-click the gate with soldiers picked to post them in it"},
   "sel.gate.open":{g:"sel",def:"Open the gate"},
   "sel.gate.shut":{g:"sel",def:"Bar the gate"},
   "sel.gate.isopen":{g:"sel",def:"standing open"},
