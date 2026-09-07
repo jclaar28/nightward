@@ -29,6 +29,7 @@ var FS_COMMON=
 // single call site knowing about fog, because every one of them ends up here.
 "uniform sampler2D uWarTex;\n"+
 "uniform vec3 uWarK;\n"+      // x on/off, y unexplored level, z explored level
+"uniform vec2 uWarE;\n"+      // x how much of its own colour memory keeps, y how fast the edge closes
 "uniform vec2 uWarSO;\n"+     // world XZ -> uv: scale, offset
 "uniform vec3 uWarFog;\n"+    // what unseen ground turns into, this hour
 "layout(location=0) out vec4 oColor;\n"+
@@ -36,7 +37,13 @@ var FS_COMMON=
 "float warLevel(){\n"+
 "  if(uWarK.x<0.5) return 1.0;\n"+
 "  float v=texture(uWarTex, vW.xz*uWarSO.x+uWarSO.y).r;\n"+
-"  return (v<0.5) ? mix(uWarK.y,uWarK.z,v*2.0) : mix(uWarK.z,1.0,(v-0.5)*2.0);\n"+
+"  float f=(v<0.5) ? mix(uWarK.y,uWarK.z,v*2.0) : mix(uWarK.z,1.0,(v-0.5)*2.0);\n"+
+// A gamma on the level, which is the whole edge in one number. The texture is
+// filtered, so the boundary already falls between texels and there is nothing to
+// sharpen with a threshold — but bending the curve moves where the middle of
+// that gradient sits. Below 1 the fog gives way early and the edge reads soft
+// and generous; above 1 it holds on and the edge reads tight and close.
+"  return pow(clamp(f,0.0,1.0), uWarE.y);\n"+
 "}\n"+
 // Two things happen to ground you cannot see, and they are not the same thing.
 //
@@ -56,7 +63,7 @@ var FS_COMMON=
 "vec3 warApply(vec3 col,float f){\n"+
 "  if(uWarK.x<0.5) return col;\n"+
 "  float g=dot(col,vec3(0.299,0.587,0.114));\n"+
-"  vec3 mem=mix(vec3(g),col,clamp((f-uWarK.y)/max(0.001,1.0-uWarK.y)*1.25,0.0,1.0));\n"+
+"  vec3 mem=mix(vec3(g),col,clamp((f-uWarK.y)/max(0.001,1.0-uWarK.y)*uWarE.x,0.0,1.0));\n"+
 "  return mix(uWarFog,mem,f);\n"+
 "}\n"+
 "float shadowAt(){\n"+
@@ -289,6 +296,11 @@ function create(canvas){
   // texels rather than on a cell edge. NEAREST here is the difference between
   // fog and a chequerboard.
   var warTex=gl.createTexture(), warN=0, warSO=[0,0], warK=[0,0.06,0.42];
+  // How much of its own colour remembered ground keeps, how fast the edge closes,
+  // and a scale on the hour's own fog colour. All three are look rather than
+  // rule, which is why they arrive through setFog with the rest of the fog and
+  // not through setOptions.
+  var warE=[1.25,1], warHaze=1;
   gl.bindTexture(gl.TEXTURE_2D,warTex);
   gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);
   gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
@@ -553,8 +565,10 @@ function create(canvas){
       gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D,warTex);
       gl.uniform1i(u(p,"uWarTex"),1);
       gl.uniform3f(u(p,"uWarK"),warN?warK[0]:0,warK[1],warK[2]);
+      gl.uniform2f(u(p,"uWarE"),warE[0],warE[1]);
       gl.uniform2f(u(p,"uWarSO"),warSO[0],warSO[1]);
-      gl.uniform3f(u(p,"uWarFog"),SKYNOW.fog[0]*SKYNOW.hz,SKYNOW.fog[1]*SKYNOW.hz,SKYNOW.fog[2]*SKYNOW.hz);
+      var hzk=SKYNOW.hz*warHaze;
+      gl.uniform3f(u(p,"uWarFog"),SKYNOW.fog[0]*hzk,SKYNOW.fog[1]*hzk,SKYNOW.fog[2]*hzk);
       gl.activeTexture(gl.TEXTURE0);
     }
     gl.useProgram(pStatic); common(pStatic);
@@ -679,10 +693,12 @@ function create(canvas){
   // byte per cell — 0 never seen, 128 seen before, 255 in sight — and `half` is
   // the world half-extent the grid covers. Pass null to switch fog off, which
   // is what every tool that is not testing fog wants.
-  function setFog(data,n,half,cell,dark,dim){
+  function setFog(data,n,half,cell,dark,dim,keep,falloff,haze){
     if(!data||!n){ warN=0; return; }
     warN=n;
     warK=[1, dark===undefined?0.06:dark, dim===undefined?0.42:dim];
+    warE=[keep===undefined?1.25:keep, falloff===undefined?1:falloff];
+    warHaze=(haze===undefined||!(haze>0))?1:haze;
     // Texel centres, not texel corners: cell i covers uv [i/n,(i+1)/n] and its
     // centre is (i+0.5)/n, while gx2w(i) is the corner. Half a cell out is half
     // a cell of fog lag on every edge, and it reads as the fog trailing you.

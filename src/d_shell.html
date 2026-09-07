@@ -426,6 +426,19 @@
     padding:8px 14px;font-size:12.5px;font-weight:600;color:var(--muted);margin-top:16px}
   #setWipe:hover,#setWipeAssets:hover{border-color:var(--bad);color:var(--bad)}
   #setNote{font-size:11.5px;color:var(--faint);line-height:1.5;margin:14px 0 0}
+  /* Same folded block as the setup card's pacing, and the same rows inside it.
+     Two panels of numbers that behave differently would be two things to learn
+     for no reason. */
+  #fogWrap{margin-top:4px;border-top:1px solid var(--line);padding-top:13px}
+  #fogHead{display:flex;align-items:baseline;justify-content:space-between;gap:12px;
+    width:100%;background:transparent;border:0;padding:0;cursor:pointer;color:var(--muted)}
+  #fogHead:hover{color:var(--ink)}
+  #fogBody{margin-top:11px}
+  #fogBody[hidden]{display:none}
+  #fogReset{margin-top:9px;background:transparent;border:1px solid var(--line);
+    border-radius:2px;padding:6px 10px;font-size:11.5px;font-weight:600;color:var(--muted)}
+  #fogReset:hover{border-color:var(--line-hi);color:var(--ink)}
+  #fogReset[hidden]{display:none}
 
   /* ---------------- selected building ---------------- */
   #bldPanel{padding:11px 12px 12px}
@@ -994,6 +1007,14 @@
         <input type="range" id="setSens" min="0.3" max="2.5" step="0.05" style="width:112px">
         <output id="setSensOut">1.00×</output>
       </div>
+    </div>
+
+    <div id="fogWrap">
+      <button id="fogHead" type="button" aria-expanded="false" aria-controls="fogBody">
+        <span class="pl">Fog of war</span><span class="pv" id="fogSummary"></span>
+      </button>
+      <div id="fogBody" hidden></div>
+      <button id="fogReset" type="button" hidden>Put the fog back</button>
     </div>
 
     <div style="display:flex;gap:8px;flex-wrap:wrap">

@@ -112,6 +112,7 @@ function show(name){
   if(name!=="play") R.setLamps([]);
   if(name==="menu"||name==="settings"||name==="net"||name==="setup"){ R.setStatic(ensureBackdrop()); }
   if(name==="setup") drawSetup();
+  if(name==="settings") drawFogSummary();
   if(name==="library"){ R.setTime(0.08); HFLIB.enter(); }
   if(name==="maps"){ R.setTime(0.06); HFMAP.enter(); }
   if(name==="menu") refreshMenu();
@@ -1306,14 +1307,7 @@ function paceStep(r){
   if(r.growth) return 1;
   return f.step;
 }
-function paceEdited(){
-  var n=0;
-  PACE_ROWS.forEach(function(r){
-    var o=M.getStatOverrides()[r.id];
-    if(o&&o[r.k]!==undefined&&o[r.k]!==paceField(r).def) n++;
-  });
-  return n;
-}
+function paceEdited(){ return knobsEdited(PACE_ROWS); }
 // What the numbers actually buy, in attackers on three nights. Growth
 // compounds, so a player reading "13%" has no idea what they have chosen until
 // they see where it lands — and the first night is a `0 means the difficulty`
@@ -1325,11 +1319,15 @@ function paceCurve(){
   return {a:Math.round(one), b:Math.round(one*Math.pow(r,4)),
           c:Math.round(one*Math.pow(r,9))};
 }
-function drawPace(){
-  var body=el("paceBody");
-  if(!body) return;
+// One renderer for both folded blocks of numbers — the pacing knobs on the
+// setup card and the fog ones in Settings. They are the same thing: a list of
+// STAT_DEFS fields, shown in whatever units the question is asked in, applied
+// live and saved with every other balance edit. A second copy of this for the
+// second panel would be a second set of conversion bugs.
+function drawKnobs(host,rows,after){
+  if(!host) return;
   var h="";
-  PACE_ROWS.forEach(function(r){
+  rows.forEach(function(r){
     var f=paceField(r);
     var raw=M.statsOf(r.id)[r.k];
     var o=M.getStatOverrides()[r.id]||{};
@@ -1344,21 +1342,58 @@ function drawPace(){
        (r.label?M.t(r.label):f.label)+(unit?'<span class="pu">'+unit+'</span>':'')+'</span>'+
        '<span class="ph">'+(r.hint?M.t(r.hint):(f.hint||("shipped "+f.def)))+'</span></span>'+
        '<input type="number" value="'+view+'" step="'+paceStep(r)+
-       '" data-pid="'+r.id+'" data-pk="'+r.k+'" data-prow="'+PACE_ROWS.indexOf(r)+'"></label>';
+       '" data-pid="'+r.id+'" data-pk="'+r.k+'" data-prow="'+rows.indexOf(r)+'"></label>';
   });
-  body.innerHTML=h;
-  body.querySelectorAll("[data-pk]").forEach(function(inp){
+  host.innerHTML=h;
+  host.querySelectorAll("[data-pk]").forEach(function(inp){
     inp.addEventListener("input",function(){
       var v=parseFloat(inp.value);
       if(!isFinite(v)) return;
-      var r=PACE_ROWS[inp.dataset.prow|0];
+      var r=rows[inp.dataset.prow|0];
       M.setStat(r.id,r.k,paceFromView(r,v));
       HFGAME.syncStats();
       saveJSON(KEY_STATS,M.getStatOverrides());
-      drawPaceSummary(); drawSetup();
+      if(after) after();
     });
   });
-  drawPaceSummary();
+  if(after) after();
+}
+function knobsEdited(rows){
+  var n=0;
+  rows.forEach(function(r){
+    var o=M.getStatOverrides()[r.id];
+    if(o&&o[r.k]!==undefined&&o[r.k]!==paceField(r).def) n++;
+  });
+  return n;
+}
+function resetKnobs(rows){
+  rows.forEach(function(r){ M.setStat(r.id,r.k,paceField(r).def); });
+  HFGAME.syncStats();
+  saveJSON(KEY_STATS,M.getStatOverrides());
+}
+function drawPace(){ drawKnobs(el("paceBody"),PACE_ROWS,function(){ drawPaceSummary(); drawSetup(); }); }
+// ---- how the fog looks -----------------------------------------------------
+// Separate from the pacing block on purpose: these change nothing about what is
+// hidden or when — that is `dark`, `dim` and sight — only what the hidden part
+// looks like. They live in Settings because that is where the other "how it
+// looks" choices already are, and because a look question is answered by
+// staring at the map rather than by deciding something before a round starts.
+var FOG_ROWS=[
+  {id:"fog", k:"on"},
+  {id:"fog", k:"dark"},
+  {id:"fog", k:"dim"},
+  {id:"fog", k:"haze"},
+  {id:"fog", k:"keep"},
+  {id:"fog", k:"falloff"}
+];
+function drawFog(){ drawKnobs(el("fogBody"),FOG_ROWS,drawFogSummary); }
+function drawFogSummary(){
+  var sum=el("fogSummary");
+  if(!sum) return;
+  var n=knobsEdited(FOG_ROWS), F=M.statsOf("fog");
+  sum.textContent=(n?(n+" CHANGED"):"AS SHIPPED")+" · "+
+    (F.on?("SHOWS "+Math.round(F.dark*100)+"% / "+Math.round(F.dim*100)+"%"):"OFF");
+  el("fogReset").hidden=!n;
 }
 // What a deferring field is worth right now, so the box can show it.
 function paceAuto(r){
@@ -1381,14 +1416,15 @@ el("paceHead").addEventListener("click",function(){
   if(open) drawPace();
 });
 el("paceReset").addEventListener("click",function(){
-  PACE_ROWS.forEach(function(r){
-    var f=M.statDefs(r.id).fields.filter(function(x){ return x.k===r.k; })[0];
-    M.setStat(r.id,r.k,f.def);
-  });
-  HFGAME.syncStats();
-  saveJSON(KEY_STATS,M.getStatOverrides());
-  drawPace(); drawSetup();
+  resetKnobs(PACE_ROWS); drawPace(); drawSetup();
 });
+el("fogHead").addEventListener("click",function(){
+  var body=el("fogBody"), open=body.hidden;
+  body.hidden=!open;
+  this.setAttribute("aria-expanded",open?"true":"false");
+  if(open) drawFog();
+});
+el("fogReset").addEventListener("click",function(){ resetKnobs(FOG_ROWS); drawFog(); });
 el("newGo").addEventListener("click",function(){ startRun(playMap); });
 el("newBack").addEventListener("click",function(){ show("menu"); });
 el("newMapPick").addEventListener("click",function(){ show("maps"); });

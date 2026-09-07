@@ -426,6 +426,19 @@
     padding:8px 14px;font-size:12.5px;font-weight:600;color:var(--muted);margin-top:16px}
   #setWipe:hover,#setWipeAssets:hover{border-color:var(--bad);color:var(--bad)}
   #setNote{font-size:11.5px;color:var(--faint);line-height:1.5;margin:14px 0 0}
+  /* Same folded block as the setup card's pacing, and the same rows inside it.
+     Two panels of numbers that behave differently would be two things to learn
+     for no reason. */
+  #fogWrap{margin-top:4px;border-top:1px solid var(--line);padding-top:13px}
+  #fogHead{display:flex;align-items:baseline;justify-content:space-between;gap:12px;
+    width:100%;background:transparent;border:0;padding:0;cursor:pointer;color:var(--muted)}
+  #fogHead:hover{color:var(--ink)}
+  #fogBody{margin-top:11px}
+  #fogBody[hidden]{display:none}
+  #fogReset{margin-top:9px;background:transparent;border:1px solid var(--line);
+    border-radius:2px;padding:6px 10px;font-size:11.5px;font-weight:600;color:var(--muted)}
+  #fogReset:hover{border-color:var(--line-hi);color:var(--ink)}
+  #fogReset[hidden]{display:none}
 
   /* ---------------- selected building ---------------- */
   #bldPanel{padding:11px 12px 12px}
@@ -994,6 +1007,14 @@
         <input type="range" id="setSens" min="0.3" max="2.5" step="0.05" style="width:112px">
         <output id="setSensOut">1.00×</output>
       </div>
+    </div>
+
+    <div id="fogWrap">
+      <button id="fogHead" type="button" aria-expanded="false" aria-controls="fogBody">
+        <span class="pl">Fog of war</span><span class="pv" id="fogSummary"></span>
+      </button>
+      <div id="fogBody" hidden></div>
+      <button id="fogReset" type="button" hidden>Put the fog back</button>
     </div>
 
     <div style="display:flex;gap:8px;flex-wrap:wrap">
@@ -3124,6 +3145,19 @@ var STAT_DEFS={
      hint:"how much of unexplored ground shows through the weather — 0 is solid fog"},
     {k:"dim",   label:"Seen before",   def:0.42,lo:0, hi:1,  step:0.01,
      hint:"explored but not in sight now: terrain and buildings you remember"},
+    // Three that decide only how it LOOKS. They change nothing about what is
+    // hidden or when — that is `dark`, `dim` and sight — so they are the ones
+    // worth dragging while staring at the map.
+    {k:"haze",  label:"Haze brightness",def:1.0, lo:0.2,hi:2,  step:0.05, unit:"×",
+     hint:"scales the hour's own fog colour: below 1 the unseen map goes darker and heavier, above 1 it lifts toward a pale bank"},
+    // Named for what it does, which is the opposite of what "drain" said: the
+    // number is the weight on the ground's OWN colour, so turning it up keeps
+    // more of it. It went in as `drain` and measured backwards on the first
+    // reading.
+    {k:"keep",  label:"Colour in memory",def:1.25,lo:0, hi:3,   step:0.05,
+     hint:"how much of the ground's own colour survives where you are not looking — 0 greys it the moment you turn away, high leaves it as it was"},
+    {k:"falloff",label:"Edge",          def:1.0, lo:0.3,hi:3,  step:0.05,
+     hint:"how tightly the fog closes at the edge of sight — below 1 it gives way early and reads soft, above 1 it holds on and reads close"},
     {k:"grace", label:"Opening reveal",def:0,   lo:0, hi:40, step:1,
      hint:"units of map lit around your commander at the start, beyond his own sight"}
   ]},
@@ -3901,6 +3935,7 @@ var FS_COMMON=
 // single call site knowing about fog, because every one of them ends up here.
 "uniform sampler2D uWarTex;\n"+
 "uniform vec3 uWarK;\n"+      // x on/off, y unexplored level, z explored level
+"uniform vec2 uWarE;\n"+      // x how much of its own colour memory keeps, y how fast the edge closes
 "uniform vec2 uWarSO;\n"+     // world XZ -> uv: scale, offset
 "uniform vec3 uWarFog;\n"+    // what unseen ground turns into, this hour
 "layout(location=0) out vec4 oColor;\n"+
@@ -3908,7 +3943,13 @@ var FS_COMMON=
 "float warLevel(){\n"+
 "  if(uWarK.x<0.5) return 1.0;\n"+
 "  float v=texture(uWarTex, vW.xz*uWarSO.x+uWarSO.y).r;\n"+
-"  return (v<0.5) ? mix(uWarK.y,uWarK.z,v*2.0) : mix(uWarK.z,1.0,(v-0.5)*2.0);\n"+
+"  float f=(v<0.5) ? mix(uWarK.y,uWarK.z,v*2.0) : mix(uWarK.z,1.0,(v-0.5)*2.0);\n"+
+// A gamma on the level, which is the whole edge in one number. The texture is
+// filtered, so the boundary already falls between texels and there is nothing to
+// sharpen with a threshold — but bending the curve moves where the middle of
+// that gradient sits. Below 1 the fog gives way early and the edge reads soft
+// and generous; above 1 it holds on and the edge reads tight and close.
+"  return pow(clamp(f,0.0,1.0), uWarE.y);\n"+
 "}\n"+
 // Two things happen to ground you cannot see, and they are not the same thing.
 //
@@ -3928,7 +3969,7 @@ var FS_COMMON=
 "vec3 warApply(vec3 col,float f){\n"+
 "  if(uWarK.x<0.5) return col;\n"+
 "  float g=dot(col,vec3(0.299,0.587,0.114));\n"+
-"  vec3 mem=mix(vec3(g),col,clamp((f-uWarK.y)/max(0.001,1.0-uWarK.y)*1.25,0.0,1.0));\n"+
+"  vec3 mem=mix(vec3(g),col,clamp((f-uWarK.y)/max(0.001,1.0-uWarK.y)*uWarE.x,0.0,1.0));\n"+
 "  return mix(uWarFog,mem,f);\n"+
 "}\n"+
 "float shadowAt(){\n"+
@@ -4161,6 +4202,11 @@ function create(canvas){
   // texels rather than on a cell edge. NEAREST here is the difference between
   // fog and a chequerboard.
   var warTex=gl.createTexture(), warN=0, warSO=[0,0], warK=[0,0.06,0.42];
+  // How much of its own colour remembered ground keeps, how fast the edge closes,
+  // and a scale on the hour's own fog colour. All three are look rather than
+  // rule, which is why they arrive through setFog with the rest of the fog and
+  // not through setOptions.
+  var warE=[1.25,1], warHaze=1;
   gl.bindTexture(gl.TEXTURE_2D,warTex);
   gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);
   gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
@@ -4425,8 +4471,10 @@ function create(canvas){
       gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D,warTex);
       gl.uniform1i(u(p,"uWarTex"),1);
       gl.uniform3f(u(p,"uWarK"),warN?warK[0]:0,warK[1],warK[2]);
+      gl.uniform2f(u(p,"uWarE"),warE[0],warE[1]);
       gl.uniform2f(u(p,"uWarSO"),warSO[0],warSO[1]);
-      gl.uniform3f(u(p,"uWarFog"),SKYNOW.fog[0]*SKYNOW.hz,SKYNOW.fog[1]*SKYNOW.hz,SKYNOW.fog[2]*SKYNOW.hz);
+      var hzk=SKYNOW.hz*warHaze;
+      gl.uniform3f(u(p,"uWarFog"),SKYNOW.fog[0]*hzk,SKYNOW.fog[1]*hzk,SKYNOW.fog[2]*hzk);
       gl.activeTexture(gl.TEXTURE0);
     }
     gl.useProgram(pStatic); common(pStatic);
@@ -4551,10 +4599,12 @@ function create(canvas){
   // byte per cell — 0 never seen, 128 seen before, 255 in sight — and `half` is
   // the world half-extent the grid covers. Pass null to switch fog off, which
   // is what every tool that is not testing fog wants.
-  function setFog(data,n,half,cell,dark,dim){
+  function setFog(data,n,half,cell,dark,dim,keep,falloff,haze){
     if(!data||!n){ warN=0; return; }
     warN=n;
     warK=[1, dark===undefined?0.06:dark, dim===undefined?0.42:dim];
+    warE=[keep===undefined?1.25:keep, falloff===undefined?1:falloff];
+    warHaze=(haze===undefined||!(haze>0))?1:haze;
     // Texel centres, not texel corners: cell i covers uv [i/n,(i+1)/n] and its
     // centre is (i+0.5)/n, while gx2w(i) is the corner. Half a cell out is half
     // a cell of fog lag on every edge, and it reads as the fog trailing you.
@@ -9530,7 +9580,8 @@ function draw(){
   // would tell us whether it needed doing.
   if(R.setFog){
     var FG=FOG();
-    if(FG.on) R.setFog(fogStep(),M.GN,(M.GN*M.CELL)/2,M.CELL,FG.dark,FG.dim);
+    if(FG.on) R.setFog(fogStep(),M.GN,(M.GN*M.CELL)/2,M.CELL,
+                       FG.dark,FG.dim,FG.keep,FG.falloff,FG.haze);
     else R.setFog(null);
   }
   pack();
@@ -12271,6 +12322,7 @@ function show(name){
   if(name!=="play") R.setLamps([]);
   if(name==="menu"||name==="settings"||name==="net"||name==="setup"){ R.setStatic(ensureBackdrop()); }
   if(name==="setup") drawSetup();
+  if(name==="settings") drawFogSummary();
   if(name==="library"){ R.setTime(0.08); HFLIB.enter(); }
   if(name==="maps"){ R.setTime(0.06); HFMAP.enter(); }
   if(name==="menu") refreshMenu();
@@ -13465,14 +13517,7 @@ function paceStep(r){
   if(r.growth) return 1;
   return f.step;
 }
-function paceEdited(){
-  var n=0;
-  PACE_ROWS.forEach(function(r){
-    var o=M.getStatOverrides()[r.id];
-    if(o&&o[r.k]!==undefined&&o[r.k]!==paceField(r).def) n++;
-  });
-  return n;
-}
+function paceEdited(){ return knobsEdited(PACE_ROWS); }
 // What the numbers actually buy, in attackers on three nights. Growth
 // compounds, so a player reading "13%" has no idea what they have chosen until
 // they see where it lands — and the first night is a `0 means the difficulty`
@@ -13484,11 +13529,15 @@ function paceCurve(){
   return {a:Math.round(one), b:Math.round(one*Math.pow(r,4)),
           c:Math.round(one*Math.pow(r,9))};
 }
-function drawPace(){
-  var body=el("paceBody");
-  if(!body) return;
+// One renderer for both folded blocks of numbers — the pacing knobs on the
+// setup card and the fog ones in Settings. They are the same thing: a list of
+// STAT_DEFS fields, shown in whatever units the question is asked in, applied
+// live and saved with every other balance edit. A second copy of this for the
+// second panel would be a second set of conversion bugs.
+function drawKnobs(host,rows,after){
+  if(!host) return;
   var h="";
-  PACE_ROWS.forEach(function(r){
+  rows.forEach(function(r){
     var f=paceField(r);
     var raw=M.statsOf(r.id)[r.k];
     var o=M.getStatOverrides()[r.id]||{};
@@ -13503,21 +13552,58 @@ function drawPace(){
        (r.label?M.t(r.label):f.label)+(unit?'<span class="pu">'+unit+'</span>':'')+'</span>'+
        '<span class="ph">'+(r.hint?M.t(r.hint):(f.hint||("shipped "+f.def)))+'</span></span>'+
        '<input type="number" value="'+view+'" step="'+paceStep(r)+
-       '" data-pid="'+r.id+'" data-pk="'+r.k+'" data-prow="'+PACE_ROWS.indexOf(r)+'"></label>';
+       '" data-pid="'+r.id+'" data-pk="'+r.k+'" data-prow="'+rows.indexOf(r)+'"></label>';
   });
-  body.innerHTML=h;
-  body.querySelectorAll("[data-pk]").forEach(function(inp){
+  host.innerHTML=h;
+  host.querySelectorAll("[data-pk]").forEach(function(inp){
     inp.addEventListener("input",function(){
       var v=parseFloat(inp.value);
       if(!isFinite(v)) return;
-      var r=PACE_ROWS[inp.dataset.prow|0];
+      var r=rows[inp.dataset.prow|0];
       M.setStat(r.id,r.k,paceFromView(r,v));
       HFGAME.syncStats();
       saveJSON(KEY_STATS,M.getStatOverrides());
-      drawPaceSummary(); drawSetup();
+      if(after) after();
     });
   });
-  drawPaceSummary();
+  if(after) after();
+}
+function knobsEdited(rows){
+  var n=0;
+  rows.forEach(function(r){
+    var o=M.getStatOverrides()[r.id];
+    if(o&&o[r.k]!==undefined&&o[r.k]!==paceField(r).def) n++;
+  });
+  return n;
+}
+function resetKnobs(rows){
+  rows.forEach(function(r){ M.setStat(r.id,r.k,paceField(r).def); });
+  HFGAME.syncStats();
+  saveJSON(KEY_STATS,M.getStatOverrides());
+}
+function drawPace(){ drawKnobs(el("paceBody"),PACE_ROWS,function(){ drawPaceSummary(); drawSetup(); }); }
+// ---- how the fog looks -----------------------------------------------------
+// Separate from the pacing block on purpose: these change nothing about what is
+// hidden or when — that is `dark`, `dim` and sight — only what the hidden part
+// looks like. They live in Settings because that is where the other "how it
+// looks" choices already are, and because a look question is answered by
+// staring at the map rather than by deciding something before a round starts.
+var FOG_ROWS=[
+  {id:"fog", k:"on"},
+  {id:"fog", k:"dark"},
+  {id:"fog", k:"dim"},
+  {id:"fog", k:"haze"},
+  {id:"fog", k:"keep"},
+  {id:"fog", k:"falloff"}
+];
+function drawFog(){ drawKnobs(el("fogBody"),FOG_ROWS,drawFogSummary); }
+function drawFogSummary(){
+  var sum=el("fogSummary");
+  if(!sum) return;
+  var n=knobsEdited(FOG_ROWS), F=M.statsOf("fog");
+  sum.textContent=(n?(n+" CHANGED"):"AS SHIPPED")+" · "+
+    (F.on?("SHOWS "+Math.round(F.dark*100)+"% / "+Math.round(F.dim*100)+"%"):"OFF");
+  el("fogReset").hidden=!n;
 }
 // What a deferring field is worth right now, so the box can show it.
 function paceAuto(r){
@@ -13540,14 +13626,15 @@ el("paceHead").addEventListener("click",function(){
   if(open) drawPace();
 });
 el("paceReset").addEventListener("click",function(){
-  PACE_ROWS.forEach(function(r){
-    var f=M.statDefs(r.id).fields.filter(function(x){ return x.k===r.k; })[0];
-    M.setStat(r.id,r.k,f.def);
-  });
-  HFGAME.syncStats();
-  saveJSON(KEY_STATS,M.getStatOverrides());
-  drawPace(); drawSetup();
+  resetKnobs(PACE_ROWS); drawPace(); drawSetup();
 });
+el("fogHead").addEventListener("click",function(){
+  var body=el("fogBody"), open=body.hidden;
+  body.hidden=!open;
+  this.setAttribute("aria-expanded",open?"true":"false");
+  if(open) drawFog();
+});
+el("fogReset").addEventListener("click",function(){ resetKnobs(FOG_ROWS); drawFog(); });
 el("newGo").addEventListener("click",function(){ startRun(playMap); });
 el("newBack").addEventListener("click",function(){ show("menu"); });
 el("newMapPick").addEventListener("click",function(){ show("maps"); });

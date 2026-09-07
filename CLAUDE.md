@@ -381,6 +381,25 @@ which meant the headline number answered for the two piles that matter least.
 move. A slider that moves nothing is worse than no slider, because it costs a
 playtest to find out.
 
+**How the fog LOOKS is a separate set of knobs from what it hides.** `dark`,
+`dim` and sight decide what is hidden and when; `haze`, `keep` and `falloff`
+decide only what the hidden part looks like, so they live in Settings rather
+than on the setup card — a look question is answered by staring at the map, not
+by deciding something before a round starts. `haze` scales the hour's own fog
+colour, `keep` is the weight on the ground's own colour in remembered ground,
+and `falloff` is a gamma on the fog level: the war texture is filtered, so the
+boundary already falls between texels and there is no threshold to sharpen, but
+bending the curve moves where the middle of that gradient sits.
+
+`drawKnobs()` renders both folded blocks — the pacing rows and these — from the
+same `STAT_DEFS` fields, because two panels of numbers with two sets of unit
+conversions is two sets of conversion bugs.
+
+`keep` shipped for an hour as `drain` and moved the OPPOSITE way to its name:
+the number is the weight on the ground's own colour, so turning it up keeps
+more. Name a knob for what the code does with it, not for the effect you had in
+mind.
+
 **Supply is counted in fives.** Every number a player is charged or paid is a
 multiple of 5 — costs, refunds, a nest's cache, starting supply, and what is in
 a pile after its random jitter. The smallest coin in the game is a 5, so nothing

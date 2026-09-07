@@ -262,5 +262,114 @@ check('...while at night the hidden ground is darker than the lit ground, not br
       `${tone.night.hid.lum} against ${tone.night.vis.lum} — the hour's fog colour is near ` +
       `black at 2am, so the one blend covers both ends of the day`);
 
+// ---- the knobs that decide how it looks ------------------------------------
+// Three numbers that change nothing about WHAT is hidden or when — that is
+// dark, dim and sight — only what the hidden part looks like. They exist to be
+// dragged while staring at the map, which makes them the same kind of thing as
+// the pacing block: a knob that moves nothing is worse than no knob, because it
+// costs a playtest to find out.
+//
+// Each one is measured where it can actually show, and the first version of
+// this got that wrong twice. It sampled a corner of a fresh map for all three —
+// but a fresh corner is UNEXPLORED, where the level is `dark` and the picture
+// is 94% fog colour whatever the drain does, so drain read identical to itself.
+// And it counted "hidden" by looking for green-dominant pixels, which this
+// terrain is not: with the fog switched off the check still called 98% of the
+// frame hidden. So the fog state is set deliberately here — everything
+// unexplored for one reading, everything remembered for the other — and how
+// much the fog is touching is measured against the same frame with fog off,
+// which needs no colour threshold at all.
+const look = await page.evaluate(() => {
+  window.requestAnimationFrame = function () { return 0; };
+  const S = __nw.state();
+  const cv = document.querySelector('#view'), gl = cv.getContext('webgl2');
+  const c = HFGAME.cam(); c.tx = 0; c.tz = 0; c.zoom = 30;
+  const L = (F, i) => 0.299 * F.b[i] + 0.587 * F.b[i + 1] + 0.114 * F.b[i + 2];
+  const KEYS = ['on', 'dark', 'dim', 'haze', 'keep', 'falloff'];
+  const def = k => HF.statDefs('fog').fields.filter(f => f.k === k)[0].def;
+  const reset = () => { for (const k of KEYS) HF.setStat('fog', k, def(k)); };
+  function read(k, v, remembered) {
+    reset();
+    if (k) HF.setStat('fog', k, v);
+    S.dayP = 0.0;
+    // Walked everywhere and standing at home, or never walked at all. Both are
+    // whole-map states, so the corner sampled below is unambiguous.
+    for (let i = 0; i < S.fog.length; i++) S.fog[i] = remembered ? 1 : 0;
+    HFGAME.fogStep();
+    __nw.frame();
+    const w = cv.width, h = cv.height, b = new Uint8Array(w * h * 4);
+    gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, b);
+    const F = { w, h, b };
+    let lum = 0, tint = 0, n = 0;
+    for (let y = 1; y < h * 0.35; y++) for (let x = 1; x < w * 0.3; x++) {
+      const i = (y * w + x) * 4;
+      lum += L(F, i);
+      // Green minus blue, SIGNED. Plain chroma — the spread between the
+      // channels — is the wrong statistic here and reads non-monotonic: the
+      // grass is green over blue and the fog colour is blue over green, so a
+      // half-and-half mix of the two is greyer than either end and the middle
+      // setting measured as the least colourful of the three. The signed
+      // difference has no such fold: grass is +17, the fog colour is -8, and
+      // grey is 0.
+      tint += b[i + 1] - b[i + 2];
+      n++;
+    }
+    reset();
+    return { lum: +(lum / n).toFixed(1), tint: +(tint / n).toFixed(1), F };
+  }
+  // How much of the picture the fog is touching at all: pixels that differ from
+  // the same frame with it switched off. No colour threshold, so no terrain to
+  // be wrong about.
+  const clear = read('on', 0, true);
+  function touched(r) {
+    let moved = 0, n = 0;
+    for (let i = 0; i < r.F.b.length; i += 4) {
+      n++;
+      if (Math.abs(L(r.F, i) - L(clear.F, i)) >= 6) moved++;
+    }
+    return +(moved / n * 100).toFixed(1);
+  }
+  const unseen = read(null, 0, false);
+  const remem  = read(null, 0, true);
+  const out = {
+    unseenLum: unseen.lum, rememTint: remem.tint, rememLum: remem.lum,
+    hazeUp: read('haze', 1.6, false).lum,
+    hazeDn: read('haze', 0.4, false).lum,
+    keepOff: read('keep', 0, true).tint,
+    keepAll: read('keep', 3, true).tint,
+    tight: touched(read('falloff', 2.5, true)),
+    loose: touched(read('falloff', 0.4, true)),
+    shipped: touched(remem),
+    off: touched(clear)
+  };
+  reset();
+  HFGAME.syncStats();
+  return out;
+});
+
+check('haze brightness lifts and drops the unseen map',
+      look.hazeUp > look.unseenLum * 1.15 && look.hazeDn < look.unseenLum * 0.75,
+      `${look.hazeDn} at 0.4x, ${look.unseenLum} shipped, ${look.hazeUp} at 1.6x, on ` +
+      `ground nobody has walked. It scales the hour's own fog colour, so a round played ` +
+      `at 0.4 is heavy weather at every hour rather than a dark noon and an unchanged ` +
+      `midnight`);
+check('colour in memory decides how grey a remembered field goes',
+      look.keepOff < look.rememTint - 1.5 && look.keepAll > look.rememTint + 1.5,
+      `the ground's own tint reads ${look.keepOff} at 0, ${look.rememTint} shipped and ` +
+      `${look.keepAll} at 3 — measured on ground that has been walked, which is the only ` +
+      `place it can show, since unexplored ground is grey before this touches it. It ` +
+      `shipped as "drain" and moved the other way: the number is the weight on the ` +
+      `ground's own colour, so turning it up keeps more`);
+check('the edge knob moves how much of the picture the fog is holding',
+      look.tight > look.shipped + 2 && look.loose < look.shipped - 2,
+      `${look.loose}% of the frame differs from a fog-free one at 0.4, ${look.shipped}% ` +
+      `shipped, ${look.tight}% at 2.5. The texture is filtered, so there is no threshold ` +
+      `to sharpen — the gamma bends where the middle of that gradient sits, which is the ` +
+      `same thing to the eye`);
+check('...and none of them is the off switch',
+      look.off === 0 && look.shipped > 40,
+      `${look.off}% with the fog off against ${look.shipped}% on. Three look knobs and a ` +
+      `rule knob in one block is a place to lose an hour wondering why the map is dark`);
+
 await close();
 done(errors);

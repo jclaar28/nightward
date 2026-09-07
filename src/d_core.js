@@ -1919,6 +1919,19 @@ var STAT_DEFS={
      hint:"how much of unexplored ground shows through the weather — 0 is solid fog"},
     {k:"dim",   label:"Seen before",   def:0.42,lo:0, hi:1,  step:0.01,
      hint:"explored but not in sight now: terrain and buildings you remember"},
+    // Three that decide only how it LOOKS. They change nothing about what is
+    // hidden or when — that is `dark`, `dim` and sight — so they are the ones
+    // worth dragging while staring at the map.
+    {k:"haze",  label:"Haze brightness",def:1.0, lo:0.2,hi:2,  step:0.05, unit:"×",
+     hint:"scales the hour's own fog colour: below 1 the unseen map goes darker and heavier, above 1 it lifts toward a pale bank"},
+    // Named for what it does, which is the opposite of what "drain" said: the
+    // number is the weight on the ground's OWN colour, so turning it up keeps
+    // more of it. It went in as `drain` and measured backwards on the first
+    // reading.
+    {k:"keep",  label:"Colour in memory",def:1.25,lo:0, hi:3,   step:0.05,
+     hint:"how much of the ground's own colour survives where you are not looking — 0 greys it the moment you turn away, high leaves it as it was"},
+    {k:"falloff",label:"Edge",          def:1.0, lo:0.3,hi:3,  step:0.05,
+     hint:"how tightly the fog closes at the edge of sight — below 1 it gives way early and reads soft, above 1 it holds on and reads close"},
     {k:"grace", label:"Opening reveal",def:0,   lo:0, hi:40, step:1,
      hint:"units of map lit around your commander at the start, beyond his own sight"}
   ]},

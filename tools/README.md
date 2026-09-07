@@ -62,8 +62,8 @@ reports 29 of 52 segments below ground against the flat version.
 these drive several full day/night cycles: dawn hands you the next day, the
 night counter advances, each wave is bigger than the last by a margin that
 widens, losing every hall ends it, clearing every nest wins it and pays its
-cache, and the nest garrisons chase what comes close without leaving home or eating your
-workers during the day.
+cache, and the nest garrisons chase what comes close without leaving home or
+eating your workers during the day.
 
 The widening margin is measured over nights 1, 4, 7 and 10 rather than over the
 three nights it actually plays, and that is a fix rather than a shortcut. The
@@ -185,7 +185,25 @@ bug rather than a rule — your own units are drawn wherever they are, because
 they are the eyes — and that the `fog.on` switch actually restores the map,
 since a feature with a broken off-switch is one nobody can bisect against.
 
-Three checks at the end do sample pixels, and they are the exception that proves
+Four more measure the knobs that decide how the fog LOOKS, as against what it
+hides, and each one is measured where it can actually show. The first version
+sampled one corner of a fresh map for all of them and two of the three were
+worthless: a fresh corner is UNEXPLORED, where the level is `dark` and the
+picture is 94% fog colour whatever the colour knob does, so that one read
+identical to itself. The fog state is set deliberately now — the whole map
+unexplored for the haze reading, the whole map remembered for the colour one.
+
+Two statistics had to change with it. "How much of the frame is fogged" was
+counted by looking for green-dominant pixels, and with the fog switched off the
+check still called 98% of the frame hidden, because this terrain is not that
+green; it is measured against the same frame with fog off now, which needs no
+colour threshold at all. And plain chroma — the spread between the channels —
+reads non-monotonic for the colour knob: the grass is green over blue and the
+fog colour is blue over green, so a half-and-half mix is greyer than either end
+and the middle setting measured as the least colourful of the three. The signed
+green-minus-blue has no such fold: -4.5 grey, -0.4 shipped, +3.9 keeping it all.
+
+Three checks in the middle do sample pixels, and they are the exception that proves
 the rule above: they are about the *place*, which is dimmed rather than culled,
 so pixels are the only evidence there is. Fog used to scale hidden ground toward
 black, which made a midday map look like midnight, and it now blends toward the

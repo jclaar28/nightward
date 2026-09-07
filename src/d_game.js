@@ -4365,7 +4365,8 @@ function draw(){
   // would tell us whether it needed doing.
   if(R.setFog){
     var FG=FOG();
-    if(FG.on) R.setFog(fogStep(),M.GN,(M.GN*M.CELL)/2,M.CELL,FG.dark,FG.dim);
+    if(FG.on) R.setFog(fogStep(),M.GN,(M.GN*M.CELL)/2,M.CELL,
+                       FG.dark,FG.dim,FG.keep,FG.falloff,FG.haze);
     else R.setFog(null);
   }
   pack();
