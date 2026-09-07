@@ -345,13 +345,28 @@ will not follow.
 
 **Layout changes must set `S.distDirty`; anything the guest can see must set
 `S.netCellsDirty`.** The flow field and the network cell list are both rebuilt
-only on those flags.
+only on those flags. A gate opening or shutting is a layout change even though
+nothing was built or sold, and it also bumps `S.pathVer` so orders already in
+flight re-route rather than walking into a door that closed behind them.
+
+**Pacing is tuned by playing, so the levers are on the setup screen.**
+`STAT_DEFS.pace` is four multipliers over whatever the difficulty says —
+starting supply, salvage yield, attackers, night length — plus `nest.ramp`
+surfaced beside them, because the ramp compounds and is the strongest single
+lever on how long a run lasts. Multipliers rather than absolutes, so easy /
+normal / hard keep meaning something and one number moves the whole curve. They
+are ordinary balance stats, so they persist and reset through the same machinery
+as everything in the Library and there is no second copy of them anywhere; the
+difficulty cards quote the multiplied figures for that reason. `tools/pace.mjs`
+moves each one on its own and reads the quantity it claims to move — a slider
+that moves nothing is worse than no slider, because it costs a playtest to find
+out.
 
 **The guest never mutates the world.** In multiplayer, a guest action calls
 `intent()` and returns; the host receives it in `applyIntent()` and runs the
 *same* function a local click would. Current intents: `pl` place, `rm` remove,
 `or` order, `jb` job, `fx` repair, `sh` shelter, `og` send out, `st` stance,
-`rd` road. A
+`rd` road, `gt` gate. A
 new player action that changes the world needs an intent, a case in
 `applyIntent`, and an ownership check — every case there re-verifies that the
 target belongs to the sending player. `tools/net.mjs` runs two real browsers
@@ -558,6 +573,18 @@ without talking to Jarrod first.
   across a road corridor the unit crosses it rather than turning down it, and
   breaking *that* during a night, when someone points at a gap in the wall, is
   what the rule exists to prevent. `tools/pathing.mjs` measures both halves.
+- **A gate is a door, and `gateBlocks()` is the only place that knows it.**
+  Three systems decide where a body can go and they are not the same code: the
+  collision in `moveUnit()`, the A* your orders run over (`walkableCell`), and
+  the horde's flow field. All three ask `gateBlocks()`, because a path that
+  believes something the collision does not is a unit grinding on a door for the
+  rest of the round. A gate is built shut; open, it is walkable by everyone and
+  keeps its low path cost, which is what makes it inviting. Shut, it costs the
+  flow field what a wall costs, or the horde walks the map to queue at a door
+  that is not going to open. It used to be a permanent hole in your own wall,
+  which meant a soldier could step out to swing and step back — `tools/gate.mjs`
+  runs every one of these against both states, because "it blocks" and "it lets
+  things through" are two claims and passing one is how you ship half a door.
 - **The horde does not path, and defenders do not flow.** Two separate systems
   on purpose. The horde runs a Dijkstra flow field, so a wall's high path cost
   pushes them elsewhere and a gate's low cost invites them in — that is the

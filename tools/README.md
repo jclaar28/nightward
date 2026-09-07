@@ -60,10 +60,20 @@ reports 29 of 52 segments below ground against the flat version.
 
 **`campaign.mjs`** — the round loop. A night is not the end of anything, so
 these drive several full day/night cycles: dawn hands you the next day, the
-night counter advances, each wave is bigger than the last by a widening margin,
+night counter advances, each wave is bigger than the last by a margin that
+widens,
 losing every hall ends it, clearing every nest wins it and pays its cache, and
 the nest garrisons chase what comes close without leaving home or eating your
 workers during the day.
+
+The widening margin is measured over nights 1, 4, 7 and 10 rather than over the
+three nights it actually plays, and that is a fix rather than a shortcut. The
+wave is a whole number of attackers per nest, and once the ramp came down to
+1.13 the rounding between two adjacent nights was larger than the difference
+between their steps: 290 → 330 → 370 is two identical steps from a curve that is
+genuinely compounding. Reading the curve where rounding cannot reach — steps of
+130, 185, 265 — tests the claim the check was always making. Playing those
+nights instead would measure survival, which is `balance.mjs`'s question.
 
 **`text.mjs`** — every word on screen comes from `TEXT_DEFS`, and that property
 is invisible in review: a hard-coded label looks identical to a routed one. So
@@ -410,6 +420,56 @@ Its one piece of setup worth copying: the open ground it right-clicks on is
 found, not assumed. The camera is wherever the round left it, so it sweeps
 screen points with `pointermove` and reads `S.hover` — asking the game what is
 under the cursor rather than redoing the projection by hand.
+
+It also holds the camera turn, which is a held key rather than a tapped one now:
+Q and E used to step fifteen degrees per key EVENT, so a turn was paced by the
+operating system's key repeat — a half-second of nothing and then a stutter. The
+awkward part of a held key is the tap, which a pure rate makes worth almost
+nothing, so the turn carries a floor paid out on release. That is two rules that
+could fight, and both are measured: half a second of held frames turns 44
+degrees, which is exactly the rate, and a one-frame tap turns 9, which is
+exactly the floor. The first run of that read 52.8 for a 44-degree claim, because
+the page's own frame loop was still running and calling `update()` around the
+stepping — freeze `requestAnimationFrame` before driving frames by hand.
+
+**`gate.mjs`** — whether a door is a door. A gate used to be a permanent hole in
+your own wall that both sides walked through, which meant a soldier could stand
+inside the line, step out to swing and step back.
+
+What makes this worth a tool of its own is how many places have an opinion.
+Three systems decide where a body can go and they are not the same code: the
+collision in `moveUnit()`, the A* your orders route over, and the flow field the
+horde runs down. A disagreement between them is not a bug you can see — it is a
+unit walking confidently into a door and grinding there, or an attacker crossing
+the map to queue at a gate that is barred. So every check runs against a closed
+gate *and* an open one: "it blocks" and "it lets things through" are two claims,
+and passing one of them is how you ship half a door.
+
+Two measurements here were wrong before they were right, and both are the same
+mistake — comparing things that were never comparable. The path check read
+`findPath()` returning null as "no route", when null means a straight line is
+already clear, which is the strongest possible yes; an open gate was reported as
+broken. And the flow-field check compared the gate cell against a wall cell three
+along, which reads higher for reasons that have nothing to do with gates, because
+the field is a distance. It straddles the gate now, so what survives the
+subtraction is the door and one cell of geometry: 12 cheaper open, 0 shut.
+
+**`pace.mjs`** — the knobs that decide how fast a round runs. These are a
+different kind of thing from the rest of the balance table: pacing is a feel
+question, and the only honest way to answer one is to play a round, move a
+number and play another. That makes a slider nobody can reach useless and a
+slider that moves nothing worse than useless, because it costs a playtest to
+find out.
+
+So every check is the same shape — move ONE multiplier, start a round, and read
+the quantity it claims to move against a round started with everything at 1.
+Starting supply moves what you begin with and leaves salvage and the wave alone;
+salvage yield moves the piles and not the purse; attackers moves night one *and*
+night five, because it multiplies the base the ramp compounds rather than only
+tonight. Unwiring any one of them fails exactly its own check and nothing else,
+which is what makes them tunable in isolation. The last check puts every stat
+back: these persist to localStorage by design, so a tool that left one set would
+change the game on the machine that ran it.
 
 Confirmed falsifiable by reverting each half in the built file: without the
 right-click branch, 1 failure; without the Escape branch, 4.

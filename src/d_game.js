@@ -190,6 +190,11 @@ function buildRigs(makeBatch){
 // round, and whenever the Library edits a number — so a change in the editor
 // reaches a round already in progress.
 var NEST={};
+var PACE={};
+// One multiplier out of the pacing group, defaulting to 1 so anything that has
+// never heard of the group — an old save, a map file, a tool — plays exactly as
+// it did before it existed.
+function paceK(k){ var v=PACE[k]; return (v===undefined||!isFinite(v)||v<=0)?1:v; }
 // Names and one-line summaries live in the text table, and the table is live:
 // re-reading them here means an edit in the Library's Text tab reaches the
 // hotbar and the selection panels on the next sync rather than the next reload.
@@ -209,6 +214,7 @@ function syncStats(){
   // The nests are not in TYPES/UNITS/ENEMY, so their block is read straight out
   // of the balance table here and re-read whenever the library edits it.
   NEST=M.statsOf("nest")||{};
+  PACE=M.statsOf("pace")||{};
   for(t in TYPES){
     st=M.statsOf(t);
     if(st) for(k in st) TYPES[t][k]=st[k];
@@ -365,7 +371,8 @@ function newGame(seed,map,opt){
             hit:0, kx:0, kz:0, stag:0, nest:true, dead:false, pulse:Math.random()*6.28,
             dmg:{}, callCd:0, guards:0};
   });
-  var dayLen=RD.day||DAY_LEN, nightLen=RD.night||NIGHT_LEN;
+  var dayLen=RD.day||DAY_LEN;
+  var nightLen=Math.max(10,(RD.night||NIGHT_LEN)*paceK("nightK"));
   S={
     seed:seed, T:T, staticMesh:mesh, map:map,
     net:opt.net||null,            // "host" | "guest" | null
@@ -374,13 +381,18 @@ function newGame(seed,map,opt){
     // whether their town hall is still up
     players:seats.map(function(c,i){
       return {id:i, cx:c[0], cz:c[1], name:"Player "+(i+1),
-              supply:RD.supply||C.supply, hall:null, site:null, cmd:null, out:false,
+              supply:Math.round((RD.supply||C.supply)*paceK("supplyK")),
+              hall:null, site:null, cmd:null, out:false,
               stance:"hold", col:SEAT_COL[i]};
     }),
     me:Math.max(0,Math.min(pn-1,(opt.me|0)||0)),
     multi:pn>1,
-    phase:"build", supply:RD.supply||C.supply, ehp:RD.hp||C.hp, wave:0,
-    send:RD.send||C.send||58,      // what one nest sends on the first night
+    phase:"build", ehp:RD.hp||C.hp, wave:0,
+    // What one nest sends on the first night, before the per-night ramp. The
+    // pacing multiplier lands here rather than in nestSend() so it scales the
+    // whole curve rather than only tonight, and so the number the HUD and the
+    // setup card quote is the number the round actually uses.
+    send:Math.max(1,Math.round((RD.send||C.send||58)*paceK("sendK"))),
     cells:{}, hall:null, enemies:[], bolts:[], parts:[], corpses:[], queue:[],
     units:[], markers:[], stance:"hold", marquee:null,
     // Roads are a graph in world space, not cells: nodes sit wherever the
@@ -394,6 +406,11 @@ function newGame(seed,map,opt){
     // at a discarded object one packet later and the selection would vanish
     // for no visible reason.
     rsel:null, rhover:null,
+    // Which salvage pile is picked, as an index into S.nodes. An index rather
+    // than the node itself for the same reason rsel is a pair of ids: the array
+    // is seeded once and never spliced, so an index is stable for the whole
+    // round on both sides of a net game, while a held object is not.
+    psel:-1,
     pathVer:0,                     // bumped whenever the walkable layout moves
     nodes:makeNodes(seed,map), gathered:0,
     dayLeft:dayLen, dayLen:dayLen,
@@ -567,6 +584,12 @@ function place(t,gx,gz,pid,rotOv){
   var b={type:t,gx:gx,gz:gz,hp:TYPES[t].hp,max:TYPES[t].hp,cd:Math.random()*0.4,
          rot:(rotOv===undefined?ghostRot(t,gx,gz):rotOv),
          rotAuto:(rotOv===undefined?S.rotAuto:false), own:p.id};
+  // A gate you have just built is a shut gate. It used to be a permanent hole
+  // in your own wall that both sides walked through, which meant a soldier
+  // could stand inside the line, step out to swing and step back — the wall was
+  // decoration on the one axis it was supposed to matter. A door has two states
+  // and this is the one that makes it a door.
+  if(t==="gate") b.shut=true;
   footCells(t,gx,gz).forEach(function(c){
     S.cells[key(c[0],c[1])] = (c[0]===gx&&c[1]===gz) ? b : {ref:b,type:t,own:p.id};
   });
@@ -629,11 +652,14 @@ function makeNodes(seed,map){
   // a map that places its piles by hand replaces the seeded scatter wholesale
   if(map&&map.nodes&&map.nodes.length){
     return map.nodes.map(function(n){
-      var a=Math.round(n.amt)||60;
+      var a=Math.max(1,Math.round((Math.round(n.amt)||60)*paceK("yieldK")));
       return {x:n.x, z:n.z, amt:a, max:a, rot:n.rot||0};
     });
   }
   var st=M.statsOf("salvage")||{nearN:2,farN:3,amt:78,farK:1.75};
+  // The piles are the entire economy — there is no income that is not carried
+  // out of one — so one multiplier on what is in them is the economy lever.
+  var yK=paceK("yieldK");
   var rng=M.rngFrom((seed||1)*7919+13), out=[], i, a, r;
   function push(a,r,amt){
     out.push({x:Math.cos(a)*r, z:Math.sin(a)*r, amt:amt, max:amt,
@@ -645,12 +671,12 @@ function makeNodes(seed,map){
   for(i=0;i<(st.nearN|0);i++){
     a=(i+rng())*(Math.PI*2/Math.max(1,st.nearN|0));
     r=6.4+rng()*4.0;
-    push(a,r,Math.round(st.amt*(0.85+rng()*0.3)));
+    push(a,r,Math.round(st.amt*yK*(0.85+rng()*0.3)));
   }
   for(i=0;i<(st.farN|0);i++){
     a=(i+rng())*(Math.PI*2/Math.max(1,st.farN|0));
     r=16.0+Math.pow(rng(),0.8)*22.0;
-    push(a,r,Math.round(st.amt*st.farK*(0.85+rng()*0.3)));
+    push(a,r,Math.round(st.amt*st.farK*yK*(0.85+rng()*0.3)));
   }
   return out;
 }
@@ -1148,7 +1174,7 @@ function walkableCell(gx,gz){
   if(gx<0||gz<0||gx>=GN||gz>=GN) return false;
   var c=cellAt(gx,gz);
   if(!c) return true;
-  return rootOf(c).type==="gate";
+  return !gateBlocks(rootOf(c));
 }
 // Straight line clear of buildings? Sampled finely enough that it cannot step
 // over a one-cell wall, which is the only kind this game has.
@@ -1496,9 +1522,16 @@ function gaitStep(u,x0,z0){
 function solidAt(x,z){
   var c=cellAt(M.w2gx(x),M.w2gx(z));
   if(!c) return false;
-  var b=rootOf(c);
-  return b.type!=="gate";                 // a gate is yours to walk through
+  return gateBlocks(rootOf(c));
 }
+// The one place that decides whether a building is a hole. Everything with an
+// opinion about walking — the collision above, the A* your orders run, the
+// horde's flow field — asks this, because a path that believes something the
+// collision does not is a unit grinding on a wall it was routed into.
+//
+// A gate is a hole only while it is open. Open, it is still the enemy's
+// favourite way in, and that is the trade the player is making.
+function gateBlocks(b){ return !(b.type==="gate" && !b.shut); }
 var TURNS=[0.60,1.05,1.57,2.10];
 function moveUnit(u,nx,nz){
   if(!solidAt(nx,nz)){ u.x=nx; u.z=nz; return true; }
@@ -1867,7 +1900,10 @@ function rebuildField(){
     for(var k=0;k<8;k++){
       var nx=x+DX[k], nz=z+DZ[k];
       if(nx<0||nz<0||nx>=N||nz>=N) continue;
-      var c2=cellAt(nx,nz), extra=c2?TYPES[rootOf(c2).type].pathCost:0;
+      // A shut gate must not still read as the cheap way in, or the horde walks
+      // the whole map to queue at a door that is not open.
+      var c2=cellAt(nx,nz), r2b=c2?rootOf(c2):null;
+      var extra=r2b?(r2b.shut?TYPES.wall.pathCost:TYPES[r2b.type].pathCost):0;
       var nd=t0.d+(k<4?1:1.414)+extra, ni=nz*N+nx;
       if(nd<dist[ni]-1e-9){ dist[ni]=nd; push(ni,nd); }
     }
@@ -2207,9 +2243,32 @@ function roadAt(x,z){
 function selectRoad(e){
   if(!S) return null;
   S.rsel=(e&&(e.own|0)===(S.me|0))?{a:e.a,b:e.b}:null;
-  if(S.rsel) S.bsel=null;             // one subject at a time; they share a panel
+  if(S.rsel){ S.bsel=null; S.psel=-1; }  // one subject at a time; they share a panel
   if(UI.building) UI.building();
   return selRoad();
+}
+// A salvage pile is nobody's property, so unlike a building or a road there is
+// no ownership test here: what it can tell you is how much is left, and that is
+// worth knowing about a pile in the middle of the map you have not claimed.
+function selectPile(i){
+  if(!S) return null;
+  i=(i===null||i===undefined)?-1:(i|0);
+  S.psel=(i>=0&&i<S.nodes.length)?i:-1;
+  if(S.psel>=0){ S.bsel=null; S.rsel=null; }
+  if(UI.building) UI.building();
+  return selPile();
+}
+function selPile(){ return (S&&S.psel>=0&&S.psel<S.nodes.length)?S.nodes[S.psel]:null; }
+// How many of your workers are actually digging this one out. The same question
+// the road panel answers, and the same reason: the player is deciding whether
+// this pile is worth walking to.
+function pileCrew(i){
+  var n=0;
+  for(var k=0;k<S.units.length;k++){
+    var u=S.units[k];
+    if(u.t==="worker"&&(u.own|0)===(S.me|0)&&u.job===S.nodes[i]) n++;
+  }
+  return n;
 }
 // How many of your workers are actually on this edge right now. The player is
 // deciding whether to call it off, and "three workers are on it" is the fact
@@ -2682,6 +2741,7 @@ function update(dt){
   // syncing it would put a cosmetic number on the wire every frame.
   S.tt=(S.tt||0)+dt;
   stepPan(dt);
+  stepTurn(dt);
   // The guest owns nothing: the host decides every position and hit point, and
   // this side only advances the cosmetic parts so the picture stays smooth
   // between snapshots.
@@ -3041,6 +3101,9 @@ function applyIntent(msg,pid){
   switch(msg.m){
     case "pl": place(msg.t,msg.gx|0,msg.gz|0,pid,msg.r||0); break;
     case "rm": removeAt(msg.gx|0,msg.gz|0,pid); break;
+    case "gt": var gc=cellAt(msg.gx|0,msg.gz|0);
+               if(gc) setGate(rootOf(gc),!!msg.s,pid);
+               break;
     // The host re-snaps the guest's endpoints against its own graph rather than
     // trusting the ones sent: the two sides can disagree about what existed
     // when the drag started, and only one of them is authoritative.
@@ -3122,8 +3185,11 @@ function snapshot(full){
     for(var k in S.cells){
       var c=S.cells[k];
       if(c.ref) continue;
+      // A gate's state rides along: the guest runs its own collision and its
+      // own paths against these cells, so a door the host has shut and the
+      // guest thinks is open is two games, not one.
       out.cl.push([c.type, c.gx, c.gz, Math.round(c.hp), c.own|0, r2(bRot(c)),
-                   c.site?1:0, c.site?r2(c.prog):0]);
+                   c.site?1:0, c.site?r2(c.prog):0, c.shut?1:0]);
     }
     S.netCellsDirty=false;
   }
@@ -3169,7 +3235,7 @@ function applySnapshot(sn){
       var r=sn.cl[i], t=r[0];
       var b={type:t,gx:r[1],gz:r[2],hp:r[3],max:TYPES[t].hp,own:r[4],
              rot:r[5],rotAuto:false,cd:0,
-             site:!!r[6], prog:r[7]||0,
+             site:!!r[6], prog:r[7]||0, shut:!!r[8],
              need:Math.max(0.001, (t==="hall") ? (TYPES.hall.raise||14)
                                                : (+TYPES[t].raise||1))};
       footCells(t,r[1],r[2]).forEach(function(c){
@@ -3592,7 +3658,8 @@ var IND={
   rallyQ:[0.072,0.055,0.020],   // ...when he is not the one selected
   work  :[0.085,0.165,0.052],   // a pile someone is working
   ghost :[0.185,0.150,0.070],   // what the thing in your hand would cover
-  grid  :[0.115,0.150,0.140]    // the cells you could put it on
+  grid  :[0.115,0.150,0.140],   // the cells you could put it on
+  gopen :[0.135,0.115,0.052]    // a gate standing open: light across the threshold
 };
 var SHADE_COL=[0.40,0.38,0.30];
 function contactShade(n,x,z,r,k){
@@ -3687,6 +3754,11 @@ function pack(){
     }
     if(playable()&&ty.range&&S.sel===c.type)
       rangeRing(n,x,z,ty.range,c.lit?IND.lit:IND.range,c.lit?IND.litT:IND.rangeT,0.05);
+    // An open gate is a hole in your own wall and has to look like one from
+    // across the map, because the whole point of shutting it is that you can
+    // see which ones you have not. Nothing under a shut gate: the absence is
+    // the other state, and a marker on every gate would say nothing.
+    if(c.type==="gate"&&!c.site&&!c.shut) groundRing(n,x,z,0.86,IND.gopen,0.03);
     if(playable()&&c.type==="brazier"&&S.sel&&(S.sel==="brazier"||TYPES[S.sel].range))
       rangeRing(n,x,z,ty.aura,IND.aura,IND.auraT,0.05);
   }
@@ -4231,12 +4303,31 @@ function setStance(v,pid){
 // to the pause menu — so it has gone rather than sitting here looking wired.
 function deselectAll(){
   if(!S) return false;
-  var had=!!(S.sel||S.bsel||S.rsel||selectedUnits().length);
-  S.sel=null; S.bsel=null; S.rsel=null;
+  var had=!!(S.sel||S.bsel||S.rsel||S.psel>=0||selectedUnits().length);
+  S.sel=null; S.bsel=null; S.rsel=null; S.psel=-1;
   clearSelection();
   if(UI.hotbar) UI.hotbar();
   if(UI.building) UI.building();
   return had;
+}
+// Open a gate or shut it. It changes what can walk where, so both the flow
+// field and the order paths have to be told the layout moved — a stale path is
+// a unit walking confidently into a door that closed behind it.
+function setGate(b,shut,pid){
+  if(!S||!b||b.type!=="gate"||b.site) return false;
+  shut=!!shut;
+  // A guest asks; the host answers with the next snapshot. Named by cell rather
+  // than by object for the same reason a road is named by node id: the guest
+  // rebuilds S.cells wholesale every packet, so the object it is holding is not
+  // the one the host would act on.
+  if((pid===undefined||pid===null)&&guest())
+    return intent({m:"gt",gx:b.gx|0,gz:b.gz|0,s:shut?1:0});
+  if(pid!==undefined&&pid!==null&&(b.own|0)!==pid) return false;
+  if(!!b.shut===shut) return false;
+  b.shut=shut;
+  S.distDirty=true; S.netCellsDirty=true; S.pathVer=(S.pathVer|0)+1;
+  if(UI.building) UI.building();
+  return true;
 }
 // Clicking a building of yours with an empty cursor picks it up as a subject
 // rather than selling it: that is what gives the hall somewhere to put a verb.
@@ -4246,7 +4337,7 @@ function selectBuilding(b){
   // the hall's is not, because there is nothing to fall back to if you scrap it.
   var pick=b&&(b.own|0)===S.me&&!(b.site&&b.type==="hall");
   S.bsel=pick?b:null;
-  if(S.bsel) S.rsel=null;             // one subject at a time; they share a panel
+  if(S.bsel){ S.rsel=null; S.psel=-1; }  // one subject at a time; they share a panel
   if(UI.building) UI.building();
   return S.bsel;
 }
@@ -4370,11 +4461,16 @@ function wireInput(){
             // Nothing built here — but a road might run through it. Roads are
             // not cells, so they are invisible to the hit test above and have
             // to be asked for separately.
-            var rp=p?roadAt(p.x,p.z):null;
-            if(rp) selectRoad(rp); else selectBuilding(null);
+            // A pile is asked for before a road: a road can run under one, and
+            // the thing the click is plainly on is the heap, not the track.
+            var np=p?nodeAtWorld(p.x,p.z,1.3):null;
+            var rp=(!np&&p)?roadAt(p.x,p.z):null;
+            if(np) selectPile(S.nodes.indexOf(np));
+            else if(rp) selectRoad(rp);
+            else { selectBuilding(null); selectPile(null); }
             if(!addSel) selectOnly([]);
           }
-        } else { selectBuilding(null); selectRoad(null); if(!addSel) selectOnly([]); }
+        } else { selectBuilding(null); selectRoad(null); selectPile(null); if(!addSel) selectOnly([]); }
       } else if(mode==="order"&&downBtn===2){
         // Right-click is an order, full stop — there is no right-drag gesture
         // left for it to compete with. Requiring the mouse to be still first
@@ -4410,7 +4506,7 @@ function wireInput(){
         // has already turned them out above, and dropping the selection in the
         // same click would take the panel away from under the player just as
         // they used it.
-        else if(!sent&&(S.bsel||S.rsel)){ selectBuilding(null); selectRoad(null); }
+        else if(!sent&&(S.bsel||S.rsel||S.psel>=0)){ selectBuilding(null); selectRoad(null); selectPile(null); }
       }
     }
     mode=null;
@@ -4435,6 +4531,18 @@ function wireInput(){
 // it stutter.
 var panKeys={w:0,a:0,s:0,d:0}, panFast=false;
 var PAN_SPD=17, PAN_FAST=2.5;
+// Q and E turn the camera, and they are held rather than tapped for the same
+// reason WASD is: a keydown repeat rate is the operating system's idea of a
+// cadence, not the game's, and it arrives as a stutter with a half-second hole
+// at the front of it. They used to step 15 degrees per event, which meant a
+// slow turn was a stutter and a fast one was whatever the key repeat felt like.
+//
+// A pure rate would make a tap almost nothing, so a tap is given a floor: the
+// turn accumulates while the key is down and the remainder up to TURN_MIN is
+// paid out on release. Anything held past that point never notices the floor,
+// which is why the two rules do not fight.
+var turnKeys={q:0,e:0}, turnAcc=0;
+var TURN_SPD=88, TURN_MIN=9;
 function panKey(ev,down){
   // Shift rides on every key event, so reading it here keeps the flag honest
   // whether shift went down before the direction key or after it.
@@ -4445,6 +4553,33 @@ function panKey(ev,down){
   panKeys[k]=down?1:0;
   if(down) ev.preventDefault();
   return true;
+}
+// Returns true when the event was a turn key, so keydown() stops treating it as
+// a tap. A key that goes down while already down is a repeat, not a new press,
+// and must not reset the tap accumulator or a held key would never reach the
+// point where the floor stops applying.
+function turnKey(ev,down){
+  var k=(ev.key||"").toLowerCase();
+  if(k!=="q"&&k!=="e") return false;
+  if(ev.ctrlKey||ev.metaKey) return false;
+  if(down){
+    if(!turnKeys[k]){ turnKeys[k]=1; turnAcc=0; }
+    ev.preventDefault();
+  }else if(turnKeys[k]){
+    turnKeys[k]=0;
+    // A tap shorter than the floor still turns the floor's worth, in the
+    // direction of the key being let go.
+    if(!turnKeys.q&&!turnKeys.e&&turnAcc<TURN_MIN)
+      cam.az+=(TURN_MIN-turnAcc)*(k==="e"?1:-1);
+  }
+  return true;
+}
+function stepTurn(dt){
+  var d=turnKeys.e-turnKeys.q;
+  if(!d) return;
+  var step=TURN_SPD*dt;
+  cam.az+=d*step;
+  turnAcc+=step;
 }
 function stepPan(dt){
   var fr=panKeys.d-panKeys.a, fw=panKeys.w-panKeys.s;
@@ -4467,19 +4602,19 @@ function stepPan(dt){
   cam.tx=Math.max(-lim,Math.min(lim,cam.tx));
   cam.tz=Math.max(-lim,Math.min(lim,cam.tz));
 }
-function clearPan(){ panKeys.w=panKeys.a=panKeys.s=panKeys.d=0; panFast=false; }
+function clearPan(){ panKeys.w=panKeys.a=panKeys.s=panKeys.d=0; panFast=false;
+  turnKeys.q=turnKeys.e=0; turnAcc=0; }
 function keydown(ev){
   if(!active||!S) return;
   if(panKey(ev,true)) return;
+  if(turnKey(ev,true)) return;
   if((ev.ctrlKey||ev.metaKey)&&(ev.key==="a"||ev.key==="A")){
     ev.preventDefault(); selectAllUnits(null); return;
   }
   if(ev.key==="h"||ev.key==="H") setStance(S.stance==="hold"?"pursue":"hold");
-  if(ev.key==="q"||ev.key==="Q") cam.az-=15;
-  if(ev.key==="e"||ev.key==="E") cam.az+=15;
   if(ev.key==="r"||ev.key==="R"){ if(ev.shiftKey) rotAuto(); else rotate(false); }
 }
-function keyup(ev){ panKey(ev,false); }
+function keyup(ev){ panKey(ev,false); turnKey(ev,false); }
 function panSpeeding(){ return panFast; }
 
 var UI={phase:null,hotbar:null,rot:null,units:null,marquee:null,building:null};
@@ -4509,8 +4644,14 @@ return {
   },
   cancelRoad:cancelRoad, roadAt:roadAt, selectRoad:selectRoad,
   rsel:selRoad, roadCrew:roadCrew, edgeLen:edgeLen,
+  psel:selPile, pileIndex:function(){ return S?S.psel:-1; },
+  selectPile:selectPile, pileCrew:pileCrew,
   // pathfinding, for the tools: findPath is the search, stepPath the follower
-  findPath:findPath, stepPath:stepPath, losClear:losClear,
+  findPath:findPath, stepPath:stepPath, losClear:losClear, solidAt:solidAt,
+  // The horde's flow field, rebuilt on demand. A tool that read S.dist straight
+  // would get whatever the last frame left there, which is the wrong answer
+  // immediately after anything moves the layout.
+  field:function(){ if(!S) return null; if(S.distDirty) rebuildField(); return S.dist; },
   walkableCell:function(gx,gz){ return walkableCell(gx,gz); },
   // the same call a right-click makes, so a test measures the real order path
   orderTo:function(list,x,z){ orderTo(list,x,z); },
@@ -4543,6 +4684,7 @@ return {
   hpAnchors:hpAnchors,
   bsel:function(){ return S?S.bsel:null; },
   selectBuilding:selectBuilding, setShelter:setShelter, sendOut:sendOut,
+  setGate:setGate,
   housedBy:housedBy, sheltering:sheltering, shelteredCount:shelteredCount,
   crewOf:crewOf, manTurret:manTurret, clearTurret:clearTurret, canCrew:canCrew,
   select:function(t){ if(S) S.sel=(S.sel===t)?null:t; },

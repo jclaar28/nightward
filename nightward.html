@@ -375,6 +375,32 @@
   #newBack{margin-top:9px;width:100%;background:transparent;border:1px solid var(--line);
     border-radius:2px;padding:9px;font-size:12.5px;font-weight:600;color:var(--muted)}
   #newBack:hover{border-color:var(--line-hi);color:var(--ink)}
+  /* Pacing. Folded away by default: it is a tuning surface, not part of
+     starting a round, and an open panel of numbers on the way into a game
+     reads as five decisions the player has to make before they can play. */
+  #paceWrap{margin-top:14px;border-top:1px solid var(--line);padding-top:11px}
+  #paceHead{display:flex;align-items:baseline;justify-content:space-between;gap:12px;
+    width:100%;background:transparent;border:0;padding:0;cursor:pointer;color:var(--muted)}
+  #paceHead:hover{color:var(--ink)}
+  #paceHead .pl{font-size:13px;font-weight:600}
+  #paceHead .pv{font-family:"IBM Plex Mono",monospace;font-size:10px;letter-spacing:.06em;
+    color:var(--faint);font-variant-numeric:tabular-nums}
+  #paceBody{margin-top:11px}
+  #paceBody[hidden]{display:none}
+  .paceRow{display:grid;grid-template-columns:1fr 74px;align-items:center;gap:10px;
+    padding:5px 0}
+  .paceRow .pk{font-size:12.5px;color:var(--ink)}
+  .paceRow .ph{display:block;font-size:10.5px;color:var(--faint);margin-top:1px;
+    line-height:1.4}
+  .paceRow .pk.pEdit{color:var(--accent)}
+  .paceRow input{width:100%;background:rgba(0,0,0,.28);border:1px solid var(--line);
+    border-radius:2px;padding:5px 7px;color:var(--ink);font-family:"IBM Plex Mono",monospace;
+    font-size:12px;text-align:right;font-variant-numeric:tabular-nums}
+  .paceRow input:focus{outline:0;border-color:var(--accent)}
+  #paceReset{margin-top:9px;background:transparent;border:1px solid var(--line);
+    border-radius:2px;padding:6px 10px;font-size:11.5px;font-weight:600;color:var(--muted)}
+  #paceReset:hover{border-color:var(--line-hi);color:var(--ink)}
+  #paceReset[hidden]{display:none}
   @media (max-width:520px){ #diffPick{grid-template-columns:1fr} }
 
   /* ---------------- settings ---------------- */
@@ -896,6 +922,14 @@
 
     <div id="diffPick" role="group" aria-label="Difficulty"></div>
     <div id="diffBlurb"></div>
+
+    <div id="paceWrap">
+      <button id="paceHead" type="button" aria-expanded="false" aria-controls="paceBody">
+        <span class="pl" data-t="setup.pace"></span><span class="pv" id="paceSummary"></span>
+      </button>
+      <div id="paceBody" hidden></div>
+      <button id="paceReset" type="button" hidden data-t="setup.pace.reset"></button>
+    </div>
 
     <div id="newMapRow">
       <div>
@@ -2926,7 +2960,7 @@ var STAT_DEFS={
      hint:"how far a guard will follow before going home"},
     // Each night is bigger than the last and the gap widens, so a long game is
     // not a safe one. These live here because it is the nests that send them.
-    {k:"ramp",    label:"Sends · per night",def:1.20,lo:1,  hi:3,    step:0.01,
+    {k:"ramp",    label:"Sends · per night",def:1.13,lo:1,  hi:3,    step:0.01,
      hint:"multiplies what one nest sends, every night it is left standing"},
     {k:"ehpK",    label:"Attacker health ×",def:1.05,lo:1,  hi:2,    step:0.01,
      hint:"multiplies attacker health each night"},
@@ -2963,6 +2997,24 @@ var STAT_DEFS={
   // Salvage is a slow drip from a deep well, not a morning's work. A round runs
   // for days now, so a pile has to outlast several of them while paying little
   // enough per trip that it never funds a defence on its own.
+  // Four multipliers over whatever the chosen difficulty says, and the one
+  // group in this table that exists for tuning rather than for the game. The
+  // pacing of a round is the hardest thing here to get right by reasoning about
+  // it — it is a feel question, and the only way to answer it is to play a
+  // round, move one number, and play another. These are on the setup card for
+  // that reason: multipliers rather than absolutes, so easy/normal/hard keep
+  // meaning something and one slider moves the whole curve.
+  pace:{ note:"How fast a round runs. Multipliers over the difficulty you picked.", fields:[
+    {k:"supplyK", label:"Starting supply ×", def:1.0, lo:0.25, hi:4, step:0.05,
+     hint:"what you begin the first day with"},
+    {k:"yieldK",  label:"Salvage yield ×",   def:1.0, lo:0.25, hi:4, step:0.05,
+     hint:"how much is in every pile on the map — the whole economy, since the piles are all there is"},
+    {k:"sendK",   label:"Attackers ×",       def:1.0, lo:0.25, hi:4, step:0.05,
+     hint:"the size of every wave, night one included"},
+    {k:"nightK",  label:"Night length ×",    def:1.0, lo:0.5,  hi:3, step:0.05,
+     hint:"how long you have to hold once the sun is down"}
+  ]},
+
   salvage:{ note:"How much is out there, and how it is spread.", fields:[
     {k:"nearN",   label:"Piles · inside", def:2,  lo:0,  hi:12,  step:1, int:true,
      hint:"close to the plateau, safe to work"},
@@ -3184,6 +3236,13 @@ var TEXT_DEFS={
   "setup.map.custom.note":{g:"setup",def:"One of yours, drawn on the Maps screen."},
   "setup.map.choose":{g:"setup",def:"Choose…"},
   "setup.map.change":{g:"setup",def:"Change…"},
+  "setup.pace":{g:"setup",def:"Pacing"},
+  "setup.pace.stock":{g:"setup",def:"AS SHIPPED"},
+  "setup.pace.some":{g:"setup",def:"{n} CHANGED"},
+  "setup.pace.reset":{g:"setup",def:"Put pacing back"},
+  "setup.pace.ramp":{g:"setup",def:"Night on night ×"},
+  "setup.pace.ramp.hint":{g:"setup",def:"compounds — every night a nest is left standing, it sends this much more than the last"},
+  "setup.pace.curve":{g:"setup",def:"night 1 {a} · night 5 {b} · night 10 {c}"},
   "setup.go":{g:"setup",def:"Set out"},
   "setup.back":{g:"setup",def:"← Menu"},
 
@@ -3244,6 +3303,18 @@ var TEXT_DEFS={
   "sel.road.calloff":{g:"sel",def:"Call it off"},
   "sel.road.tearup":{g:"sel",def:"Tear it up"},
   "sel.road.hint":{g:"sel",def:"a road costs work, not supply — there is nothing back"},
+  "sel.gate.open":{g:"sel",def:"Open the gate"},
+  "sel.gate.shut":{g:"sel",def:"Bar the gate"},
+  "sel.gate.isopen":{g:"sel",def:"standing open"},
+  "sel.gate.isshut":{g:"sel",def:"barred"},
+  "sel.gate.hint.open":{g:"sel",def:"anything can walk through it, and they prefer to"},
+  "sel.gate.hint.shut":{g:"sel",def:"nobody walks through — yours included"},
+  "sel.pile.name":{g:"sel",def:"Salvage Pile"},
+  "sel.pile.left":{g:"sel",def:"{n} supply left"},
+  "sel.pile.spent":{g:"sel",def:"worked out"},
+  "sel.pile.crew":{g:"sel",def:"{n} {noun} on it"},
+  "sel.pile.nocrew":{g:"sel",def:"nobody is working it"},
+  "sel.pile.hint":{g:"sel",def:"of {n} it started with"},
   "sel.kind.line":{g:"sel",def:"{name} ×{n}"},
   "sel.kind.civil":{g:"sel",def:"{hp} hp"},
   "sel.kind.armed":{g:"sel",def:"{hp} hp · {dmg} dmg"},
@@ -5234,6 +5305,11 @@ function buildRigs(makeBatch){
 // round, and whenever the Library edits a number — so a change in the editor
 // reaches a round already in progress.
 var NEST={};
+var PACE={};
+// One multiplier out of the pacing group, defaulting to 1 so anything that has
+// never heard of the group — an old save, a map file, a tool — plays exactly as
+// it did before it existed.
+function paceK(k){ var v=PACE[k]; return (v===undefined||!isFinite(v)||v<=0)?1:v; }
 // Names and one-line summaries live in the text table, and the table is live:
 // re-reading them here means an edit in the Library's Text tab reaches the
 // hotbar and the selection panels on the next sync rather than the next reload.
@@ -5253,6 +5329,7 @@ function syncStats(){
   // The nests are not in TYPES/UNITS/ENEMY, so their block is read straight out
   // of the balance table here and re-read whenever the library edits it.
   NEST=M.statsOf("nest")||{};
+  PACE=M.statsOf("pace")||{};
   for(t in TYPES){
     st=M.statsOf(t);
     if(st) for(k in st) TYPES[t][k]=st[k];
@@ -5409,7 +5486,8 @@ function newGame(seed,map,opt){
             hit:0, kx:0, kz:0, stag:0, nest:true, dead:false, pulse:Math.random()*6.28,
             dmg:{}, callCd:0, guards:0};
   });
-  var dayLen=RD.day||DAY_LEN, nightLen=RD.night||NIGHT_LEN;
+  var dayLen=RD.day||DAY_LEN;
+  var nightLen=Math.max(10,(RD.night||NIGHT_LEN)*paceK("nightK"));
   S={
     seed:seed, T:T, staticMesh:mesh, map:map,
     net:opt.net||null,            // "host" | "guest" | null
@@ -5418,13 +5496,18 @@ function newGame(seed,map,opt){
     // whether their town hall is still up
     players:seats.map(function(c,i){
       return {id:i, cx:c[0], cz:c[1], name:"Player "+(i+1),
-              supply:RD.supply||C.supply, hall:null, site:null, cmd:null, out:false,
+              supply:Math.round((RD.supply||C.supply)*paceK("supplyK")),
+              hall:null, site:null, cmd:null, out:false,
               stance:"hold", col:SEAT_COL[i]};
     }),
     me:Math.max(0,Math.min(pn-1,(opt.me|0)||0)),
     multi:pn>1,
-    phase:"build", supply:RD.supply||C.supply, ehp:RD.hp||C.hp, wave:0,
-    send:RD.send||C.send||58,      // what one nest sends on the first night
+    phase:"build", ehp:RD.hp||C.hp, wave:0,
+    // What one nest sends on the first night, before the per-night ramp. The
+    // pacing multiplier lands here rather than in nestSend() so it scales the
+    // whole curve rather than only tonight, and so the number the HUD and the
+    // setup card quote is the number the round actually uses.
+    send:Math.max(1,Math.round((RD.send||C.send||58)*paceK("sendK"))),
     cells:{}, hall:null, enemies:[], bolts:[], parts:[], corpses:[], queue:[],
     units:[], markers:[], stance:"hold", marquee:null,
     // Roads are a graph in world space, not cells: nodes sit wherever the
@@ -5438,6 +5521,11 @@ function newGame(seed,map,opt){
     // at a discarded object one packet later and the selection would vanish
     // for no visible reason.
     rsel:null, rhover:null,
+    // Which salvage pile is picked, as an index into S.nodes. An index rather
+    // than the node itself for the same reason rsel is a pair of ids: the array
+    // is seeded once and never spliced, so an index is stable for the whole
+    // round on both sides of a net game, while a held object is not.
+    psel:-1,
     pathVer:0,                     // bumped whenever the walkable layout moves
     nodes:makeNodes(seed,map), gathered:0,
     dayLeft:dayLen, dayLen:dayLen,
@@ -5611,6 +5699,12 @@ function place(t,gx,gz,pid,rotOv){
   var b={type:t,gx:gx,gz:gz,hp:TYPES[t].hp,max:TYPES[t].hp,cd:Math.random()*0.4,
          rot:(rotOv===undefined?ghostRot(t,gx,gz):rotOv),
          rotAuto:(rotOv===undefined?S.rotAuto:false), own:p.id};
+  // A gate you have just built is a shut gate. It used to be a permanent hole
+  // in your own wall that both sides walked through, which meant a soldier
+  // could stand inside the line, step out to swing and step back — the wall was
+  // decoration on the one axis it was supposed to matter. A door has two states
+  // and this is the one that makes it a door.
+  if(t==="gate") b.shut=true;
   footCells(t,gx,gz).forEach(function(c){
     S.cells[key(c[0],c[1])] = (c[0]===gx&&c[1]===gz) ? b : {ref:b,type:t,own:p.id};
   });
@@ -5673,11 +5767,14 @@ function makeNodes(seed,map){
   // a map that places its piles by hand replaces the seeded scatter wholesale
   if(map&&map.nodes&&map.nodes.length){
     return map.nodes.map(function(n){
-      var a=Math.round(n.amt)||60;
+      var a=Math.max(1,Math.round((Math.round(n.amt)||60)*paceK("yieldK")));
       return {x:n.x, z:n.z, amt:a, max:a, rot:n.rot||0};
     });
   }
   var st=M.statsOf("salvage")||{nearN:2,farN:3,amt:78,farK:1.75};
+  // The piles are the entire economy — there is no income that is not carried
+  // out of one — so one multiplier on what is in them is the economy lever.
+  var yK=paceK("yieldK");
   var rng=M.rngFrom((seed||1)*7919+13), out=[], i, a, r;
   function push(a,r,amt){
     out.push({x:Math.cos(a)*r, z:Math.sin(a)*r, amt:amt, max:amt,
@@ -5689,12 +5786,12 @@ function makeNodes(seed,map){
   for(i=0;i<(st.nearN|0);i++){
     a=(i+rng())*(Math.PI*2/Math.max(1,st.nearN|0));
     r=6.4+rng()*4.0;
-    push(a,r,Math.round(st.amt*(0.85+rng()*0.3)));
+    push(a,r,Math.round(st.amt*yK*(0.85+rng()*0.3)));
   }
   for(i=0;i<(st.farN|0);i++){
     a=(i+rng())*(Math.PI*2/Math.max(1,st.farN|0));
     r=16.0+Math.pow(rng(),0.8)*22.0;
-    push(a,r,Math.round(st.amt*st.farK*(0.85+rng()*0.3)));
+    push(a,r,Math.round(st.amt*st.farK*yK*(0.85+rng()*0.3)));
   }
   return out;
 }
@@ -6192,7 +6289,7 @@ function walkableCell(gx,gz){
   if(gx<0||gz<0||gx>=GN||gz>=GN) return false;
   var c=cellAt(gx,gz);
   if(!c) return true;
-  return rootOf(c).type==="gate";
+  return !gateBlocks(rootOf(c));
 }
 // Straight line clear of buildings? Sampled finely enough that it cannot step
 // over a one-cell wall, which is the only kind this game has.
@@ -6540,9 +6637,16 @@ function gaitStep(u,x0,z0){
 function solidAt(x,z){
   var c=cellAt(M.w2gx(x),M.w2gx(z));
   if(!c) return false;
-  var b=rootOf(c);
-  return b.type!=="gate";                 // a gate is yours to walk through
+  return gateBlocks(rootOf(c));
 }
+// The one place that decides whether a building is a hole. Everything with an
+// opinion about walking — the collision above, the A* your orders run, the
+// horde's flow field — asks this, because a path that believes something the
+// collision does not is a unit grinding on a wall it was routed into.
+//
+// A gate is a hole only while it is open. Open, it is still the enemy's
+// favourite way in, and that is the trade the player is making.
+function gateBlocks(b){ return !(b.type==="gate" && !b.shut); }
 var TURNS=[0.60,1.05,1.57,2.10];
 function moveUnit(u,nx,nz){
   if(!solidAt(nx,nz)){ u.x=nx; u.z=nz; return true; }
@@ -6911,7 +7015,10 @@ function rebuildField(){
     for(var k=0;k<8;k++){
       var nx=x+DX[k], nz=z+DZ[k];
       if(nx<0||nz<0||nx>=N||nz>=N) continue;
-      var c2=cellAt(nx,nz), extra=c2?TYPES[rootOf(c2).type].pathCost:0;
+      // A shut gate must not still read as the cheap way in, or the horde walks
+      // the whole map to queue at a door that is not open.
+      var c2=cellAt(nx,nz), r2b=c2?rootOf(c2):null;
+      var extra=r2b?(r2b.shut?TYPES.wall.pathCost:TYPES[r2b.type].pathCost):0;
       var nd=t0.d+(k<4?1:1.414)+extra, ni=nz*N+nx;
       if(nd<dist[ni]-1e-9){ dist[ni]=nd; push(ni,nd); }
     }
@@ -7251,9 +7358,32 @@ function roadAt(x,z){
 function selectRoad(e){
   if(!S) return null;
   S.rsel=(e&&(e.own|0)===(S.me|0))?{a:e.a,b:e.b}:null;
-  if(S.rsel) S.bsel=null;             // one subject at a time; they share a panel
+  if(S.rsel){ S.bsel=null; S.psel=-1; }  // one subject at a time; they share a panel
   if(UI.building) UI.building();
   return selRoad();
+}
+// A salvage pile is nobody's property, so unlike a building or a road there is
+// no ownership test here: what it can tell you is how much is left, and that is
+// worth knowing about a pile in the middle of the map you have not claimed.
+function selectPile(i){
+  if(!S) return null;
+  i=(i===null||i===undefined)?-1:(i|0);
+  S.psel=(i>=0&&i<S.nodes.length)?i:-1;
+  if(S.psel>=0){ S.bsel=null; S.rsel=null; }
+  if(UI.building) UI.building();
+  return selPile();
+}
+function selPile(){ return (S&&S.psel>=0&&S.psel<S.nodes.length)?S.nodes[S.psel]:null; }
+// How many of your workers are actually digging this one out. The same question
+// the road panel answers, and the same reason: the player is deciding whether
+// this pile is worth walking to.
+function pileCrew(i){
+  var n=0;
+  for(var k=0;k<S.units.length;k++){
+    var u=S.units[k];
+    if(u.t==="worker"&&(u.own|0)===(S.me|0)&&u.job===S.nodes[i]) n++;
+  }
+  return n;
 }
 // How many of your workers are actually on this edge right now. The player is
 // deciding whether to call it off, and "three workers are on it" is the fact
@@ -7726,6 +7856,7 @@ function update(dt){
   // syncing it would put a cosmetic number on the wire every frame.
   S.tt=(S.tt||0)+dt;
   stepPan(dt);
+  stepTurn(dt);
   // The guest owns nothing: the host decides every position and hit point, and
   // this side only advances the cosmetic parts so the picture stays smooth
   // between snapshots.
@@ -8085,6 +8216,9 @@ function applyIntent(msg,pid){
   switch(msg.m){
     case "pl": place(msg.t,msg.gx|0,msg.gz|0,pid,msg.r||0); break;
     case "rm": removeAt(msg.gx|0,msg.gz|0,pid); break;
+    case "gt": var gc=cellAt(msg.gx|0,msg.gz|0);
+               if(gc) setGate(rootOf(gc),!!msg.s,pid);
+               break;
     // The host re-snaps the guest's endpoints against its own graph rather than
     // trusting the ones sent: the two sides can disagree about what existed
     // when the drag started, and only one of them is authoritative.
@@ -8166,8 +8300,11 @@ function snapshot(full){
     for(var k in S.cells){
       var c=S.cells[k];
       if(c.ref) continue;
+      // A gate's state rides along: the guest runs its own collision and its
+      // own paths against these cells, so a door the host has shut and the
+      // guest thinks is open is two games, not one.
       out.cl.push([c.type, c.gx, c.gz, Math.round(c.hp), c.own|0, r2(bRot(c)),
-                   c.site?1:0, c.site?r2(c.prog):0]);
+                   c.site?1:0, c.site?r2(c.prog):0, c.shut?1:0]);
     }
     S.netCellsDirty=false;
   }
@@ -8213,7 +8350,7 @@ function applySnapshot(sn){
       var r=sn.cl[i], t=r[0];
       var b={type:t,gx:r[1],gz:r[2],hp:r[3],max:TYPES[t].hp,own:r[4],
              rot:r[5],rotAuto:false,cd:0,
-             site:!!r[6], prog:r[7]||0,
+             site:!!r[6], prog:r[7]||0, shut:!!r[8],
              need:Math.max(0.001, (t==="hall") ? (TYPES.hall.raise||14)
                                                : (+TYPES[t].raise||1))};
       footCells(t,r[1],r[2]).forEach(function(c){
@@ -8636,7 +8773,8 @@ var IND={
   rallyQ:[0.072,0.055,0.020],   // ...when he is not the one selected
   work  :[0.085,0.165,0.052],   // a pile someone is working
   ghost :[0.185,0.150,0.070],   // what the thing in your hand would cover
-  grid  :[0.115,0.150,0.140]    // the cells you could put it on
+  grid  :[0.115,0.150,0.140],   // the cells you could put it on
+  gopen :[0.135,0.115,0.052]    // a gate standing open: light across the threshold
 };
 var SHADE_COL=[0.40,0.38,0.30];
 function contactShade(n,x,z,r,k){
@@ -8731,6 +8869,11 @@ function pack(){
     }
     if(playable()&&ty.range&&S.sel===c.type)
       rangeRing(n,x,z,ty.range,c.lit?IND.lit:IND.range,c.lit?IND.litT:IND.rangeT,0.05);
+    // An open gate is a hole in your own wall and has to look like one from
+    // across the map, because the whole point of shutting it is that you can
+    // see which ones you have not. Nothing under a shut gate: the absence is
+    // the other state, and a marker on every gate would say nothing.
+    if(c.type==="gate"&&!c.site&&!c.shut) groundRing(n,x,z,0.86,IND.gopen,0.03);
     if(playable()&&c.type==="brazier"&&S.sel&&(S.sel==="brazier"||TYPES[S.sel].range))
       rangeRing(n,x,z,ty.aura,IND.aura,IND.auraT,0.05);
   }
@@ -9275,12 +9418,31 @@ function setStance(v,pid){
 // to the pause menu — so it has gone rather than sitting here looking wired.
 function deselectAll(){
   if(!S) return false;
-  var had=!!(S.sel||S.bsel||S.rsel||selectedUnits().length);
-  S.sel=null; S.bsel=null; S.rsel=null;
+  var had=!!(S.sel||S.bsel||S.rsel||S.psel>=0||selectedUnits().length);
+  S.sel=null; S.bsel=null; S.rsel=null; S.psel=-1;
   clearSelection();
   if(UI.hotbar) UI.hotbar();
   if(UI.building) UI.building();
   return had;
+}
+// Open a gate or shut it. It changes what can walk where, so both the flow
+// field and the order paths have to be told the layout moved — a stale path is
+// a unit walking confidently into a door that closed behind it.
+function setGate(b,shut,pid){
+  if(!S||!b||b.type!=="gate"||b.site) return false;
+  shut=!!shut;
+  // A guest asks; the host answers with the next snapshot. Named by cell rather
+  // than by object for the same reason a road is named by node id: the guest
+  // rebuilds S.cells wholesale every packet, so the object it is holding is not
+  // the one the host would act on.
+  if((pid===undefined||pid===null)&&guest())
+    return intent({m:"gt",gx:b.gx|0,gz:b.gz|0,s:shut?1:0});
+  if(pid!==undefined&&pid!==null&&(b.own|0)!==pid) return false;
+  if(!!b.shut===shut) return false;
+  b.shut=shut;
+  S.distDirty=true; S.netCellsDirty=true; S.pathVer=(S.pathVer|0)+1;
+  if(UI.building) UI.building();
+  return true;
 }
 // Clicking a building of yours with an empty cursor picks it up as a subject
 // rather than selling it: that is what gives the hall somewhere to put a verb.
@@ -9290,7 +9452,7 @@ function selectBuilding(b){
   // the hall's is not, because there is nothing to fall back to if you scrap it.
   var pick=b&&(b.own|0)===S.me&&!(b.site&&b.type==="hall");
   S.bsel=pick?b:null;
-  if(S.bsel) S.rsel=null;             // one subject at a time; they share a panel
+  if(S.bsel){ S.rsel=null; S.psel=-1; }  // one subject at a time; they share a panel
   if(UI.building) UI.building();
   return S.bsel;
 }
@@ -9414,11 +9576,16 @@ function wireInput(){
             // Nothing built here — but a road might run through it. Roads are
             // not cells, so they are invisible to the hit test above and have
             // to be asked for separately.
-            var rp=p?roadAt(p.x,p.z):null;
-            if(rp) selectRoad(rp); else selectBuilding(null);
+            // A pile is asked for before a road: a road can run under one, and
+            // the thing the click is plainly on is the heap, not the track.
+            var np=p?nodeAtWorld(p.x,p.z,1.3):null;
+            var rp=(!np&&p)?roadAt(p.x,p.z):null;
+            if(np) selectPile(S.nodes.indexOf(np));
+            else if(rp) selectRoad(rp);
+            else { selectBuilding(null); selectPile(null); }
             if(!addSel) selectOnly([]);
           }
-        } else { selectBuilding(null); selectRoad(null); if(!addSel) selectOnly([]); }
+        } else { selectBuilding(null); selectRoad(null); selectPile(null); if(!addSel) selectOnly([]); }
       } else if(mode==="order"&&downBtn===2){
         // Right-click is an order, full stop — there is no right-drag gesture
         // left for it to compete with. Requiring the mouse to be still first
@@ -9454,7 +9621,7 @@ function wireInput(){
         // has already turned them out above, and dropping the selection in the
         // same click would take the panel away from under the player just as
         // they used it.
-        else if(!sent&&(S.bsel||S.rsel)){ selectBuilding(null); selectRoad(null); }
+        else if(!sent&&(S.bsel||S.rsel||S.psel>=0)){ selectBuilding(null); selectRoad(null); selectPile(null); }
       }
     }
     mode=null;
@@ -9479,6 +9646,18 @@ function wireInput(){
 // it stutter.
 var panKeys={w:0,a:0,s:0,d:0}, panFast=false;
 var PAN_SPD=17, PAN_FAST=2.5;
+// Q and E turn the camera, and they are held rather than tapped for the same
+// reason WASD is: a keydown repeat rate is the operating system's idea of a
+// cadence, not the game's, and it arrives as a stutter with a half-second hole
+// at the front of it. They used to step 15 degrees per event, which meant a
+// slow turn was a stutter and a fast one was whatever the key repeat felt like.
+//
+// A pure rate would make a tap almost nothing, so a tap is given a floor: the
+// turn accumulates while the key is down and the remainder up to TURN_MIN is
+// paid out on release. Anything held past that point never notices the floor,
+// which is why the two rules do not fight.
+var turnKeys={q:0,e:0}, turnAcc=0;
+var TURN_SPD=88, TURN_MIN=9;
 function panKey(ev,down){
   // Shift rides on every key event, so reading it here keeps the flag honest
   // whether shift went down before the direction key or after it.
@@ -9489,6 +9668,33 @@ function panKey(ev,down){
   panKeys[k]=down?1:0;
   if(down) ev.preventDefault();
   return true;
+}
+// Returns true when the event was a turn key, so keydown() stops treating it as
+// a tap. A key that goes down while already down is a repeat, not a new press,
+// and must not reset the tap accumulator or a held key would never reach the
+// point where the floor stops applying.
+function turnKey(ev,down){
+  var k=(ev.key||"").toLowerCase();
+  if(k!=="q"&&k!=="e") return false;
+  if(ev.ctrlKey||ev.metaKey) return false;
+  if(down){
+    if(!turnKeys[k]){ turnKeys[k]=1; turnAcc=0; }
+    ev.preventDefault();
+  }else if(turnKeys[k]){
+    turnKeys[k]=0;
+    // A tap shorter than the floor still turns the floor's worth, in the
+    // direction of the key being let go.
+    if(!turnKeys.q&&!turnKeys.e&&turnAcc<TURN_MIN)
+      cam.az+=(TURN_MIN-turnAcc)*(k==="e"?1:-1);
+  }
+  return true;
+}
+function stepTurn(dt){
+  var d=turnKeys.e-turnKeys.q;
+  if(!d) return;
+  var step=TURN_SPD*dt;
+  cam.az+=d*step;
+  turnAcc+=step;
 }
 function stepPan(dt){
   var fr=panKeys.d-panKeys.a, fw=panKeys.w-panKeys.s;
@@ -9511,19 +9717,19 @@ function stepPan(dt){
   cam.tx=Math.max(-lim,Math.min(lim,cam.tx));
   cam.tz=Math.max(-lim,Math.min(lim,cam.tz));
 }
-function clearPan(){ panKeys.w=panKeys.a=panKeys.s=panKeys.d=0; panFast=false; }
+function clearPan(){ panKeys.w=panKeys.a=panKeys.s=panKeys.d=0; panFast=false;
+  turnKeys.q=turnKeys.e=0; turnAcc=0; }
 function keydown(ev){
   if(!active||!S) return;
   if(panKey(ev,true)) return;
+  if(turnKey(ev,true)) return;
   if((ev.ctrlKey||ev.metaKey)&&(ev.key==="a"||ev.key==="A")){
     ev.preventDefault(); selectAllUnits(null); return;
   }
   if(ev.key==="h"||ev.key==="H") setStance(S.stance==="hold"?"pursue":"hold");
-  if(ev.key==="q"||ev.key==="Q") cam.az-=15;
-  if(ev.key==="e"||ev.key==="E") cam.az+=15;
   if(ev.key==="r"||ev.key==="R"){ if(ev.shiftKey) rotAuto(); else rotate(false); }
 }
-function keyup(ev){ panKey(ev,false); }
+function keyup(ev){ panKey(ev,false); turnKey(ev,false); }
 function panSpeeding(){ return panFast; }
 
 var UI={phase:null,hotbar:null,rot:null,units:null,marquee:null,building:null};
@@ -9553,8 +9759,14 @@ return {
   },
   cancelRoad:cancelRoad, roadAt:roadAt, selectRoad:selectRoad,
   rsel:selRoad, roadCrew:roadCrew, edgeLen:edgeLen,
+  psel:selPile, pileIndex:function(){ return S?S.psel:-1; },
+  selectPile:selectPile, pileCrew:pileCrew,
   // pathfinding, for the tools: findPath is the search, stepPath the follower
-  findPath:findPath, stepPath:stepPath, losClear:losClear,
+  findPath:findPath, stepPath:stepPath, losClear:losClear, solidAt:solidAt,
+  // The horde's flow field, rebuilt on demand. A tool that read S.dist straight
+  // would get whatever the last frame left there, which is the wrong answer
+  // immediately after anything moves the layout.
+  field:function(){ if(!S) return null; if(S.distDirty) rebuildField(); return S.dist; },
   walkableCell:function(gx,gz){ return walkableCell(gx,gz); },
   // the same call a right-click makes, so a test measures the real order path
   orderTo:function(list,x,z){ orderTo(list,x,z); },
@@ -9587,6 +9799,7 @@ return {
   hpAnchors:hpAnchors,
   bsel:function(){ return S?S.bsel:null; },
   selectBuilding:selectBuilding, setShelter:setShelter, sendOut:sendOut,
+  setGate:setGate,
   housedBy:housedBy, sheltering:sheltering, shelteredCount:shelteredCount,
   crewOf:crewOf, manTurret:manTurret, clearTurret:clearTurret, canCrew:canCrew,
   select:function(t){ if(S) S.sel=(S.sel===t)?null:t; },
@@ -11916,7 +12129,9 @@ HFGAME.UI.building=function(){
   if(!box) return;
   var b=S&&HFGAME.bsel();
   var rd=S&&HFGAME.rsel();
+  var pl=S&&HFGAME.psel();
   if(S&&rd&&S.phase!=="won"&&S.phase!=="lost"){ roadPanel(box,rd); return; }
+  if(S&&pl&&S.phase!=="won"&&S.phase!=="lost"){ pilePanel(box,pl); return; }
   if(!b||S.phase==="won"||S.phase==="lost"){ box.hidden=true; dockActs(null); return; }
   box.hidden=false;
   // While it is still a heap of materials the bar answers "how far along", not
@@ -11939,6 +12154,14 @@ HFGAME.UI.building=function(){
       ? M.t("sel.turret.crew",{n:crew.length}) : M.t("sel.turret.empty");
     el("bldIn").textContent=crew.length?(crew.length+"/"+tcap):"";
     el("bldHint").textContent=crew.length?"":M.t("sel.turret.hint");
+    dockActs(b,T,[]);
+    return;
+  }
+  if(b.type==="gate"&&!site){
+    el("bldHouse").hidden=false;
+    el("bldHoused").textContent=M.t(b.shut?"sel.gate.isshut":"sel.gate.isopen");
+    el("bldIn").textContent="";
+    el("bldHint").textContent=M.t(b.shut?"sel.gate.hint.shut":"sel.gate.hint.open");
     dockActs(b,T,[]);
     return;
   }
@@ -11982,6 +12205,30 @@ function roadPanel(box,e){
   }
   el("bldHint").textContent=M.t("sel.road.hint");
   dockActs(e,T,[],true);
+}
+// And so does a salvage pile. The one thing worth knowing about a pile is how
+// much is left in it — the whole economic decision in this game is which pile
+// to walk to next, and until now the only way to answer that was to watch the
+// heap shrink. The bar is what is left of what it started with, so a pile that
+// is nearly out reads at a glance rather than as a number you have to compare
+// against a number you do not have.
+//
+// There is no dock verb: a pile is not yours, there is nothing to do to it.
+function pilePanel(box,nd){
+  var left=Math.max(0,Math.round(nd.amt)), f=Math.max(0,Math.min(1,nd.amt/Math.max(1,nd.max)));
+  box.hidden=false;
+  el("bldName").textContent=M.t("sel.pile.name");
+  el("bldHp").textContent=left?M.t("sel.pile.left",{n:left}):M.t("sel.pile.spent");
+  el("bldBar").style.width=(f*100).toFixed(1)+"%";
+  el("bldBar").classList.toggle("crit",f<0.20);
+  var crew=HFGAME.pileCrew(HFGAME.pileIndex());
+  el("bldHouse").hidden=false;
+  el("bldHoused").textContent=crew
+    ? M.t("sel.pile.crew",{n:crew, noun:M.t(crew===1?"sel.worker.one":"sel.worker.many")})
+    : M.t("sel.pile.nocrew");
+  el("bldIn").textContent="";
+  el("bldHint").textContent=M.t("sel.pile.hint",{n:Math.round(nd.max)});
+  dockActs(null);
 }
 // ---- what a selected unit is worth ----------------------------------------
 // The numbers come straight out of the balance table, so a value edited in the
@@ -12091,6 +12338,19 @@ function dockActs(b,T,housed,road){
     var dsell2=el("dockSell");
     dsell2.hidden=false;
     dsell2.textContent=M.t(b.site?"sel.cancel":"sel.selldown",{n:Math.round(T.cost*0.8)});
+    return;
+  }
+  // A gate's verb is its door. It borrows the shelter button the way the
+  // turret's "stand down" does — same slot, same two-state look — because a
+  // gate has exactly one thing you can do to it and a button of its own would
+  // be a third layout to keep in step for no gain.
+  if(!road&&b.type==="gate"&&!b.site){
+    ds.hidden=false;
+    ds.textContent=M.t(b.shut?"sel.gate.open":"sel.gate.shut");
+    ds.setAttribute("aria-pressed",b.shut?"true":"false");
+    var dsell3=el("dockSell");
+    dsell3.hidden=false;
+    dsell3.textContent=M.t("sel.selldown",{n:Math.round(T.cost*0.8)});
     return;
   }
   ds.hidden=road||!housed.length;
@@ -12781,6 +13041,7 @@ el("grpArmy").addEventListener("click",function(){
 el("dockShelter").addEventListener("click",function(){
   var b=HFGAME.bsel(); if(!b) return;
   if(b.type==="turret"){ HFGAME.clearTurret(b); HFGAME.UI.building(); return; }
+  if(b.type==="gate"){ HFGAME.setGate(b,!b.shut); HFGAME.UI.building(); return; }
   HFGAME.setShelter(b,!HFGAME.sheltering(b));
   HFGAME.UI.building();
 });
@@ -12860,14 +13121,19 @@ function drawSetup(){
   box.innerHTML="";
   Object.keys(HFGAME.DIFF).forEach(function(k){
     var C=HFGAME.DIFF[k];
-    var first=(C.nests|0)*(C.send|0);
+    // The card quotes what the round will use, multipliers included — a card
+    // that still said 290 while the pacing block below it had halved the waves
+    // would be the one number on this screen that lies.
+    var P=M.statsOf("pace");
+    var first=(C.nests|0)*Math.max(1,Math.round(C.send*P.sendK));
+    var startSupply=Math.round(C.supply*P.supplyK);
     var b=document.createElement("button");
     b.type="button"; b.className="diffCard"; b.dataset.diff=k;
     b.setAttribute("aria-pressed",k===SET.difficulty?"true":"false");
     b.innerHTML='<span class="dn">'+C.label+'</span><span class="dm">'+
       M.t("setup.card.nests",{n:C.nests})+'<br>'+
       M.t("setup.card.first",{n:first})+'<br>'+
-      M.t("setup.card.supply",{n:C.supply})+'</span>';
+      M.t("setup.card.supply",{n:startSupply})+'</span>';
     b.addEventListener("click",function(){
       SET.difficulty=k; applySettings(); refreshMenu(); drawSetup();
     });
@@ -12879,7 +13145,93 @@ function drawSetup(){
   el("newMapName").textContent=playMap?playMap.name:M.t("setup.map.random");
   el("newMapNote").textContent=M.t(playMap?"setup.map.custom.note":"setup.map.random.note");
   el("newMapPick").textContent=M.t(playMap?"setup.map.change":"setup.map.choose");
+  if(el("paceSummary")) drawPaceSummary();
 }
+// ---- pacing ----------------------------------------------------------------
+// Four multipliers and the night-on-night ramp, on the screen you are already
+// on when you decide what kind of round you want. They are ordinary balance
+// stats, so they persist and reset through the same machinery as everything in
+// the Library — there is no second copy of them and nothing here owns a number.
+//
+// The ramp is the odd one out: it lives with the nests, because it is the nests
+// that send them, and it is surfaced here rather than duplicated because it is
+// the single strongest lever on how long a run lasts.
+var PACE_ROWS=[
+  {id:"pace", k:"supplyK"},
+  {id:"pace", k:"yieldK"},
+  {id:"pace", k:"sendK"},
+  {id:"pace", k:"nightK"},
+  {id:"nest", k:"ramp", label:"setup.pace.ramp", hint:"setup.pace.ramp.hint"}
+];
+function paceEdited(){
+  var n=0;
+  PACE_ROWS.forEach(function(r){
+    var o=M.getStatOverrides()[r.id];
+    if(o&&o[r.k]!==undefined&&o[r.k]!==M.statDefs(r.id).fields
+        .filter(function(f){ return f.k===r.k; })[0].def) n++;
+  });
+  return n;
+}
+// What the numbers actually buy, in attackers. The multipliers are abstract and
+// the ramp compounds, so a player reading "1.13" has no idea what they have
+// chosen until they see the three nights it produces.
+function paceCurve(){
+  var C=HFGAME.DIFF[SET.difficulty], P=M.statsOf("pace"), N=M.statsOf("nest");
+  var one=Math.max(1,Math.round(C.send*P.sendK))*(C.nests|0);
+  var r=N.ramp;
+  return {a:Math.round(one), b:Math.round(one*Math.pow(r,4)),
+          c:Math.round(one*Math.pow(r,9))};
+}
+function drawPace(){
+  var body=el("paceBody");
+  if(!body) return;
+  var h="";
+  PACE_ROWS.forEach(function(r){
+    var f=M.statDefs(r.id).fields.filter(function(x){ return x.k===r.k; })[0];
+    var v=M.statsOf(r.id)[r.k];
+    var o=M.getStatOverrides()[r.id]||{};
+    var dirty=(o[r.k]!==undefined&&o[r.k]!==f.def);
+    h+='<label class="paceRow"><span><span class="pk'+(dirty?" pEdit":"")+'">'+
+       (r.label?M.t(r.label):f.label)+'</span>'+
+       '<span class="ph">'+(r.hint?M.t(r.hint):(f.hint||("shipped "+f.def)))+'</span></span>'+
+       '<input type="number" value="'+v+'" step="'+f.step+'" min="'+f.lo+'" max="'+f.hi+
+       '" data-pid="'+r.id+'" data-pk="'+r.k+'"></label>';
+  });
+  body.innerHTML=h;
+  body.querySelectorAll("[data-pk]").forEach(function(inp){
+    inp.addEventListener("input",function(){
+      var v=parseFloat(inp.value);
+      if(!isFinite(v)) return;
+      M.setStat(inp.dataset.pid,inp.dataset.pk,v);
+      HFGAME.syncStats();
+      saveJSON(KEY_STATS,M.getStatOverrides());
+      drawPaceSummary(); drawSetup();
+    });
+  });
+  drawPaceSummary();
+}
+function drawPaceSummary(){
+  var n=paceEdited(), c=paceCurve();
+  el("paceSummary").textContent=
+    (n?M.t("setup.pace.some",{n:n}):M.t("setup.pace.stock"))+" · "+
+    M.t("setup.pace.curve",{a:c.a,b:c.b,c:c.c});
+  el("paceReset").hidden=!n;
+}
+el("paceHead").addEventListener("click",function(){
+  var body=el("paceBody"), open=body.hidden;
+  body.hidden=!open;
+  this.setAttribute("aria-expanded",open?"true":"false");
+  if(open) drawPace();
+});
+el("paceReset").addEventListener("click",function(){
+  PACE_ROWS.forEach(function(r){
+    var f=M.statDefs(r.id).fields.filter(function(x){ return x.k===r.k; })[0];
+    M.setStat(r.id,r.k,f.def);
+  });
+  HFGAME.syncStats();
+  saveJSON(KEY_STATS,M.getStatOverrides());
+  drawPace(); drawSetup();
+});
 el("newGo").addEventListener("click",function(){ startRun(playMap); });
 el("newBack").addEventListener("click",function(){ show("menu"); });
 el("newMapPick").addEventListener("click",function(){ show("maps"); });

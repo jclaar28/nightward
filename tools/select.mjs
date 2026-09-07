@@ -153,5 +153,77 @@ s = await holdThen(() => {
 check('escape with nothing to let go of opens the menu', s.paused,
       `paused ${s.paused}`);
 
+// ---- the camera turns while you hold the key -------------------------------
+// Q and E used to step fifteen degrees per key EVENT, which meant a turn was
+// paced by the operating system's key repeat: a half-second of nothing, then a
+// stutter at whatever rate the machine felt like. They are held now, the way
+// WASD already was, and the frame does the turning.
+//
+// The awkward part of a held key is the tap. A pure rate makes a quick press
+// almost nothing, so the turn is given a floor that is paid out on release —
+// which means there are two rules that could fight, and both are measured here.
+// A real keydown/keyup pair, not a call to the handler: the whole point is that
+// the key state and the frame loop are talking to each other.
+// The check above left the round paused, and a paused round takes no input at
+// all — every reading below would be zero for a reason that has nothing to do
+// with the camera.
+await esc();
+// The page's own frame loop is still running, and it calls update() too — so a
+// "half a second of frames" driven from here was actually half a second of
+// frames plus however many the browser fitted in around them, and the first
+// run of this read 52.8 degrees where the rate says 44. Freeze it and the
+// stepping below is the only thing moving the camera.
+await page.evaluate(() => { window.requestAnimationFrame = function () { return 0; }; });
+const key = (t, k) => page.evaluate(a =>
+  window.dispatchEvent(new KeyboardEvent(a.t, { key: a.k, bubbles: true })), { t, k });
+const az = () => page.evaluate(() => HFGAME.camAz());
+const step = (dt, n) => page.evaluate(a => {
+  for (let i = 0; i < a.n; i++) __nw.run(a.dt, a.dt);
+}, { dt, n });
+
+// A held key: half a second of frames with the key down.
+const held0 = await az();
+await key('keydown', 'e');
+await step(1 / 60, 30);
+const mid = await az();
+await key('keyup', 'e');
+const held = await az();
+
+check('holding E turns the camera every frame it is down',
+      Math.abs(mid - held0) > 40 && Math.abs(mid - held0) < 48,
+      `${(mid - held0).toFixed(1)} degrees over half a second of frames — a rate, not a ` +
+      `key repeat. The old code turned 15 per event and nothing at all between them`);
+check('...and stops when the key comes up',
+      Math.abs(held - mid) < 0.001,
+      `${(held - mid).toFixed(3)} more degrees after release — the floor only pays out ` +
+      `on a tap, and a key held past it must not get a bonus turn as well`);
+
+// A tap: down and up with a single frame between, far short of the floor.
+const tap0 = await az();
+await key('keydown', 'q');
+await step(1 / 60, 1);
+await key('keyup', 'q');
+const tapped = await az();
+check('a tap still turns a useful amount',
+      tapped - tap0 < -6 && tapped - tap0 > -12,
+      `${(tapped - tap0).toFixed(1)} degrees from one frame of held time — without the ` +
+      `floor a quick press would be worth 1.5 degrees and the key would feel dead`);
+check('...and Q and E turn opposite ways',
+      (mid - held0) > 0 && (tapped - tap0) < 0,
+      `E turned ${(mid - held0).toFixed(0)} one way, Q ${(tapped - tap0).toFixed(0)} the ` +
+      `other — one sign each, which is the whole difference between two keys and one`);
+
+// Both at once is a real thing a hand does, and it must not drift.
+const both0 = await az();
+await key('keydown', 'q');
+await key('keydown', 'e');
+await step(1 / 60, 30);
+const both = await az();
+await key('keyup', 'q');
+await key('keyup', 'e');
+check('holding both cancels out rather than picking a winner',
+      Math.abs(both - both0) < 0.001,
+      `${(both - both0).toFixed(3)} degrees with both keys down`);
+
 await close();
 done(errors);

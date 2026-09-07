@@ -77,8 +77,26 @@ check('the night counter advances',
 const waves = cycles.log.map(c => c.wave);
 const gaps = waves.slice(1).map((w, i) => w - waves[i]);
 check('each night is bigger than the last', gaps.every(g => g > 0), waves.join(' → '));
-check('the growth accelerates', gaps.length > 1 && gaps[gaps.length - 1] > gaps[0],
-      `steps of ${gaps.join(', ')}`);
+
+// The claim is that the ramp COMPOUNDS — that night ten is worse than nine
+// times as much extra as night two. Three consecutive nights cannot show that
+// any more: the wave is a whole number of attackers per nest, and at the
+// gentler ramp the rounding on two adjacent nights is bigger than the
+// difference between their steps. This reads the curve over a span where
+// rounding cannot reach, which is what the claim was always about; playing
+// those nights would measure survival instead, and that is balance.mjs's
+// question rather than this one's.
+const curve = await page.evaluate(() => {
+  const S = __nw.state(), keep = S.night, out = [];
+  for (const n of [1, 4, 7, 10]) { S.night = n; out.push(HFGAME.waveSize()); }
+  S.night = keep;
+  return out;
+});
+const cGaps = curve.slice(1).map((w, i) => w - curve[i]);
+check('the growth accelerates', cGaps[cGaps.length - 1] > cGaps[0] * 1.2,
+      `nights 1, 4, 7 and 10 are ${curve.join(', ')} — steps of ${cGaps.join(', ')}. ` +
+      `A ramp that added a flat number every night would give three equal steps, and ` +
+      `a long run would be no harder than a short one per night survived`);
 
 // ---- losing every hall still ends it ---------------------------------------
 const lost = await page.evaluate(seed => {

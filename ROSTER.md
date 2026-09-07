@@ -110,7 +110,7 @@ difficulty and rises 5% each night. Night one:
 | cache | 320 supply to whoever pulls it down |
 | garrison | 3 at rest, +2 a night to a ceiling of 16, chasing 9 from home |
 | wakes | 4 defenders when hit, at most once every 5s |
-| sends | its difficulty's number, ×1.2 every night |
+| sends | its difficulty's number, ×1.13 every night |
 | spite | 0.5 — how much harder the survivors come once one of them is dead |
 
 **Salvage Pile.** A finite cache of the old world. Workers carry it back to the hall a load at a time, and the pile visibly shrinks as it is worked out. Drawn at a scale set per instance from what is left.

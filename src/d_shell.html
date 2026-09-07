@@ -375,6 +375,32 @@
   #newBack{margin-top:9px;width:100%;background:transparent;border:1px solid var(--line);
     border-radius:2px;padding:9px;font-size:12.5px;font-weight:600;color:var(--muted)}
   #newBack:hover{border-color:var(--line-hi);color:var(--ink)}
+  /* Pacing. Folded away by default: it is a tuning surface, not part of
+     starting a round, and an open panel of numbers on the way into a game
+     reads as five decisions the player has to make before they can play. */
+  #paceWrap{margin-top:14px;border-top:1px solid var(--line);padding-top:11px}
+  #paceHead{display:flex;align-items:baseline;justify-content:space-between;gap:12px;
+    width:100%;background:transparent;border:0;padding:0;cursor:pointer;color:var(--muted)}
+  #paceHead:hover{color:var(--ink)}
+  #paceHead .pl{font-size:13px;font-weight:600}
+  #paceHead .pv{font-family:"IBM Plex Mono",monospace;font-size:10px;letter-spacing:.06em;
+    color:var(--faint);font-variant-numeric:tabular-nums}
+  #paceBody{margin-top:11px}
+  #paceBody[hidden]{display:none}
+  .paceRow{display:grid;grid-template-columns:1fr 74px;align-items:center;gap:10px;
+    padding:5px 0}
+  .paceRow .pk{font-size:12.5px;color:var(--ink)}
+  .paceRow .ph{display:block;font-size:10.5px;color:var(--faint);margin-top:1px;
+    line-height:1.4}
+  .paceRow .pk.pEdit{color:var(--accent)}
+  .paceRow input{width:100%;background:rgba(0,0,0,.28);border:1px solid var(--line);
+    border-radius:2px;padding:5px 7px;color:var(--ink);font-family:"IBM Plex Mono",monospace;
+    font-size:12px;text-align:right;font-variant-numeric:tabular-nums}
+  .paceRow input:focus{outline:0;border-color:var(--accent)}
+  #paceReset{margin-top:9px;background:transparent;border:1px solid var(--line);
+    border-radius:2px;padding:6px 10px;font-size:11.5px;font-weight:600;color:var(--muted)}
+  #paceReset:hover{border-color:var(--line-hi);color:var(--ink)}
+  #paceReset[hidden]{display:none}
   @media (max-width:520px){ #diffPick{grid-template-columns:1fr} }
 
   /* ---------------- settings ---------------- */
@@ -896,6 +922,14 @@
 
     <div id="diffPick" role="group" aria-label="Difficulty"></div>
     <div id="diffBlurb"></div>
+
+    <div id="paceWrap">
+      <button id="paceHead" type="button" aria-expanded="false" aria-controls="paceBody">
+        <span class="pl" data-t="setup.pace"></span><span class="pv" id="paceSummary"></span>
+      </button>
+      <div id="paceBody" hidden></div>
+      <button id="paceReset" type="button" hidden data-t="setup.pace.reset"></button>
+    </div>
 
     <div id="newMapRow">
       <div>

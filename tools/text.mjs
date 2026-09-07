@@ -58,7 +58,7 @@ const dom = await page.evaluate(async () => {
   const owned = s => shapes.some(re => re.test(s));
   // ids that legitimately hold data rather than prose: numbers, codes, names
   // the player typed, and counts the game composes from a keyed template.
-  const DATA = /^(supply|grpWorkN|grpArmyN|grpWorkIn|dayLeft|nightLeft|nightSend|wLeft|hallPct|bldHp|bldBar|dayBar|nightBar|hallBar|mRuns|mWins|mBest|mLast|mDiffTag|mAssets|mMapCount|libTextCount|libTris|libVerts|libPartCount|netOffer|netAnswer|netOfferIn|netAnswerIn|netStatus|netMapNote|nightNo|nightNo2|nestsLeft|nestsLeft2|newMapName|newMapNote|newMapPick|diffBlurb|bldName|bldHoused|bldIn|bldHint|troopWhat|dockWhat|dockSell|dockShelter|troopStance|ovTitle|ovBody|ovStats|pauseTag|pauseNote|libName|libNote|libGroupTag|libEyebrow|libTextOut|libOut)$/;
+  const DATA = /^(supply|grpWorkN|grpArmyN|grpWorkIn|dayLeft|nightLeft|nightSend|wLeft|hallPct|bldHp|bldBar|dayBar|nightBar|hallBar|mRuns|mWins|mBest|mLast|mDiffTag|mAssets|mMapCount|libTextCount|libTris|libVerts|libPartCount|netOffer|netAnswer|netOfferIn|netAnswerIn|netStatus|netMapNote|nightNo|nightNo2|nestsLeft|nestsLeft2|newMapName|newMapNote|newMapPick|diffBlurb|paceSummary|bldName|bldHoused|bldIn|bldHint|troopWhat|dockWhat|dockSell|dockShelter|troopStance|ovTitle|ovBody|ovStats|pauseTag|pauseNote|libName|libNote|libGroupTag|libEyebrow|libTextOut|libOut)$/;
   const SKIP = new Set(['SCRIPT','STYLE','CANVAS','OPTION','TEXTAREA','INPUT']);
 
   for (const screen of ['menu','setup','settings','net','library','maps']) {

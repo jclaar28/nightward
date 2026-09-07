@@ -1761,7 +1761,7 @@ var STAT_DEFS={
      hint:"how far a guard will follow before going home"},
     // Each night is bigger than the last and the gap widens, so a long game is
     // not a safe one. These live here because it is the nests that send them.
-    {k:"ramp",    label:"Sends · per night",def:1.20,lo:1,  hi:3,    step:0.01,
+    {k:"ramp",    label:"Sends · per night",def:1.13,lo:1,  hi:3,    step:0.01,
      hint:"multiplies what one nest sends, every night it is left standing"},
     {k:"ehpK",    label:"Attacker health ×",def:1.05,lo:1,  hi:2,    step:0.01,
      hint:"multiplies attacker health each night"},
@@ -1798,6 +1798,24 @@ var STAT_DEFS={
   // Salvage is a slow drip from a deep well, not a morning's work. A round runs
   // for days now, so a pile has to outlast several of them while paying little
   // enough per trip that it never funds a defence on its own.
+  // Four multipliers over whatever the chosen difficulty says, and the one
+  // group in this table that exists for tuning rather than for the game. The
+  // pacing of a round is the hardest thing here to get right by reasoning about
+  // it — it is a feel question, and the only way to answer it is to play a
+  // round, move one number, and play another. These are on the setup card for
+  // that reason: multipliers rather than absolutes, so easy/normal/hard keep
+  // meaning something and one slider moves the whole curve.
+  pace:{ note:"How fast a round runs. Multipliers over the difficulty you picked.", fields:[
+    {k:"supplyK", label:"Starting supply ×", def:1.0, lo:0.25, hi:4, step:0.05,
+     hint:"what you begin the first day with"},
+    {k:"yieldK",  label:"Salvage yield ×",   def:1.0, lo:0.25, hi:4, step:0.05,
+     hint:"how much is in every pile on the map — the whole economy, since the piles are all there is"},
+    {k:"sendK",   label:"Attackers ×",       def:1.0, lo:0.25, hi:4, step:0.05,
+     hint:"the size of every wave, night one included"},
+    {k:"nightK",  label:"Night length ×",    def:1.0, lo:0.5,  hi:3, step:0.05,
+     hint:"how long you have to hold once the sun is down"}
+  ]},
+
   salvage:{ note:"How much is out there, and how it is spread.", fields:[
     {k:"nearN",   label:"Piles · inside", def:2,  lo:0,  hi:12,  step:1, int:true,
      hint:"close to the plateau, safe to work"},
@@ -2019,6 +2037,13 @@ var TEXT_DEFS={
   "setup.map.custom.note":{g:"setup",def:"One of yours, drawn on the Maps screen."},
   "setup.map.choose":{g:"setup",def:"Choose…"},
   "setup.map.change":{g:"setup",def:"Change…"},
+  "setup.pace":{g:"setup",def:"Pacing"},
+  "setup.pace.stock":{g:"setup",def:"AS SHIPPED"},
+  "setup.pace.some":{g:"setup",def:"{n} CHANGED"},
+  "setup.pace.reset":{g:"setup",def:"Put pacing back"},
+  "setup.pace.ramp":{g:"setup",def:"Night on night ×"},
+  "setup.pace.ramp.hint":{g:"setup",def:"compounds — every night a nest is left standing, it sends this much more than the last"},
+  "setup.pace.curve":{g:"setup",def:"night 1 {a} · night 5 {b} · night 10 {c}"},
   "setup.go":{g:"setup",def:"Set out"},
   "setup.back":{g:"setup",def:"← Menu"},
 
@@ -2079,6 +2104,18 @@ var TEXT_DEFS={
   "sel.road.calloff":{g:"sel",def:"Call it off"},
   "sel.road.tearup":{g:"sel",def:"Tear it up"},
   "sel.road.hint":{g:"sel",def:"a road costs work, not supply — there is nothing back"},
+  "sel.gate.open":{g:"sel",def:"Open the gate"},
+  "sel.gate.shut":{g:"sel",def:"Bar the gate"},
+  "sel.gate.isopen":{g:"sel",def:"standing open"},
+  "sel.gate.isshut":{g:"sel",def:"barred"},
+  "sel.gate.hint.open":{g:"sel",def:"anything can walk through it, and they prefer to"},
+  "sel.gate.hint.shut":{g:"sel",def:"nobody walks through — yours included"},
+  "sel.pile.name":{g:"sel",def:"Salvage Pile"},
+  "sel.pile.left":{g:"sel",def:"{n} supply left"},
+  "sel.pile.spent":{g:"sel",def:"worked out"},
+  "sel.pile.crew":{g:"sel",def:"{n} {noun} on it"},
+  "sel.pile.nocrew":{g:"sel",def:"nobody is working it"},
+  "sel.pile.hint":{g:"sel",def:"of {n} it started with"},
   "sel.kind.line":{g:"sel",def:"{name} ×{n}"},
   "sel.kind.civil":{g:"sel",def:"{hp} hp"},
   "sel.kind.armed":{g:"sel",def:"{hp} hp · {dmg} dmg"},

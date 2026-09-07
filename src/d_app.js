@@ -225,7 +225,9 @@ HFGAME.UI.building=function(){
   if(!box) return;
   var b=S&&HFGAME.bsel();
   var rd=S&&HFGAME.rsel();
+  var pl=S&&HFGAME.psel();
   if(S&&rd&&S.phase!=="won"&&S.phase!=="lost"){ roadPanel(box,rd); return; }
+  if(S&&pl&&S.phase!=="won"&&S.phase!=="lost"){ pilePanel(box,pl); return; }
   if(!b||S.phase==="won"||S.phase==="lost"){ box.hidden=true; dockActs(null); return; }
   box.hidden=false;
   // While it is still a heap of materials the bar answers "how far along", not
@@ -248,6 +250,14 @@ HFGAME.UI.building=function(){
       ? M.t("sel.turret.crew",{n:crew.length}) : M.t("sel.turret.empty");
     el("bldIn").textContent=crew.length?(crew.length+"/"+tcap):"";
     el("bldHint").textContent=crew.length?"":M.t("sel.turret.hint");
+    dockActs(b,T,[]);
+    return;
+  }
+  if(b.type==="gate"&&!site){
+    el("bldHouse").hidden=false;
+    el("bldHoused").textContent=M.t(b.shut?"sel.gate.isshut":"sel.gate.isopen");
+    el("bldIn").textContent="";
+    el("bldHint").textContent=M.t(b.shut?"sel.gate.hint.shut":"sel.gate.hint.open");
     dockActs(b,T,[]);
     return;
   }
@@ -291,6 +301,30 @@ function roadPanel(box,e){
   }
   el("bldHint").textContent=M.t("sel.road.hint");
   dockActs(e,T,[],true);
+}
+// And so does a salvage pile. The one thing worth knowing about a pile is how
+// much is left in it — the whole economic decision in this game is which pile
+// to walk to next, and until now the only way to answer that was to watch the
+// heap shrink. The bar is what is left of what it started with, so a pile that
+// is nearly out reads at a glance rather than as a number you have to compare
+// against a number you do not have.
+//
+// There is no dock verb: a pile is not yours, there is nothing to do to it.
+function pilePanel(box,nd){
+  var left=Math.max(0,Math.round(nd.amt)), f=Math.max(0,Math.min(1,nd.amt/Math.max(1,nd.max)));
+  box.hidden=false;
+  el("bldName").textContent=M.t("sel.pile.name");
+  el("bldHp").textContent=left?M.t("sel.pile.left",{n:left}):M.t("sel.pile.spent");
+  el("bldBar").style.width=(f*100).toFixed(1)+"%";
+  el("bldBar").classList.toggle("crit",f<0.20);
+  var crew=HFGAME.pileCrew(HFGAME.pileIndex());
+  el("bldHouse").hidden=false;
+  el("bldHoused").textContent=crew
+    ? M.t("sel.pile.crew",{n:crew, noun:M.t(crew===1?"sel.worker.one":"sel.worker.many")})
+    : M.t("sel.pile.nocrew");
+  el("bldIn").textContent="";
+  el("bldHint").textContent=M.t("sel.pile.hint",{n:Math.round(nd.max)});
+  dockActs(null);
 }
 // ---- what a selected unit is worth ----------------------------------------
 // The numbers come straight out of the balance table, so a value edited in the
@@ -400,6 +434,19 @@ function dockActs(b,T,housed,road){
     var dsell2=el("dockSell");
     dsell2.hidden=false;
     dsell2.textContent=M.t(b.site?"sel.cancel":"sel.selldown",{n:Math.round(T.cost*0.8)});
+    return;
+  }
+  // A gate's verb is its door. It borrows the shelter button the way the
+  // turret's "stand down" does — same slot, same two-state look — because a
+  // gate has exactly one thing you can do to it and a button of its own would
+  // be a third layout to keep in step for no gain.
+  if(!road&&b.type==="gate"&&!b.site){
+    ds.hidden=false;
+    ds.textContent=M.t(b.shut?"sel.gate.open":"sel.gate.shut");
+    ds.setAttribute("aria-pressed",b.shut?"true":"false");
+    var dsell3=el("dockSell");
+    dsell3.hidden=false;
+    dsell3.textContent=M.t("sel.selldown",{n:Math.round(T.cost*0.8)});
     return;
   }
   ds.hidden=road||!housed.length;
@@ -1090,6 +1137,7 @@ el("grpArmy").addEventListener("click",function(){
 el("dockShelter").addEventListener("click",function(){
   var b=HFGAME.bsel(); if(!b) return;
   if(b.type==="turret"){ HFGAME.clearTurret(b); HFGAME.UI.building(); return; }
+  if(b.type==="gate"){ HFGAME.setGate(b,!b.shut); HFGAME.UI.building(); return; }
   HFGAME.setShelter(b,!HFGAME.sheltering(b));
   HFGAME.UI.building();
 });
@@ -1169,14 +1217,19 @@ function drawSetup(){
   box.innerHTML="";
   Object.keys(HFGAME.DIFF).forEach(function(k){
     var C=HFGAME.DIFF[k];
-    var first=(C.nests|0)*(C.send|0);
+    // The card quotes what the round will use, multipliers included — a card
+    // that still said 290 while the pacing block below it had halved the waves
+    // would be the one number on this screen that lies.
+    var P=M.statsOf("pace");
+    var first=(C.nests|0)*Math.max(1,Math.round(C.send*P.sendK));
+    var startSupply=Math.round(C.supply*P.supplyK);
     var b=document.createElement("button");
     b.type="button"; b.className="diffCard"; b.dataset.diff=k;
     b.setAttribute("aria-pressed",k===SET.difficulty?"true":"false");
     b.innerHTML='<span class="dn">'+C.label+'</span><span class="dm">'+
       M.t("setup.card.nests",{n:C.nests})+'<br>'+
       M.t("setup.card.first",{n:first})+'<br>'+
-      M.t("setup.card.supply",{n:C.supply})+'</span>';
+      M.t("setup.card.supply",{n:startSupply})+'</span>';
     b.addEventListener("click",function(){
       SET.difficulty=k; applySettings(); refreshMenu(); drawSetup();
     });
@@ -1188,7 +1241,93 @@ function drawSetup(){
   el("newMapName").textContent=playMap?playMap.name:M.t("setup.map.random");
   el("newMapNote").textContent=M.t(playMap?"setup.map.custom.note":"setup.map.random.note");
   el("newMapPick").textContent=M.t(playMap?"setup.map.change":"setup.map.choose");
+  if(el("paceSummary")) drawPaceSummary();
 }
+// ---- pacing ----------------------------------------------------------------
+// Four multipliers and the night-on-night ramp, on the screen you are already
+// on when you decide what kind of round you want. They are ordinary balance
+// stats, so they persist and reset through the same machinery as everything in
+// the Library — there is no second copy of them and nothing here owns a number.
+//
+// The ramp is the odd one out: it lives with the nests, because it is the nests
+// that send them, and it is surfaced here rather than duplicated because it is
+// the single strongest lever on how long a run lasts.
+var PACE_ROWS=[
+  {id:"pace", k:"supplyK"},
+  {id:"pace", k:"yieldK"},
+  {id:"pace", k:"sendK"},
+  {id:"pace", k:"nightK"},
+  {id:"nest", k:"ramp", label:"setup.pace.ramp", hint:"setup.pace.ramp.hint"}
+];
+function paceEdited(){
+  var n=0;
+  PACE_ROWS.forEach(function(r){
+    var o=M.getStatOverrides()[r.id];
+    if(o&&o[r.k]!==undefined&&o[r.k]!==M.statDefs(r.id).fields
+        .filter(function(f){ return f.k===r.k; })[0].def) n++;
+  });
+  return n;
+}
+// What the numbers actually buy, in attackers. The multipliers are abstract and
+// the ramp compounds, so a player reading "1.13" has no idea what they have
+// chosen until they see the three nights it produces.
+function paceCurve(){
+  var C=HFGAME.DIFF[SET.difficulty], P=M.statsOf("pace"), N=M.statsOf("nest");
+  var one=Math.max(1,Math.round(C.send*P.sendK))*(C.nests|0);
+  var r=N.ramp;
+  return {a:Math.round(one), b:Math.round(one*Math.pow(r,4)),
+          c:Math.round(one*Math.pow(r,9))};
+}
+function drawPace(){
+  var body=el("paceBody");
+  if(!body) return;
+  var h="";
+  PACE_ROWS.forEach(function(r){
+    var f=M.statDefs(r.id).fields.filter(function(x){ return x.k===r.k; })[0];
+    var v=M.statsOf(r.id)[r.k];
+    var o=M.getStatOverrides()[r.id]||{};
+    var dirty=(o[r.k]!==undefined&&o[r.k]!==f.def);
+    h+='<label class="paceRow"><span><span class="pk'+(dirty?" pEdit":"")+'">'+
+       (r.label?M.t(r.label):f.label)+'</span>'+
+       '<span class="ph">'+(r.hint?M.t(r.hint):(f.hint||("shipped "+f.def)))+'</span></span>'+
+       '<input type="number" value="'+v+'" step="'+f.step+'" min="'+f.lo+'" max="'+f.hi+
+       '" data-pid="'+r.id+'" data-pk="'+r.k+'"></label>';
+  });
+  body.innerHTML=h;
+  body.querySelectorAll("[data-pk]").forEach(function(inp){
+    inp.addEventListener("input",function(){
+      var v=parseFloat(inp.value);
+      if(!isFinite(v)) return;
+      M.setStat(inp.dataset.pid,inp.dataset.pk,v);
+      HFGAME.syncStats();
+      saveJSON(KEY_STATS,M.getStatOverrides());
+      drawPaceSummary(); drawSetup();
+    });
+  });
+  drawPaceSummary();
+}
+function drawPaceSummary(){
+  var n=paceEdited(), c=paceCurve();
+  el("paceSummary").textContent=
+    (n?M.t("setup.pace.some",{n:n}):M.t("setup.pace.stock"))+" · "+
+    M.t("setup.pace.curve",{a:c.a,b:c.b,c:c.c});
+  el("paceReset").hidden=!n;
+}
+el("paceHead").addEventListener("click",function(){
+  var body=el("paceBody"), open=body.hidden;
+  body.hidden=!open;
+  this.setAttribute("aria-expanded",open?"true":"false");
+  if(open) drawPace();
+});
+el("paceReset").addEventListener("click",function(){
+  PACE_ROWS.forEach(function(r){
+    var f=M.statDefs(r.id).fields.filter(function(x){ return x.k===r.k; })[0];
+    M.setStat(r.id,r.k,f.def);
+  });
+  HFGAME.syncStats();
+  saveJSON(KEY_STATS,M.getStatOverrides());
+  drawPace(); drawSetup();
+});
 el("newGo").addEventListener("click",function(){ startRun(playMap); });
 el("newBack").addEventListener("click",function(){ show("menu"); });
 el("newMapPick").addEventListener("click",function(){ show("maps"); });
