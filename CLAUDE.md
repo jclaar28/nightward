@@ -349,18 +349,37 @@ only on those flags. A gate opening or shutting is a layout change even though
 nothing was built or sold, and it also bumps `S.pathVer` so orders already in
 flight re-route rather than walking into a door that closed behind them.
 
-**Pacing is tuned by playing, so the levers are on the setup screen.**
-`STAT_DEFS.pace` is four multipliers over whatever the difficulty says —
-starting supply, salvage yield, attackers, night length — plus `nest.ramp`
-surfaced beside them, because the ramp compounds and is the strongest single
-lever on how long a run lasts. Multipliers rather than absolutes, so easy /
-normal / hard keep meaning something and one number moves the whole curve. They
-are ordinary balance stats, so they persist and reset through the same machinery
-as everything in the Library and there is no second copy of them anywhere; the
-difficulty cards quote the multiplied figures for that reason. `tools/pace.mjs`
-moves each one on its own and reads the quantity it claims to move — a slider
-that moves nothing is worse than no slider, because it costs a playtest to find
-out.
+**Pacing is tuned by playing, so the levers are on the setup screen**, and
+they are stated in the units the question is asked in: supply, attackers,
+minutes. `PACE_ROWS` in `d_app.js` is the panel; every row points at an ordinary
+entry in `STAT_DEFS`, so nothing here is a second copy of a number and the
+Library still edits the same values.
+
+They were multipliers over the difficulty first. That kept easy / normal / hard
+meaning something and made every one of them useless for the job — "salvage
+yield 1.35x" is not a number anybody has an opinion about. Absolutes keep both,
+through two conventions:
+
+- **Zero means "whatever the difficulty says."** `pace.supply` and `pace.first`
+  default to 0 and `paceOr()` falls back to `DIFF`; any positive value wins. The
+  panel resolves it for display, so the box shows 290 rather than a blank beside
+  the words "starting attackers".
+- **The panel may convert units; the table never stores two.** `paceToView` /
+  `paceFromView` render `worker.gather` as a percentage of the rate it shipped
+  at and `nest.ramp` as a growth percentage, and write back the stat's own
+  units. A rate of 2.4/s is only judgeable against the one it shipped at, and
+  1.13 is a number you have to subtract one from before it means anything.
+
+`pace.first` is the whole of night one across every nest; the simulation stores
+`S.send` per nest because that is what the growth and the spite term act on, and
+the division in `startRound` is the only place the two meet. `salvage.amt` is
+the MAX a pile holds — the outside ones, five sevenths of the map's supply —
+with `nearK` the share the safe inside piles get; it was the other way round,
+which meant the headline number answered for the two piles that matter least.
+
+`tools/pace.mjs` moves each knob on its own and reads the quantity it claims to
+move. A slider that moves nothing is worse than no slider, because it costs a
+playtest to find out.
 
 **The guest never mutates the world.** In multiplayer, a guest action calls
 `intent()` and returns; the host receives it in `applyIntent()` and runs the

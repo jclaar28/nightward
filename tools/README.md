@@ -61,8 +61,7 @@ reports 29 of 52 segments below ground against the flat version.
 **`campaign.mjs`** — the round loop. A night is not the end of anything, so
 these drive several full day/night cycles: dawn hands you the next day, the
 night counter advances, each wave is bigger than the last by a margin that
-widens,
-losing every hall ends it, clearing every nest wins it and pays its cache, and
+widens, losing every hall ends it, clearing every nest wins it and pays its cache, and
 the nest garrisons chase what comes close without leaving home or eating your
 workers during the day.
 
@@ -461,15 +460,23 @@ number and play another. That makes a slider nobody can reach useless and a
 slider that moves nothing worse than useless, because it costs a playtest to
 find out.
 
-So every check is the same shape — move ONE multiplier, start a round, and read
-the quantity it claims to move against a round started with everything at 1.
-Starting supply moves what you begin with and leaves salvage and the wave alone;
-salvage yield moves the piles and not the purse; attackers moves night one *and*
-night five, because it multiplies the base the ramp compounds rather than only
-tonight. Unwiring any one of them fails exactly its own check and nothing else,
-which is what makes them tunable in isolation. The last check puts every stat
-back: these persist to localStorage by design, so a tool that left one set would
-change the game on the machine that ran it.
+So every check is the same shape — move ONE knob, start a round, and read the
+quantity it claims to move against a round started with everything at its
+shipped value. Unwiring any one of them fails exactly its own check and nothing
+else, which is what makes them tunable in isolation.
+
+The knobs are absolutes now rather than multipliers over the difficulty, and two
+of the checks exist only because of what that costs. An absolute has to still
+defer when it is left alone, or stating it has quietly taken easy / normal /
+hard out of the game — so one check confirms that an untouched field resolves to
+the difficulty's own figure and a stated one overrides it. And two knobs are
+shown in units the table does not store, because a gather rate of 2.4/s is only
+judgeable against the one it shipped at: the round-trip check reads the values
+straight off the rendered inputs, since the conversion living in the panel is
+exactly the thing that can be wrong.
+
+The last check puts every stat back. These persist to localStorage by design, so
+a tool that left one set would change the game on the machine that ran it.
 
 Confirmed falsifiable by reverting each half in the built file: without the
 right-click branch, 1 failure; without the Escape branch, 4.

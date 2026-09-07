@@ -290,15 +290,15 @@ function nestList(){
   return cur.nests;
 }
 function seededNodes(){
-  var st=M.statsOf("salvage")||{nearN:2,farN:3,amt:78,farK:1.75};
+  var st=M.statsOf("salvage")||{nearN:2,farN:3,amt:78,nearK:0.48};
   var rng=M.rngFrom((cur.seed||1)*7919+13), out=[], i, a, r;
   for(i=0;i<(st.nearN|0);i++){
     a=(i+rng())*(Math.PI*2/Math.max(1,st.nearN|0)); r=6.2+rng()*3.2;
-    out.push({x:Math.cos(a)*r,z:Math.sin(a)*r,amt:Math.round(st.amt*(0.85+rng()*0.3)),rot:rng()*6.28});
+    out.push({x:Math.cos(a)*r,z:Math.sin(a)*r,amt:Math.round(st.amt*st.nearK*(0.85+rng()*0.3)),rot:rng()*6.28});
   }
   for(i=0;i<(st.farN|0);i++){
     a=(i+rng())*(Math.PI*2/Math.max(1,st.farN|0)); r=13.8+rng()*4.6;
-    out.push({x:Math.cos(a)*r,z:Math.sin(a)*r,amt:Math.round(st.amt*st.farK*(0.85+rng()*0.3)),rot:rng()*6.28});
+    out.push({x:Math.cos(a)*r,z:Math.sin(a)*r,amt:Math.round(st.amt*(0.85+rng()*0.3)),rot:rng()*6.28});
   }
   return out;
 }

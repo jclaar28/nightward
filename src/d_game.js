@@ -194,7 +194,20 @@ var PACE={};
 // One multiplier out of the pacing group, defaulting to 1 so anything that has
 // never heard of the group — an old save, a map file, a tool — plays exactly as
 // it did before it existed.
-function paceK(k){ var v=PACE[k]; return (v===undefined||!isFinite(v)||v<=0)?1:v; }
+// A pacing number that is allowed to defer: zero means "whatever the difficulty
+// says", which is how the panel keeps absolutes without taking easy/normal/hard
+// away from the round.
+function paceOr(k,fallback){
+  var v=PACE[k];
+  return (v===undefined||!isFinite(v)||v<=0)?fallback:v;
+}
+// ...and one that always has a value. Guarded rather than assumed so anything
+// that has never heard of the group — an old save, a map file, a tool — plays
+// exactly as it did before it existed.
+function paceNum(k,fallback){
+  var v=PACE[k];
+  return (v===undefined||!isFinite(v)||v<=0)?fallback:v;
+}
 // Names and one-line summaries live in the text table, and the table is live:
 // re-reading them here means an edit in the Library's Text tab reaches the
 // hotbar and the selection panels on the next sync rather than the next reload.
@@ -371,8 +384,11 @@ function newGame(seed,map,opt){
             hit:0, kx:0, kz:0, stag:0, nest:true, dead:false, pulse:Math.random()*6.28,
             dmg:{}, callCd:0, guards:0};
   });
-  var dayLen=RD.day||DAY_LEN;
-  var nightLen=Math.max(10,(RD.night||NIGHT_LEN)*paceK("nightK"));
+  // Minutes on the panel, seconds in the simulation. A map that states its own
+  // day or night in seconds still wins: a hand-authored round is a designed
+  // thing and the panel is a tuning surface.
+  var dayLen=RD.day||Math.round(paceNum("dayMin",DAY_LEN/60)*60);
+  var nightLen=RD.night||Math.round(paceNum("nightMin",NIGHT_LEN/60)*60);
   S={
     seed:seed, T:T, staticMesh:mesh, map:map,
     net:opt.net||null,            // "host" | "guest" | null
@@ -381,7 +397,7 @@ function newGame(seed,map,opt){
     // whether their town hall is still up
     players:seats.map(function(c,i){
       return {id:i, cx:c[0], cz:c[1], name:"Player "+(i+1),
-              supply:Math.round((RD.supply||C.supply)*paceK("supplyK")),
+              supply:Math.round(paceOr("supply",RD.supply||C.supply)),
               hall:null, site:null, cmd:null, out:false,
               stance:"hold", col:SEAT_COL[i]};
     }),
@@ -392,7 +408,13 @@ function newGame(seed,map,opt){
     // pacing multiplier lands here rather than in nestSend() so it scales the
     // whole curve rather than only tonight, and so the number the HUD and the
     // setup card quote is the number the round actually uses.
-    send:Math.max(1,Math.round((RD.send||C.send||58)*paceK("sendK"))),
+    // Stored per nest, because that is what the ramp and the spite term act on
+    // and what a nest going down subtracts. The panel states the whole of night
+    // one instead, because "290 attackers" is a thing a player has an opinion
+    // about and "58 per nest, and there are five" is arithmetic they should not
+    // have to do. Dividing here is the only place the two meet.
+    send:Math.max(1,Math.round(paceOr("first",(RD.send||C.send||58)*nests.length)/
+                               Math.max(1,nests.length))),
     cells:{}, hall:null, enemies:[], bolts:[], parts:[], corpses:[], queue:[],
     units:[], markers:[], stance:"hold", marquee:null,
     // Roads are a graph in world space, not cells: nodes sit wherever the
@@ -652,14 +674,11 @@ function makeNodes(seed,map){
   // a map that places its piles by hand replaces the seeded scatter wholesale
   if(map&&map.nodes&&map.nodes.length){
     return map.nodes.map(function(n){
-      var a=Math.max(1,Math.round((Math.round(n.amt)||60)*paceK("yieldK")));
+      var a=Math.max(1,Math.round(n.amt)||60);
       return {x:n.x, z:n.z, amt:a, max:a, rot:n.rot||0};
     });
   }
-  var st=M.statsOf("salvage")||{nearN:2,farN:3,amt:78,farK:1.75};
-  // The piles are the entire economy — there is no income that is not carried
-  // out of one — so one multiplier on what is in them is the economy lever.
-  var yK=paceK("yieldK");
+  var st=M.statsOf("salvage")||{nearN:2,farN:3,amt:78,nearK:0.48};
   var rng=M.rngFrom((seed||1)*7919+13), out=[], i, a, r;
   function push(a,r,amt){
     out.push({x:Math.cos(a)*r, z:Math.sin(a)*r, amt:amt, max:amt,
@@ -671,12 +690,12 @@ function makeNodes(seed,map){
   for(i=0;i<(st.nearN|0);i++){
     a=(i+rng())*(Math.PI*2/Math.max(1,st.nearN|0));
     r=6.4+rng()*4.0;
-    push(a,r,Math.round(st.amt*yK*(0.85+rng()*0.3)));
+    push(a,r,Math.round(st.amt*st.nearK*(0.85+rng()*0.3)));
   }
   for(i=0;i<(st.farN|0);i++){
     a=(i+rng())*(Math.PI*2/Math.max(1,st.farN|0));
     r=16.0+Math.pow(rng(),0.8)*22.0;
-    push(a,r,Math.round(st.amt*st.farK*yK*(0.85+rng()*0.3)));
+    push(a,r,Math.round(st.amt*(0.85+rng()*0.3)));
   }
   return out;
 }

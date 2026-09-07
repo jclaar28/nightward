@@ -1798,22 +1798,28 @@ var STAT_DEFS={
   // Salvage is a slow drip from a deep well, not a morning's work. A round runs
   // for days now, so a pile has to outlast several of them while paying little
   // enough per trip that it never funds a defence on its own.
-  // Four multipliers over whatever the chosen difficulty says, and the one
-  // group in this table that exists for tuning rather than for the game. The
-  // pacing of a round is the hardest thing here to get right by reasoning about
-  // it — it is a feel question, and the only way to answer it is to play a
-  // round, move one number, and play another. These are on the setup card for
-  // that reason: multipliers rather than absolutes, so easy/normal/hard keep
-  // meaning something and one slider moves the whole curve.
-  pace:{ note:"How fast a round runs. Multipliers over the difficulty you picked.", fields:[
-    {k:"supplyK", label:"Starting supply ×", def:1.0, lo:0.25, hi:4, step:0.05,
-     hint:"what you begin the first day with"},
-    {k:"yieldK",  label:"Salvage yield ×",   def:1.0, lo:0.25, hi:4, step:0.05,
-     hint:"how much is in every pile on the map — the whole economy, since the piles are all there is"},
-    {k:"sendK",   label:"Attackers ×",       def:1.0, lo:0.25, hi:4, step:0.05,
-     hint:"the size of every wave, night one included"},
-    {k:"nightK",  label:"Night length ×",    def:1.0, lo:0.5,  hi:3, step:0.05,
-     hint:"how long you have to hold once the sun is down"}
+  // The pacing of a round is the hardest thing in this table to get right by
+  // reasoning about it. It is a feel question, and the only way to answer one is
+  // to play a round, move a number and play another — so these live on the setup
+  // card rather than buried in the Library, and they are stated in the units the
+  // question is actually asked in: supply, attackers, minutes.
+  //
+  // They were multipliers first, over whatever the difficulty said. That kept
+  // easy/normal/hard meaning something, and it made every one of them unusable
+  // for the job: "salvage yield 1.35x" is not a number anybody has an opinion
+  // about, and finding out what it meant took arithmetic against a figure that
+  // was not on screen. Absolutes with a zero that means "whatever the difficulty
+  // says" keep both — the difficulty still picks the shape of the round, and the
+  // moment you have an opinion about a number you can state it.
+  pace:{ note:"How fast a round runs, in the units the question is asked in.", fields:[
+    {k:"supply",  label:"Starting supply",   def:0, lo:0, hi:2000, step:5, int:true, unit:"supply",
+     hint:"what you begin the first day with — 0 leaves it to the difficulty"},
+    {k:"first",   label:"Starting attackers",def:0, lo:0, hi:4000, step:10, int:true,
+     hint:"the whole of night one, across every nest — 0 leaves it to the difficulty"},
+    {k:"dayMin",  label:"Day length",        def:6, lo:1, hi:30, step:0.5, unit:"min",
+     hint:"how long you have to build before the light goes"},
+    {k:"nightMin",label:"Night length",      def:2, lo:0.5,hi:15, step:0.5, unit:"min",
+     hint:"how long you have to hold once it is down"}
   ]},
 
   salvage:{ note:"How much is out there, and how it is spread.", fields:[
@@ -1821,9 +1827,17 @@ var STAT_DEFS={
      hint:"close to the plateau, safe to work"},
     {k:"farN",    label:"Piles · outside",def:7,  lo:0,  hi:20,  step:1, int:true,
      hint:"out in the open ground between you and the nests"},
-    {k:"amt",     label:"Yield · inside", def:340,lo:5,  hi:4000,step:10,int:true, unit:"supply"},
-    {k:"farK",    label:"Yield · outside",def:2.1,lo:0.2,hi:6,   step:0.05,
-     hint:"× the inside yield"}
+    // The MAX, not the base. It used to be the inside pile's yield with the
+    // outside ones a multiple of it, which meant the number in the table was
+    // never the number that mattered: the outside piles are five sevenths of the
+    // map's supply and the richest thing on it, and asking "how much is in a
+    // pile" got you the answer for the two you can reach safely. The pair are
+    // the same two degrees of freedom either way round; this way the headline
+    // number is the one worth having an opinion about.
+    {k:"amt",     label:"Supply per pile", def:714,lo:5,  hi:4000,step:10,int:true, unit:"supply",
+     hint:"the most any one pile holds — the outside piles, out where the lanes run"},
+    {k:"nearK",   label:"Inside piles",   def:0.48,lo:0.05,hi:1, step:0.01,
+     hint:"share of that in the piles close to the plateau, which are safe to work and worth less"}
   ]},
 
   soldier:{ note:"Blocks with its body. Attackers stop to fight it.", fields:[
@@ -2041,8 +2055,12 @@ var TEXT_DEFS={
   "setup.pace.stock":{g:"setup",def:"AS SHIPPED"},
   "setup.pace.some":{g:"setup",def:"{n} CHANGED"},
   "setup.pace.reset":{g:"setup",def:"Put pacing back"},
-  "setup.pace.ramp":{g:"setup",def:"Night on night ×"},
-  "setup.pace.ramp.hint":{g:"setup",def:"compounds — every night a nest is left standing, it sends this much more than the last"},
+  "setup.pace.ramp":{g:"setup",def:"Attacker growth"},
+  "setup.pace.ramp.hint":{g:"setup",def:"compounds — each night is this much bigger than the one before, so the gap widens as the run goes on"},
+  "setup.pace.gather":{g:"setup",def:"Gather rate"},
+  "setup.pace.gather.hint":{g:"setup",def:"how fast a worker pulls supply out of a pile, against the rate it shipped at"},
+  "setup.pace.carry":{g:"setup",def:"Worker carry"},
+  "setup.pace.carry.hint":{g:"setup",def:"a full load — then it stops and walks the whole way back, which is most of what a worker's day is"},
   "setup.pace.curve":{g:"setup",def:"night 1 {a} · night 5 {b} · night 10 {c}"},
   "setup.go":{g:"setup",def:"Set out"},
   "setup.back":{g:"setup",def:"← Menu"},

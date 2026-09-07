@@ -118,8 +118,8 @@ difficulty and rises 5% each night. Night one:
 | | |
 |---|---|
 | piles | 2 near, 7 far |
-| worth | 340 near, 714 far (×2.1) |
-| on the map | 5678 in piles, plus 960 on easy / 1600 on normal / 2560 on hard in caches |
+| worth | 343 inside, 714 outside (inside is ×0.48) |
+| on the map | 5683 in piles, plus 960 on easy / 1600 on normal / 2560 on hard in caches |
 
 ### Difficulty
 

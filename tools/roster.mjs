@@ -160,8 +160,8 @@ push('| | |', '|---|---|',
 push(`**Salvage Pile.** ${world('salvage').note}`, '');
 push('| | |', '|---|---|',
      `| piles | ${S.nearN} near, ${S.farN} far |`,
-     `| worth | ${S.amt} near, ${n(S.amt * S.farK, 0)} far (×${n(S.farK)}) |`,
-     `| on the map | ${n(S.nearN * S.amt + S.farN * S.amt * S.farK, 0)} in piles, ` +
+     `| worth | ${n(S.amt * S.nearK, 0)} inside, ${S.amt} outside (inside is ×${n(S.nearK)}) |`,
+     `| on the map | ${n(S.nearN * S.amt * S.nearK + S.farN * S.amt, 0)} in piles, ` +
      `plus ${Object.keys(R.diff).map(d => R.diff[d].nests * N.cache + ' on ' + R.diff[d].label.toLowerCase()).join(' / ')} in caches |`, '');
 
 push('### Difficulty', '');

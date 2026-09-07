@@ -1253,27 +1253,57 @@ function drawSetup(){
 // that send them, and it is surfaced here rather than duplicated because it is
 // the single strongest lever on how long a run lasts.
 var PACE_ROWS=[
-  {id:"pace", k:"supplyK"},
-  {id:"pace", k:"yieldK"},
-  {id:"pace", k:"sendK"},
-  {id:"pace", k:"nightK"},
-  {id:"nest", k:"ramp", label:"setup.pace.ramp", hint:"setup.pace.ramp.hint"}
+  {id:"salvage", k:"amt"},
+  {id:"worker",  k:"gather", pct:true, label:"setup.pace.gather", hint:"setup.pace.gather.hint"},
+  {id:"worker",  k:"carry",  label:"setup.pace.carry", hint:"setup.pace.carry.hint"},
+  {id:"pace",    k:"supply", auto:true},
+  {id:"pace",    k:"first",  auto:true},
+  {id:"nest",    k:"ramp",   growth:true, label:"setup.pace.ramp", hint:"setup.pace.ramp.hint"},
+  {id:"pace",    k:"dayMin"},
+  {id:"pace",    k:"nightMin"}
 ];
+function paceField(r){
+  return M.statDefs(r.id).fields.filter(function(f){ return f.k===r.k; })[0];
+}
+// Three of these are stored in units nobody wants to type. A gather rate is
+// 2.4 supply a second, which is a rate you can only judge against the one it
+// shipped at; a growth of 1.13 is a number you have to subtract one from and
+// multiply by a hundred before it means anything. So the panel reads and writes
+// percentages and the table keeps its own units — a presentation, not a second
+// copy. The stored value is still the stat, and the Library still shows it raw.
+function paceToView(r,v){
+  var f=paceField(r);
+  if(r.pct)    return Math.round(v/f.def*100);
+  if(r.growth) return Math.round((v-1)*1000)/10;
+  return v;
+}
+function paceFromView(r,v){
+  var f=paceField(r);
+  if(r.pct)    return f.def*v/100;
+  if(r.growth) return 1+v/100;
+  return v;
+}
+function paceStep(r){
+  var f=paceField(r);
+  if(r.pct)    return 5;
+  if(r.growth) return 1;
+  return f.step;
+}
 function paceEdited(){
   var n=0;
   PACE_ROWS.forEach(function(r){
     var o=M.getStatOverrides()[r.id];
-    if(o&&o[r.k]!==undefined&&o[r.k]!==M.statDefs(r.id).fields
-        .filter(function(f){ return f.k===r.k; })[0].def) n++;
+    if(o&&o[r.k]!==undefined&&o[r.k]!==paceField(r).def) n++;
   });
   return n;
 }
-// What the numbers actually buy, in attackers. The multipliers are abstract and
-// the ramp compounds, so a player reading "1.13" has no idea what they have
-// chosen until they see the three nights it produces.
+// What the numbers actually buy, in attackers on three nights. Growth
+// compounds, so a player reading "13%" has no idea what they have chosen until
+// they see where it lands — and the first night is a `0 means the difficulty`
+// field, so the panel has to resolve it the same way the round will.
 function paceCurve(){
   var C=HFGAME.DIFF[SET.difficulty], P=M.statsOf("pace"), N=M.statsOf("nest");
-  var one=Math.max(1,Math.round(C.send*P.sendK))*(C.nests|0);
+  var one=(P.first>0)?P.first:(C.send*(C.nests|0));
   var r=N.ramp;
   return {a:Math.round(one), b:Math.round(one*Math.pow(r,4)),
           c:Math.round(one*Math.pow(r,9))};
@@ -1283,28 +1313,42 @@ function drawPace(){
   if(!body) return;
   var h="";
   PACE_ROWS.forEach(function(r){
-    var f=M.statDefs(r.id).fields.filter(function(x){ return x.k===r.k; })[0];
-    var v=M.statsOf(r.id)[r.k];
+    var f=paceField(r);
+    var raw=M.statsOf(r.id)[r.k];
     var o=M.getStatOverrides()[r.id]||{};
     var dirty=(o[r.k]!==undefined&&o[r.k]!==f.def);
+    // A field that defers to the difficulty shows the figure the round will
+    // actually use rather than the zero that means "defer". A blank box beside
+    // the words "starting attackers" is not an answer to the question.
+    var view=paceToView(r,raw);
+    if(r.auto&&!(raw>0)) view=paceAuto(r);
+    var unit=r.pct||r.growth?"%":(f.unit?" "+f.unit:"");
     h+='<label class="paceRow"><span><span class="pk'+(dirty?" pEdit":"")+'">'+
-       (r.label?M.t(r.label):f.label)+'</span>'+
+       (r.label?M.t(r.label):f.label)+(unit?'<span class="pu">'+unit+'</span>':'')+'</span>'+
        '<span class="ph">'+(r.hint?M.t(r.hint):(f.hint||("shipped "+f.def)))+'</span></span>'+
-       '<input type="number" value="'+v+'" step="'+f.step+'" min="'+f.lo+'" max="'+f.hi+
-       '" data-pid="'+r.id+'" data-pk="'+r.k+'"></label>';
+       '<input type="number" value="'+view+'" step="'+paceStep(r)+
+       '" data-pid="'+r.id+'" data-pk="'+r.k+'" data-prow="'+PACE_ROWS.indexOf(r)+'"></label>';
   });
   body.innerHTML=h;
   body.querySelectorAll("[data-pk]").forEach(function(inp){
     inp.addEventListener("input",function(){
       var v=parseFloat(inp.value);
       if(!isFinite(v)) return;
-      M.setStat(inp.dataset.pid,inp.dataset.pk,v);
+      var r=PACE_ROWS[inp.dataset.prow|0];
+      M.setStat(r.id,r.k,paceFromView(r,v));
       HFGAME.syncStats();
       saveJSON(KEY_STATS,M.getStatOverrides());
       drawPaceSummary(); drawSetup();
     });
   });
   drawPaceSummary();
+}
+// What a deferring field is worth right now, so the box can show it.
+function paceAuto(r){
+  var C=HFGAME.DIFF[SET.difficulty];
+  if(r.k==="supply") return C.supply;
+  if(r.k==="first")  return C.send*(C.nests|0);
+  return paceField(r).def;
 }
 function drawPaceSummary(){
   var n=paceEdited(), c=paceCurve();
