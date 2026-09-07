@@ -247,11 +247,11 @@ function syncStats(){
 // every night after — which is the whole reason to leave the walls.
 // `send` is per nest per night one; `nests` is how many the map seeds.
 var DIFF={
-  easy  :{supply:60, nests:3, send:62, hp:36,
+  easy  :{supply:60, nests:3, send:45, hp:36,
           mix:{shambler:0.76, runner:0.20, brute:0.04}},
-  normal:{supply:45, nests:5, send:58, hp:42,
+  normal:{supply:45, nests:5, send:40, hp:42,
           mix:{shambler:0.66, runner:0.25, brute:0.09}},
-  hard  :{supply:30, nests:8, send:54, hp:46,
+  hard  :{supply:30, nests:8, send:35, hp:46,
           mix:{shambler:0.58, runner:0.28, brute:0.14}}
 };
 // After DIFF, not before: syncText() names the difficulties out of the text
@@ -646,6 +646,14 @@ function place(t,gx,gz,pid,rotOv){
   if(UI.phase) UI.phase();
   return true;
 }
+// Four fifths back, on the 5-grid the rest of the economy is counted in. The
+// cheapest two things you can build cost 5 and 10, and four fifths of those
+// rounds back to the whole price — a wall you put in the wrong place is free to
+// move, which is forgiving in exactly the spot where a player misplaces things,
+// and is the only sensible answer once the smallest coin is a 5.
+function refundOf(t){
+  return Math.max(0,Math.round((TYPES[t].cost||0)*0.8/5)*5);
+}
 function removeAt(gx,gz,pid){
   if(!playable()) return;
   if((pid===undefined||pid===null)&&guest()) return intent({m:"rm",gx:gx,gz:gz});
@@ -659,7 +667,7 @@ function removeAt(gx,gz,pid){
   if(S.bsel===b) S.bsel=null;
   if(b.type==="turret") clearTurret(b,true);   // nobody is left standing on air
   footCells(b.type,b.gx,b.gz).forEach(function(cc){ delete S.cells[key(cc[0],cc[1])]; });
-  if(p) p.supply+=Math.round(TYPES[b.type].cost*0.8);
+  if(p) p.supply+=refundOf(b.type);
   if(SND) SND.remove(M.gx2w(b.gx),M.gx2w(b.gz));
   S.distDirty=true; S.netCellsDirty=true; S.pathVer=(S.pathVer|0)+1;
   if(UI.hotbar) UI.hotbar();
@@ -677,13 +685,18 @@ function makeNodes(seed,map){
   // a map that places its piles by hand replaces the seeded scatter wholesale
   if(map&&map.nodes&&map.nodes.length){
     return map.nodes.map(function(n){
-      var a=Math.max(1,Math.round(n.amt)||60);
+      var a=Math.max(5,Math.round((Math.round(n.amt)||60)/5)*5);
       return {x:n.x, z:n.z, amt:a, max:a, rot:n.rot||0};
     });
   }
   var st=M.statsOf("salvage")||{nearN:2,farN:3,amt:78,nearK:0.48};
   var rng=M.rngFrom((seed||1)*7919+13), out=[], i, a, r;
+  // Every pile lands on the 5-grid, jitter and all. Supply is denominated in
+  // fives everywhere a player reads it — what a thing costs, what it gives back,
+  // what a nest pays — and a pile that says 617 left is the one number on screen
+  // that is not counted in the same currency as the rest.
   function push(a,r,amt){
+    amt=Math.max(5,Math.round(amt/5)*5);
     out.push({x:Math.cos(a)*r, z:Math.sin(a)*r, amt:amt, max:amt,
               rot:rng()*Math.PI*2});
   }
@@ -4758,6 +4771,7 @@ return {
   hpAnchors:hpAnchors,
   bsel:function(){ return S?S.bsel:null; },
   selectBuilding:selectBuilding, setShelter:setShelter, sendOut:sendOut,
+  refundOf:refundOf,
   setGate:setGate,
   housedBy:housedBy, sheltering:sheltering, shelteredCount:shelteredCount,
   crewOf:crewOf, manTurret:manTurret, clearTurret:clearTurret, canCrew:canCrew,

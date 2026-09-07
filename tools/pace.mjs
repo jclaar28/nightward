@@ -104,6 +104,11 @@ const probe = await page.evaluate(seed => {
   };
   __hf.show('menu');
   res.diff = { supply: D.supply, send: D.send, nests: D.nests };
+  // The shipped growth, read from the table rather than written down here. The
+  // first version of this hard-coded 1.13 in two places and both went stale the
+  // next time the curve was retuned — a check that has to be edited whenever the
+  // thing it guards changes is a check nobody trusts.
+  res.ramp = def('nest', 'ramp');
   return res;
 }, SEED);
 
@@ -149,9 +154,10 @@ check('starting attackers is the whole of night one, across every nest',
       `on — but "600 attackers" is a thing you have an opinion about and "120 each, ` +
       `and there are five" is arithmetic you should not have to do`);
 check('...and growth compounds from it rather than adding a flat number',
-      Math.abs(b.fifth / b.first - Math.pow(1.13, 4)) < 0.02 &&
+      Math.abs(b.fifth / b.first - Math.pow(probe.ramp, 4)) < 0.02 &&
       Math.abs(probe.growthUp.fifth / probe.growthUp.first - Math.pow(1.5, 4)) < 0.02,
-      `at 13% night five is ${b.fifth} against night one's ${b.first}, and at 50% it is ` +
+      `at ${Math.round((probe.ramp - 1) * 100)}% night five is ${b.fifth} against night ` +
+      `one's ${b.first}, and at 50% it is ` +
       `${probe.growthUp.fifth} against ${probe.growthUp.first} — each night is a ` +
       `percentage of the night before, so the gap widens as the run goes on`);
 
@@ -179,10 +185,13 @@ check('...and a figure you state overrides it',
 
 // ---- what the panel shows is what the table stores --------------------------
 check('the two percentage knobs round-trip through the panel',
-      probe.shown['worker.gather'] === 100 && probe.shown['nest.ramp'] === 13,
+      probe.shown['worker.gather'] === 100 &&
+      probe.shown['nest.ramp'] === Math.round((probe.ramp - 1) * 1000) / 10,
       `the panel reads ${probe.shown['worker.gather']}% gather and ` +
-      `${probe.shown['nest.ramp']}% growth for a table holding ${b.gather}/s and 1.13. ` +
-      `A rate of 2.4 is only judgeable against the one it shipped at, and 1.13 is a ` +
+      `${probe.shown['nest.ramp']}% growth for a table holding ${b.gather}/s and ` +
+      `${probe.ramp}. ` +
+      `A rate of 2.4 is only judgeable against the one it shipped at, and a growth ` +
+      `stored as 1.10 is a ` +
       `number you have to subtract one from before it means anything — so the panel ` +
       `converts and the table keeps its own units`);
 check('...and a deferring field shows what it resolved to, not a zero',

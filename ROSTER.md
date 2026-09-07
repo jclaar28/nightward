@@ -16,7 +16,7 @@ a second copy would stop following the values the in-game library edits.*
 | **Soldier** | 105 | 2.1 | 19 / 0.85s | 22.4 | 1.35 | 8 | 4 | — |
 | **Archer** | 52 | 2.3 | 15 / 1.05s | 14.3 | 8.2 | 10 | 1.5 | — |
 | **Scout** | 58 | 2.9 | 7 / 1.1s | 6.4 | 1.2 | 22 | 1 | — |
-| **Worker** | 45 | 2.45 | — | — | — | 6 | — | gathers 2.4/s · carries 3 · repairs 17 hp/s |
+| **Worker** | 45 | 2.45 | — | — | — | 6 | — | gathers 2.4/s · carries 2 · repairs 17 hp/s |
 
 **Commander.** The one unit you start with, and the only one who can raise a town hall. Taller than a soldier, hits harder, and wears the crown — until the hall is up, losing the commander loses the round.
 
@@ -36,7 +36,7 @@ a second copy would stop following the values the in-game library edits.*
 |---|---|---|---|---|---|---|---|
 | **Town Hall** | free | 600 | 14s | 999 | 12 | 3×3 | houses 2 and 1 scout, replaced every 18s |
 | **Road** | — | — | 2.6s per unit | — | — | off-grid | +55% speed within 1.1, runs of 2–26, ends snap within 2.4 |
-| **Cottage** | 26 | 90 | 4.5s | 30 | 7 | 1×1 | houses 2, replaced every 14s |
+| **Cottage** | 30 | 90 | 4.5s | 30 | 7 | 1×1 | houses 2, replaced every 14s |
 
 **Town Hall.** The objective. 3×3 footprint (4.5 units), impassable. Timber-framed over a stone base course, with a banded door and shuttered windows — the vocabulary every other building borrows.
 
@@ -47,8 +47,8 @@ a second copy would stop following the values the in-game library edits.*
 | | supply | health | goes up in | path cost | sight | footprint | what it does |
 |---|---|---|---|---|---|---|---|
 | **Watchtower** | 30 | 170 | 4s | 60 | 8 | 1×1 | 13 every 0.42s to 6.6 (31 dps) |
-| **Ballista** | 48 | 200 | 7s | 60 | 11 | 1×1 | 105 every 1.75s to 9.6 (60 dps); splash 70% across 2.4 |
-| **Brazier** | 12 | 70 | 2.5s | 8 | 6 | 1×1 | guns within 4.8 reload 22% faster |
+| **Ballista** | 50 | 200 | 7s | 60 | 11 | 1×1 | 105 every 1.75s to 9.6 (60 dps); splash 70% across 2.4 |
+| **Brazier** | 15 | 70 | 2.5s | 8 | 6 | 1×1 | guns within 4.8 reload 22% faster |
 
 **Watchtower.** 13 damage every 0.42 s at the nearest attacker within 6.6 units — deliberately short, so a tower covers an approach rather than the whole map. Drawn at 0.70 scale in play.
 
@@ -60,9 +60,9 @@ a second copy would stop following the values the in-game library edits.*
 
 | | supply | health | goes up in | path cost | sight | footprint | what it does |
 |---|---|---|---|---|---|---|---|
-| **Palisade** | 3 | 110 | 1s | 14 | 4 | 1×1 | — |
-| **Gate** | 7 | 90 | 1.5s | 2 | 4 | 1×1 | — |
-| **Turret** | 34 | 280 | 9s of labour | 20 | 11 | 1×1 | one archer may stand on it, shooting 3.4u further |
+| **Palisade** | 5 | 110 | 1s | 14 | 4 | 1×1 | — |
+| **Gate** | 10 | 90 | 1.5s | 2 | 4 | 1×1 | — |
+| **Turret** | 35 | 280 | 9s of labour | 20 | 11 | 1×1 | one archer may stand on it, shooting 3.4u further |
 
 **Palisade.** Half a cell, growing from the centre toward +X. A wall cell emits one run per connected neighbour, so corners, tees and crossings build themselves.
 
@@ -74,7 +74,7 @@ a second copy would stop following the values the in-game library edits.*
 
 | | supply | health | goes up in | path cost | sight | footprint | what it does |
 |---|---|---|---|---|---|---|---|
-| **Barracks** | 44 | 220 | 6s | 40 | 8 | 1×1 | houses 3, replaced every 11s |
+| **Barracks** | 45 | 220 | 6s | 40 | 8 | 1×1 | houses 3, replaced every 11s |
 | **Archery Range** | 40 | 160 | 5.5s | 40 | 8 | 1×1 | houses 3, replaced every 13s |
 
 **Barracks.** Houses three soldiers. They muster the moment you place it, so you can walk them into position during the build phase, and it retrains one loss at a time for as long as it stands.
@@ -110,7 +110,7 @@ difficulty and rises 5% each night. Night one:
 | cache | 320 supply to whoever pulls it down |
 | garrison | 3 at rest, +2 a night to a ceiling of 16, chasing 9 from home |
 | wakes | 4 defenders when hit, at most once every 5s |
-| sends | its difficulty's number, ×1.13 every night |
+| sends | its difficulty's number, ×1.1 every night |
 | spite | 0.5 — how much harder the survivors come once one of them is dead |
 
 **Salvage Pile.** A finite cache of the old world. Workers carry it back to the hall a load at a time, and the pile visibly shrinks as it is worked out. Drawn at a scale set per instance from what is left.
@@ -118,15 +118,15 @@ difficulty and rises 5% each night. Night one:
 | | |
 |---|---|
 | piles | 2 near, 7 far |
-| worth | 343 inside, 714 outside (inside is ×0.48) |
-| on the map | 5683 in piles, plus 960 on easy / 1600 on normal / 2560 on hard in caches |
+| worth | 252 inside, 525 outside (inside is ×0.48) |
+| on the map | 4179 in piles, plus 960 on easy / 1600 on normal / 2560 on hard in caches |
 
 ### Difficulty
 
 | | starting supply | nests | each sends | base health | shambler / runner / brute |
 |---|---|---|---|---|---|
-| **Easy** | 60 | 3 | 62 | 36 | 76% / 20% / 4% |
-| **Normal** | 45 | 5 | 58 | 42 | 66% / 25% / 9% |
-| **Hard** | 30 | 8 | 54 | 46 | 58% / 28% / 14% |
+| **Easy** | 60 | 3 | 45 | 36 | 76% / 20% / 4% |
+| **Normal** | 45 | 5 | 40 | 42 | 66% / 25% / 9% |
+| **Hard** | 30 | 8 | 35 | 46 | 58% / 28% / 14% |
 
-The first night is every living nest's send added together — 186 on easy, 290 on normal, 432 on hard. Pulling one down is a permanent cut to every night after it.
+The first night is every living nest's send added together — 135 on easy, 200 on normal, 280 on hard. Pulling one down is a permanent cut to every night after it.

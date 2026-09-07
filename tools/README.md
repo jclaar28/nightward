@@ -540,8 +540,9 @@ crossings across a whole buffer measured the noise under a decayed tail, and an
 absolute end-threshold made a quiet distant sound look shorter than the loud
 near one it came from. Both are now relative to the sound's own peak.
 
-**`economy.mjs`** — how much a day pays, how long the map lasts, and whether the
-first night is sized against the first day. That last one is a ratio held in two
+**`economy.mjs`** — how much a day pays, how long the map lasts, whether the
+first night is sized against the first day, and whether supply is still counted
+in fives. That last one is a ratio held in two
 different files — what the piles give is in `STAT_DEFS.salvage`, what a nest
 sends is in `DIFF` in `d_game.js` — and moving either alone is how an opening
 ends up frantic or free. It is checked as a band around *normal* rather than one
@@ -560,6 +561,17 @@ gather rate, carry, or the map size.
 ```sh
 node tools/economy.mjs --days 10 --seeds 3 --diff normal,hard
 ```
+
+The five-grid checks are the newest and the least like the others: they are an
+invariant rather than a measurement. Every number a player is charged or paid is
+a multiple of 5, which is the kind of rule that holds for a week and then rots —
+typing 34 into a cost field looks perfectly fine, and the only symptom is a
+supply counter drifting off the grid an hour into a round. So the source and a
+real map's piles are both checked, because they can disagree: a pile's contents
+come out of a multiply and a random jitter, and the table being right says
+nothing about what a player actually walks to. The step sizes are checked too —
+a supply field the Library moves in ones walks you off the grid with the arrow
+keys, which is the same rot arriving by a different door.
 
 **`balance.mjs`** — plays a full day and holds a night, across seeds and
 difficulty sizes. `--nights N` plays out that many, which is the meaningful

@@ -433,7 +433,7 @@ function dockActs(b,T,housed,road){
     if(tc){ ds.textContent=M.t("sel.turret.down"); ds.setAttribute("aria-pressed","false"); }
     var dsell2=el("dockSell");
     dsell2.hidden=false;
-    dsell2.textContent=M.t(b.site?"sel.cancel":"sel.selldown",{n:Math.round(T.cost*0.8)});
+    dsell2.textContent=M.t(b.site?"sel.cancel":"sel.selldown",{n:HFGAME.refundOf(b.type)});
     return;
   }
   // A gate's verb is its door. It borrows the shelter button the way the
@@ -446,7 +446,7 @@ function dockActs(b,T,housed,road){
     ds.setAttribute("aria-pressed",b.shut?"true":"false");
     var dsell3=el("dockSell");
     dsell3.hidden=false;
-    dsell3.textContent=M.t("sel.selldown",{n:Math.round(T.cost*0.8)});
+    dsell3.textContent=M.t("sel.selldown",{n:HFGAME.refundOf(b.type)});
     return;
   }
   ds.hidden=road||!housed.length;
@@ -466,7 +466,7 @@ function dockActs(b,T,housed,road){
     return;
   }
   dsell.hidden=(b.type==="hall");
-  dsell.textContent=M.t(b.site?"sel.cancel":"sel.selldown",{n:Math.round(T.cost*0.8)});
+  dsell.textContent=M.t(b.site?"sel.cancel":"sel.selldown",{n:HFGAME.refundOf(b.type)});
 }
 HFGAME.UI.marquee=function(){
   var S=HFGAME.state(); if(!S) return;

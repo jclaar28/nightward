@@ -381,6 +381,20 @@ which meant the headline number answered for the two piles that matter least.
 move. A slider that moves nothing is worse than no slider, because it costs a
 playtest to find out.
 
+**Supply is counted in fives.** Every number a player is charged or paid is a
+multiple of 5 — costs, refunds, a nest's cache, starting supply, and what is in
+a pile after its random jitter. The smallest coin in the game is a 5, so nothing
+on screen asks anyone to think in ones. Two places make that easy to break: a
+cost field typed as 34 looks perfectly fine, and a pile's contents come out of a
+multiply and a jitter, so the table being right says nothing about what is
+actually out on the map. `tools/economy.mjs` checks the source AND a real map's
+piles, and that every supply field's `step` is 5 as well, since a field the
+Library moves in ones walks you off the grid with the arrow keys. Refunds are
+four fifths rounded to the grid, which means the two cheapest things — a wall at
+5 and a gate at 10 — come back whole; below a 5 there is nothing for a partial
+refund to be, and a misplaced wall being free to move is forgiving in exactly
+the place people misplace things.
+
 **The guest never mutates the world.** In multiplayer, a guest action calls
 `intent()` and returns; the host receives it in `applyIntent()` and runs the
 *same* function a local click would. Current intents: `pl` place, `rm` remove,

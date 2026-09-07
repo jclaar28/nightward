@@ -137,5 +137,52 @@ if (PER.easy && PER.normal && PER.hard) {
         `same day's work`);
 }
 
+// ---- supply is counted in fives -------------------------------------------
+// Every number a player is charged or paid is a multiple of 5, so the smallest
+// coin in the game is a 5 and nothing on screen asks them to think in ones.
+// This is the kind of rule that holds for a week and then rots: it costs
+// nothing to type 34 into a cost field, it looks fine, and the only symptom is
+// a supply counter that drifts off the grid an hour into a round.
+//
+// It is checked at the source AND on a real map, because the two can disagree:
+// a pile's contents come out of a multiply and a random jitter, so the table
+// being right says nothing about what a player actually finds out there.
+const grid = await page.evaluate(() => {
+  __nw.start(4242);
+  const S = __nw.state();
+  const bad = [];
+  const on5 = (label, v) => { if (Math.round(v) % 5 !== 0) bad.push(label + '=' + v); };
+  for (const t in HFGAME.TYPES) {
+    const T = HFGAME.TYPES[t];
+    if (!T.cost) continue;
+    on5(t + '.cost', T.cost);
+    on5(t + '.refund', HFGAME.refundOf(t));
+  }
+  on5('nest.cache', HF.statsOf('nest').cache);
+  on5('salvage.amt', HF.statsOf('salvage').amt);
+  for (const d in HFGAME.DIFF) on5(d + '.supply', HFGAME.DIFF[d].supply);
+  const piles = S.nodes.map(n => n.max);
+  piles.forEach((v, i) => on5('pile' + i, v));
+  // A supply field the Library steps in ones would walk a player straight off
+  // the grid with the arrow keys, which is the same rot arriving by a different
+  // door.
+  const steps = [];
+  for (const id in HF.STAT_DEFS)
+    for (const f of HF.STAT_DEFS[id].fields)
+      if (f.unit === 'supply' && f.step % 5 !== 0) steps.push(id + '.' + f.k);
+  return { bad, steps, piles, costs: Object.keys(HFGAME.TYPES)
+    .filter(t => HFGAME.TYPES[t].cost)
+    .map(t => t + ' ' + HFGAME.TYPES[t].cost + '/' + HFGAME.refundOf(t)) };
+});
+check('every price, refund and pile is a multiple of five',
+      grid.bad.length === 0,
+      grid.bad.length ? grid.bad.slice(0, 6).join(', ')
+        : `${grid.costs.join(', ')} — cost/refund, and ${grid.piles.length} piles ` +
+          `from ${Math.min(...grid.piles)} to ${Math.max(...grid.piles)}`);
+check('...and the Library cannot step one off it',
+      grid.steps.length === 0,
+      grid.steps.length ? grid.steps.join(', ')
+        : `every supply field moves in fives`);
+
 await close();
 done(errors);

@@ -1630,7 +1630,7 @@ var STAT_DEFS={
      hint:"how far it puts attackers on your minimap"}
   ]},
   tower:{ note:"Volume damage. Short range on purpose.", fields:[
-    {k:"cost",     label:"Cost",           def:30,  lo:1,   hi:200,  step:1,  int:true, unit:"supply"},
+    {k:"cost",     label:"Cost",           def:30,  lo:1,   hi:200,  step:5,  int:true, unit:"supply"},
     {k:"hp",       label:"Hit points",     def:170, lo:20,  hi:1200, step:10, int:true},
     {k:"range",    label:"Range",          def:6.6, lo:2,   hi:20,   step:0.1, unit:"u"},
     {k:"fire",     label:"Reload",         def:0.42,lo:0.05,hi:5,    step:0.01,unit:"s"},
@@ -1644,7 +1644,7 @@ var STAT_DEFS={
      hint:"how far it puts attackers on your minimap"}
   ]},
   ballista:{ note:"Reach and splash. Targets the heaviest thing in range.", fields:[
-    {k:"cost",     label:"Cost",           def:48,  lo:1,   hi:300,  step:1,  int:true, unit:"supply"},
+    {k:"cost",     label:"Cost",           def:50,  lo:1,   hi:300,  step:5,  int:true, unit:"supply"},
     {k:"hp",       label:"Hit points",     def:200, lo:20,  hi:1200, step:10, int:true},
     {k:"range",    label:"Range",          def:9.6, lo:2,   hi:24,   step:0.1, unit:"u"},
     {k:"fire",     label:"Reload",         def:1.75,lo:0.1, hi:8,    step:0.05,unit:"s"},
@@ -1660,7 +1660,7 @@ var STAT_DEFS={
      hint:"how far it puts attackers on your minimap"}
   ]},
   brazier:{ note:"No attack. Buys reload speed and light.", fields:[
-    {k:"cost",     label:"Cost",           def:12,  lo:1,   hi:120,  step:1,  int:true, unit:"supply"},
+    {k:"cost",     label:"Cost",           def:15,  lo:1,   hi:120,  step:5,  int:true, unit:"supply"},
     {k:"hp",       label:"Hit points",     def:70,  lo:10,  hi:600,  step:5,  int:true},
     {k:"aura",     label:"Aura radius",    def:4.8, lo:1,   hi:16,   step:0.1, unit:"u"},
     {k:"auraK",    label:"Reload ×",       def:0.78,lo:0.3, hi:1,    step:0.01,
@@ -1672,7 +1672,7 @@ var STAT_DEFS={
      hint:"how far it puts attackers on your minimap"}
   ]},
   wall:{ note:"Cheap time. High path cost pushes the swarm elsewhere.", fields:[
-    {k:"cost",     label:"Cost",           def:3,   lo:1,   hi:60,   step:1,  int:true, unit:"supply"},
+    {k:"cost",     label:"Cost",           def:5,   lo:1,   hi:60,   step:5,  int:true, unit:"supply"},
     {k:"hp",       label:"Hit points",     def:110, lo:10,  hi:900,  step:5,  int:true},
     {k:"raise",    label:"Build time",     def:1, lo:0,   hi:120,  step:0.5, unit:"s",
      hint:"materials sit on the ground until this runs out"},
@@ -1681,7 +1681,7 @@ var STAT_DEFS={
      hint:"how far it puts attackers on your minimap"}
   ]},
   gate:{ note:"Deliberately inviting — low path cost pulls the swarm in.", fields:[
-    {k:"cost",     label:"Cost",           def:7,   lo:1,   hi:80,   step:1,  int:true, unit:"supply"},
+    {k:"cost",     label:"Cost",           def:10,   lo:1,   hi:80,   step:5,  int:true, unit:"supply"},
     {k:"hp",       label:"Hit points",     def:90,  lo:10,  hi:900,  step:5,  int:true},
     {k:"raise",    label:"Build time",     def:1.5, lo:0,   hi:120,  step:0.5, unit:"s",
      hint:"materials sit on the ground until this runs out"},
@@ -1696,7 +1696,7 @@ var STAT_DEFS={
   // up. `range` is added to whoever is standing on it — the turret itself has no
   // weapon and never will.
   turret:{ note:"A platform on the wall line. Worth exactly what you garrison it with.", fields:[
-    {k:"cost",     label:"Cost",           def:34,  lo:1,   hi:200,  step:1,  int:true, unit:"supply"},
+    {k:"cost",     label:"Cost",           def:35,  lo:1,   hi:200,  step:5,  int:true, unit:"supply"},
     {k:"hp",       label:"Hit points",     def:280, lo:20,  hi:1200, step:10, int:true},
     {k:"build",    label:"Labour",         def:9,   lo:0.5, hi:120,  step:0.5, unit:"worker-s",
      hint:"seconds of a worker's hands, not seconds on a clock"},
@@ -1710,7 +1710,7 @@ var STAT_DEFS={
      hint:"how hard attackers try to route around it"}
   ]},
   barracks:{ note:"Musters soldiers on placement, retrains losses while it stands.", fields:[
-    {k:"cost",    label:"Cost",          def:44,  lo:1,  hi:300, step:1, int:true, unit:"supply"},
+    {k:"cost",    label:"Cost",          def:45,  lo:1,  hi:300, step:5, int:true, unit:"supply"},
     {k:"hp",      label:"Hit points",    def:220, lo:20, hi:1200,step:10,int:true},
     {k:"cap",     label:"Garrison",      def:3,   lo:1,  hi:12,  step:1, int:true,
      hint:"soldiers housed"},
@@ -1723,7 +1723,7 @@ var STAT_DEFS={
      hint:"how far it puts attackers on your minimap"}
   ]},
   archery:{ note:"Musters archers on placement, retrains losses while it stands.", fields:[
-    {k:"cost",    label:"Cost",          def:40,  lo:1,  hi:300, step:1, int:true, unit:"supply"},
+    {k:"cost",    label:"Cost",          def:40,  lo:1,  hi:300, step:5, int:true, unit:"supply"},
     {k:"hp",      label:"Hit points",    def:160, lo:20, hi:1200,step:10,int:true},
     {k:"cap",     label:"Garrison",      def:3,   lo:1,  hi:12,  step:1, int:true,
      hint:"archers housed"},
@@ -1736,7 +1736,7 @@ var STAT_DEFS={
   ]},
 
   cottage:{ note:"Houses workers. The only building that makes supply instead of spending it.", fields:[
-    {k:"cost",    label:"Cost",          def:26,  lo:1,  hi:300, step:1, int:true, unit:"supply"},
+    {k:"cost",    label:"Cost",          def:30,  lo:1,  hi:300, step:5, int:true, unit:"supply"},
     {k:"hp",      label:"Hit points",    def:90,  lo:20, hi:1200,step:5, int:true},
     {k:"cap",     label:"Workers",       def:2,   lo:1,  hi:12,  step:1, int:true},
     {k:"retrain", label:"Rebuild time",  def:14,  lo:1,  hi:90,  step:0.5, unit:"s"},
@@ -1751,8 +1751,8 @@ var STAT_DEFS={
     {k:"speed",   label:"Speed",         def:2.45,lo:0.2,hi:10,  step:0.05, unit:"u/s"},
     {k:"gather",  label:"Gather rate",   def:2.4, lo:0.5,hi:60,  step:0.1, unit:"/s",
      hint:"supply pulled from a pile per second"},
-    {k:"carry",   label:"Carry",         def:3,   lo:1,  hi:200, step:1, int:true,
-     hint:"a full load, then it walks back"},
+    {k:"carry",   label:"Carry",         def:2,   lo:1,  hi:200, step:1, int:true,
+     hint:"a full load, then it walks back — the walk is most of a worker's day, so this is the strongest lever on income there is"},
     {k:"repair",  label:"Repair rate",   def:17,  lo:1,  hi:200, step:1, int:true, unit:"hp/s",
      hint:"health put back into a damaged building"},
     {k:"nerve",   label:"Nerve",         def:2.1, lo:0, hi:20,   step:0.1, unit:"u",
@@ -1767,7 +1767,7 @@ var STAT_DEFS={
      hint:"one committed push, not a chip over several days"},
     {k:"regen",   label:"Knits back",     def:0.50,lo:0,   hi:1,    step:0.05,
      hint:"share of full health recovered each dawn"},
-    {k:"cache",   label:"Cache",          def:320, lo:0,   hi:3000, step:10, int:true, unit:"supply",
+    {k:"cache",   label:"Cache",          def:320, lo:0,   hi:3000, step:5, int:true, unit:"supply",
      hint:"paid to whoever did the most damage bringing it down"},
     {k:"guard",   label:"Guard · first night",def:3, lo:0,  hi:40,   step:1,  int:true,
      hint:"attackers that live at the nest by day, on night one"},
@@ -1781,7 +1781,7 @@ var STAT_DEFS={
      hint:"how far a guard will follow before going home"},
     // Each night is bigger than the last and the gap widens, so a long game is
     // not a safe one. These live here because it is the nests that send them.
-    {k:"ramp",    label:"Sends · per night",def:1.13,lo:1,  hi:3,    step:0.01,
+    {k:"ramp",    label:"Sends · per night",def:1.10,lo:1,  hi:3,    step:0.01,
      hint:"multiplies what one nest sends, every night it is left standing"},
     {k:"ehpK",    label:"Attacker health ×",def:1.05,lo:1,  hi:2,    step:0.01,
      hint:"multiplies attacker health each night"},
@@ -1854,7 +1854,7 @@ var STAT_DEFS={
     // pile" got you the answer for the two you can reach safely. The pair are
     // the same two degrees of freedom either way round; this way the headline
     // number is the one worth having an opinion about.
-    {k:"amt",     label:"Supply per pile", def:714,lo:5,  hi:4000,step:10,int:true, unit:"supply",
+    {k:"amt",     label:"Supply per pile", def:525,lo:5,  hi:4000,step:5,int:true, unit:"supply",
      hint:"the most any one pile holds — the outside piles, out where the lanes run"},
     {k:"nearK",   label:"Inside piles",   def:0.48,lo:0.05,hi:1, step:0.01,
      hint:"share of that in the piles close to the plateau, which are safe to work and worth less"}
