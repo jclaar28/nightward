@@ -16,6 +16,10 @@
     "select": "node tools/select.mjs",
     "decals": "node tools/decals.mjs",
     "terrain": "node tools/terrain.mjs",
+    "lighting": "node tools/lighting.mjs",
+    "combat": "node tools/combat.mjs",
+    "hud": "node tools/hud.mjs",
+    "weather": "node tools/weather.mjs",
     "check": "python3 src/build.py && node tools/smoke.mjs && node tools/instances.mjs"
   },
   "devDependencies": {

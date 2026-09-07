@@ -109,9 +109,53 @@ after it and silently re-grows every map on every existing seed.
 `tools/terrain.mjs` counts the draws for this reason.
 
 **Nothing sits at a fixed height.** `gy(x,z)` returns the terrain height and
-every draw site uses it. `PLAT` is the plateau constant, not the ground. Hard-
+every draw site — and every *spawn* site — uses it. Seventeen effect sites in
+`d_game.js` were still anchored to `PLAT` long after the rule was written: melee
+sparks, impact flashes, a tower's muzzle, the height a bolt flies at, the height
+a corpse stops falling. All of them are correct on the plateau, which is where
+most of a night is fought, and all of them are wrong the moment anything happens
+out where the ground rolls. `tools/combat.mjs` stages a fight at a nest for
+exactly that reason.
+
+The same constant was under the cursor, too. `pick()` used to intersect the
+camera's ray with a plane at `PLAT`; it walks the ray down onto the height field
+now (`groundHit`), because the plane answer is out by 4.1 units for every 3 it
+is wrong about the height — a road laid where you did not point. Unit picking
+and marquee selection projected from `PLAT` as well, which meant a unit standing
+off the plateau could not be clicked at all. `tools/hud.mjs` holds all three. `PLAT` is the plateau constant, not the ground. Hard-
 coding `PLAT` is how the nests ended up floating half a unit in the air across
-the whole map.
+the whole map — and `packLamps` was still doing it long after, hanging every
+fire in the game at the plateau's height, which is right exactly until somebody
+builds a brazier off the flat. `tools/lighting.mjs` stands two braziers on
+ground at different heights and compares what each hangs above its own; with one
+brazier it cannot tell the two answers apart and passes either way.
+
+**Darkness is not the same as legibility.** A silhouette reads by its outline,
+and a dark outline around a dark shape on dark ground does not separate the two
+— it makes the shape slightly bigger. That is why a night wave was ninety
+attackers you could pick out ten of, and why a fresnel rim was the wrong first
+answer: on boxes and cones there is no curvature for a rim to sweep across, so a
+face is either edge-on and one pixel wide or facing you and takes none. What
+works here is the sky's own colour added at glancing angles (`uRim`, sharp
+enough that flat ground takes a two-hundredth of it) and the ink pass turning
+pale where the picture is dark (`uInk`). Both are per-hour numbers in the `SKY`
+table. The moonlit ink is gated on how far the depth jumps, because the map is
+strewn with pebbles and lighting every edge turns a night into a wireframe.
+
+**The emissive channel carries three things.** `aEmit` packs the emissive level
+(0-2), the finish in the next two bits (`mat*8`), and — for the static mesh only
+— a wind sway weight from 32 up. Decoding is `mod(aEmit,8)`, `floor(mod(aEmit,32)/8)`
+and `floor(aEmit/32)`. That is one float doing three jobs to avoid a fourth
+vertex attribute across a quarter of a million vertices, and getting the
+arithmetic wrong makes a canopy glossy or a brazier dark without throwing.
+`tools/weather.mjs` decodes every vertex and checks all three read back.
+
+**The wind is a vertex shader, and the shadow pass runs the same one.** The
+trees are static geometry — one buffer, one draw — so there is nothing per tree
+to animate. `GLSL_SWAY` is shared by `VS_STATIC` and `VS_SHADOW_STATIC` on
+purpose: a tree that sways while its shadow stands still is worse than no wind.
+Both take the clock from `R.setClock`, which the game feeds from `S.tt`, so a
+headless run of a known number of steps draws the same frame every time.
 
 **`spark()` uses `g` for the green channel.** Particle records are colour
 records. Their ground height is `gnd`. Do not reuse single letters on those

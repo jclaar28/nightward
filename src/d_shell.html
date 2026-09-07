@@ -607,10 +607,16 @@
      to unset top/left explicitly or it lands in the corner of the screen */
   /* thin depleting lines pinned over things in the world */
   #worldBars{position:fixed;inset:0;pointer-events:none;z-index:7;overflow:hidden}
-  .wBar{position:absolute;width:46px;height:3px;margin-left:-23px;
-    background:rgba(9,11,14,.72);border:1px solid rgba(0,0,0,.55);
-    box-shadow:0 0 0 1px rgba(237,235,231,.10)}
-  .wBar i{display:block;height:100%;background:#E8913C;
+  /* A gauge on the field, not a debug readout. The outer light ring is gone —
+     it read as a selected input — and the ends are rounded so a bar at a
+     soldier's scale is a stroke rather than a brick. Width and height come from
+     the camera in worldBars(), because a bar that stays 46px while the thing it
+     belongs to halves stops belonging to it. */
+  .wBar{position:absolute;height:3px;border-radius:2px;overflow:hidden;
+    background:rgba(6,8,11,.34);
+    box-shadow:0 1px 2px rgba(0,0,0,.45), inset 0 0 0 1px rgba(0,0,0,.30)}
+  .wBar i{display:block;height:100%;border-radius:2px;background:#E8913C;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.16);
     transition:width .10s linear}
   /* yours reads cool, theirs reads warm, so a melee stays legible at a glance */
   .wBar.own i{background:#74BE9B}

@@ -223,6 +223,113 @@ the same sequence right afterwards, so the bare `rnd()` left behind in the quad
 loop is the only reason existing seeds still grow the same forest. It looks
 exactly like dead code. Deleting it reports 0 draws for 40,000 cells.
 
+**`hud.mjs`** — the layer between the cursor and the world. Where the cursor is
+pointing, where a unit sits on screen for a click or a marquee, and where a
+building's box begins for a pick were all answered against a flat plane at the
+plateau's height. That is exactly right in the middle of the map and wrong
+everywhere else: the camera looks down at 36 degrees, so three units of drop
+between the plane and the real hillside slides the answer nearly three cells
+sideways. Reverting the fix, the cursor reports a point 5.90 units from where
+its own ray crosses the terrain, and a unit standing out there cannot be clicked
+or marqueed at all — 0 selected, twice.
+
+Ground truth for the cursor is computed inside the test by walking the camera's
+ray down onto the height field in tenth-unit steps. That is deliberately not how
+the game does it — the game solves it — so the check is a second opinion rather
+than the same arithmetic run twice.
+
+It is the one tool here that leaves the page's frame loop running, for a reason
+worth knowing: everything inside a single `page.evaluate` runs to completion
+before a rAF callback can interleave, so each block is atomic anyway, and the
+health bars are DOM elements written by that loop — stopping it leaves nothing
+to measure. The bar checks straddle two evaluates for the same reason: damage in
+one, a frame, read in the next.
+
+**`weather.mjs`** — the world moving when nothing in the simulation moves. The
+trees are part of the static mesh — one buffer, one draw call, nothing per tree
+to animate on the CPU — so the wind lives in the vertex shader, and what tells
+it which vertices are foliage is a sway weight packed into the top of the
+emissive channel: emit uses 0-2 and the finish uses the next two bits, so
+everything from 32 up was free. That packing is the part that breaks silently.
+Get the arithmetic wrong and a canopy stops being matte or a brazier stops being
+a light, and nothing throws — so this decodes every vertex of the static mesh
+and asserts the two fields the sway weight shares a float with still read back
+as themselves.
+
+The motion is measured against the clock rather than the wall: two draws at the
+same clock value must be byte-identical, which is what makes a headless run
+reproducible and is exactly what fails if somebody reaches for `Date.now()`.
+Broken four ways — no wind (0% of the frame changes), sway applied to
+everything (the settlement ripples), the weight packed over the finish bits
+(heaviest weight reads 1 instead of 7), and the clock taken from the wall
+(327,097 bytes differ between two draws that should match).
+
+Its third check took two attempts and the fix is the useful part: "nothing else
+moves" was measured on a patch found by checking only that the ground was level,
+which framed a stand of pines fifteen units away and reported the ground
+rippling at 3.9%. It looks at the buildable plateau now, at a zoom whose corners
+stay inside the treeline, because the view is wider than it is tall and at zoom
+9 the corners reach 16.9 units while the nearest trees start at 14.8.
+
+**`combat.mjs`** — whether a fight happens where the fight is. Nearly every
+effect in the game was spawned at `PLAT`, the plateau constant, rather than at
+the ground under it: the sparks off a blow, the flash off an impact, a tower's
+muzzle, the height a bolt flies at, the height a corpse stops falling. On the
+plateau that is exactly right and invisible, which is why it survived so long —
+march out to a nest, where the ground rolls by three units, and sparks go off
+underground, bodies come to rest buried or hovering, and an arrow aimed at a
+fixed chest height lands in the dirt in front of anything standing uphill.
+
+So it stages a real fight away from the flat, by the bait method
+`campaign.mjs` uses, and measures every effect against the terrain beneath it.
+`instances.mjs` makes this kind of claim about things that are *drawn*; this one
+is about things that are *spawned*, which no draw-time check can see, because by
+then the number is already wrong.
+
+Three of its checks needed a second attempt. "Nothing is spawned underneath the
+ground" only catches one of the two ways this fails — whether the ground is
+above or below the plateau decides the direction — and the chosen nest sits
+below it, so the first version watched sparks go off four units over everyone's
+heads and called it fine. The bolt check sampled mid-flight, where the two
+candidate heights have not diverged yet (0.40 from one and 0.49 from the other,
+which decides nothing); it follows each bolt until it disappears and reads where
+it actually arrived, 0.19 from its target's chest against 0.85 from the height
+the old code aimed at. And the corpse landing is driven directly rather than
+waited for, because one commander takes a very long time to kill a nest guard
+and what is under test is four lines of the corpse step.
+
+**`lighting.mjs`** — whether you can see what is coming. A body stood 13 levels
+of luminance off the ground behind it at night against 44 by day, so a wave of
+ninety attackers was a wave you could pick out ten of. This measures the
+contrast at the BOUNDARY of a shape rather than the average over its middle,
+because that is what a silhouette reads by.
+
+Three of its measurements were wrong before they were right, and each mistake is
+worth knowing. Averaging the whole silhouette *including the shadow it casts*
+reported dusk as the hardest hour to see a body — a unit's shadow at dusk is ten
+times the area of the unit, so what that number described was the contrast of a
+shadow. Contrast against the ground alone could not tell a dark outline from a
+pale one, because both differ from the grass by about the same amount; it now
+also measures how far the outline stands off the *body*, which is the thing a
+dark line around a dark shape cannot do. And the counterweight check — night
+must still be night — passed with the edge light turned up eight times, because
+edges are a sliver of the frame and the mean barely moves; it reads the bright
+tail as well now.
+
+The tool is bit-identical run to run, which took work: the page keeps its own
+frame loop running while a test does its setup, so every reading was taken from
+whatever it drew last rather than from the frame the test built, and a unit's
+gait phase advances with distance walked, so two runs measured two different
+stances and disagreed by twelve levels on an unchanged build. It stops the loop
+and freezes the pose. Any tool here that reads pixels should do the same.
+
+Checked by breaking the change six ways: no sky rim (13.0 at night), no moonlit
+outline (the outline sits 9.1 off its body instead of 15.2), the fire stops
+moving (0% swing), lamps pinned to the plateau again (2.35 and 1.79 above their
+own ground), the night lit until it is day (the brightest half-percent reaches
+199), and the depth gate dropped so every pebble is outlined (19,772 cold marks
+against 10,550).
+
 **`decals.mjs`** — the marks on the ground, and the one bug in them that no
 instance count could ever have caught. Every ring in the game was geometrically
 perfect and looked wrong anyway: the chips were opaque, so the ink pass found a

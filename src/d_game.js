@@ -274,6 +274,7 @@ function init(renderer, cv, settings, endCb){
     // d_gl.render — so they are the one group that must NOT be in BATCHES.
     marker:R.makeBatch(M.buildAsset("marker"),false,"add"),
     dshade:R.makeBatch(M.buildAsset("shadepatch"),false,"mul"),
+    mist:R.makeBatch(M.buildAsset("mistpatch"),false,"add"),
     debris:R.makeBatch(M.buildAsset("spark"),false),
     corpse:R.makeBatch(M.buildAsset("corpse")),
     bolt :R.makeBatch(M.buildAsset("tracer"),false),
@@ -296,7 +297,7 @@ function init(renderer, cv, settings, endCb){
            B.bolt,B.arrow,B.spark,B.debris,B.tile];
   // Drawn after everything solid, blended, and in this order: the shade is
   // taken out of the ground first so the light that follows lands on top of it.
-  DECALS=[B.dshade,B.grid,B.rchip,B.marker];
+  DECALS=[B.dshade,B.mist,B.grid,B.rchip,B.marker];
   buildRigs(true);
   // bones draw with the living attackers, between the buildings and the effects
   var rigB=[];
@@ -314,11 +315,11 @@ function init(renderer, cv, settings, endCb){
            bolt:400,arrow:300,wall:1400,turret:200,soldier:120,archer:120,worker:120,
            scout:40, commander:8,
            marker:24,salvage:24,cottage:120,nest:24,site:600,road:5200,
-           rchip:9000,dshade:3200};
+           rchip:9000,dshade:3200,mist:120};
   ["hall","tower","ballista","brazier","barracks","archery","cottage",
    "wall","wpost","gate","turret",
    "soldier","archer","worker","scout","commander","salvage","nest",
-   "corpse","bolt","arrow","spark","debris","rchip","dshade","marker","tile","grid","site",
+   "corpse","bolt","arrow","spark","debris","rchip","dshade","mist","marker","tile","grid","site",
    "road"].forEach(function(k){
     buf[k]=new Float32Array(12*(CAP[k]||700));
   });
@@ -453,7 +454,7 @@ function rebuildAssets(){
    ["soldier","soldier"],["archer","archer"],["worker","worker"],
    ["commander","commander"],
    ["cottage","cottage"],["salvage","salvage"],
-   ["arrow","arrow"],["marker","marker"],["dshade","shadepatch"]]
+   ["arrow","arrow"],["marker","marker"],["dshade","shadepatch"],["mist","mistpatch"]]
   .forEach(function(pair){ R.rebuildBatch(B[pair[0]], M.buildAsset(pair[1])); });
   buildRigs(false);
 }
@@ -777,7 +778,7 @@ function collapseSite(p){
   var b=p.site;
   if(!b) return;
   var bx=M.gx2w(b.gx), bz=M.gx2w(b.gz);
-  spark(bx,PLAT+0.9,bz,10,[0.85,0.70,0.48],1.1,3.0,0.55,1.0);
+  spark(bx,gy(bx,bz)+0.9,bz,10,[0.85,0.70,0.48],1.1,3.0,0.55,1.0);
   footCells(b.type,b.gx,b.gz).forEach(function(c){ delete S.cells[key(c[0],c[1])]; });
   p.site=null; p.placed=false;
   S.distDirty=true; S.netCellsDirty=true; S.pathVer=(S.pathVer|0)+1;
@@ -792,7 +793,7 @@ function finishHall(p,b){
   b.garrison=[]; b.trainCd=0;
   musterAll(b);
   var hx=M.gx2w(b.gx), hz=M.gx2w(b.gz);
-  spark(hx,PLAT+1.6,hz,14,[1.15,0.98,0.62],1.2,3.2,0.55,1.1);
+  spark(hx,gy(hx,hz)+1.6,hz,14,[1.15,0.98,0.62],1.2,3.2,0.55,1.1);
   if(SND) SND.built(hx,hz);
   S.distDirty=true; S.netCellsDirty=true; S.pathVer=(S.pathVer|0)+1;
   if(UI.hotbar) UI.hotbar();
@@ -1017,7 +1018,7 @@ function updateWorker(u,U,dt){
       var hx=M.gx2w(h.gx), hz=M.gx2w(h.gz);
       if(stepToBuilding(u,U,h)){
         u.inside=true;
-        spark(hx,PLAT+0.5,hz,3,[1.05,0.95,0.68],0.7,1.4,0.26,0.45);
+        spark(hx,gy(hx,hz)+0.5,hz,3,[1.05,0.95,0.68],0.7,1.4,0.26,0.45);
         if(UI.units) UI.units();
       }
       return;
@@ -1053,7 +1054,7 @@ function updateWorker(u,U,dt){
     u.carry+=take; u.job.amt-=take;
     u.rot=Math.atan2(u.job.z-u.z,u.job.x-u.x);
     if(Math.random()<dt*2.2)
-      spark(u.job.x,PLAT+0.5,u.job.z,1,[1.1,0.95,0.62],0.9,1.5,0.35,0.5);
+      spark(u.job.x,gy(u.job.x,u.job.z)+0.5,u.job.z,1,[1.1,0.95,0.62],0.9,1.5,0.35,0.5);
     if(u.carry>=U2.carry-1e-6 || u.job.amt<=0) u.mode="toHall";
     return;
   }
@@ -1389,7 +1390,7 @@ function updateRoadwork(u,U,dt,op){
   if(u.atk<0) u.atk=0;
   job.e.prog+=dt;
   if(Math.random()<dt*1.6)
-    spark(job.x,PLAT+0.25,job.z,1,[0.72,0.66,0.54],0.6,1.1,0.22,0.4);
+    spark(job.x,gy(job.x,job.z)+0.25,job.z,1,[0.72,0.66,0.54],0.6,1.1,0.22,0.4);
   if(job.e.prog>=job.e.need){
     job.e.prog=job.e.need;
     job.e.done=true;
@@ -1459,7 +1460,7 @@ function updateMender(u,U,dt,op){
   if(u.atk<0) u.atk=0;                    // the same loop the commander uses
   b.hp=Math.min(b.max, b.hp+(U.repair||16)*dt);
   if(Math.random()<dt*3.4)
-    spark(bx+(Math.random()-0.5)*1.4, PLAT+0.75, bz+(Math.random()-0.5)*1.4,
+    spark(bx+(Math.random()-0.5)*1.4, gy(bx,bz)+0.75, bz+(Math.random()-0.5)*1.4,
           1, [1.15,1.02,0.68], 0.8, 1.6, 0.30, 0.5);
   if(b.hp>=b.max){ u.fix=null; u.fixOrder=false; }
 }
@@ -1617,7 +1618,7 @@ function updateUnits(dt){
           site.prog+=work;
           site.hp=Math.min(site.max, site.hp+site.max*work/site.need);
           if(Math.random()<dt*4.0)
-            spark(sx+(Math.random()-0.5)*2.6, PLAT+0.9, sz+(Math.random()-0.5)*2.6,
+            spark(sx+(Math.random()-0.5)*2.6, gy(sx,sz)+0.9, sz+(Math.random()-0.5)*2.6,
                   1, [1.20,1.00,0.62], 0.85, 1.7, 0.34, 0.55);
           if(u.atk<0) u.atk=0;        // keep the hammer swinging while it works
           if(site.prog>=site.need) finishHall(op2,site);
@@ -1659,7 +1660,8 @@ function updateUnits(dt){
           u.atk=0;                        // and the animation runs off it
           if(U.melee){
             hurtTarget(tgt,U.dmg,u.own|0);
-            spark((u.x+tgt.x)/2,PLAT+0.55,(u.z+tgt.z)/2,3,[1.9,1.9,1.6],1.0,2.2,0.20,0.6);
+            var mhx=(u.x+tgt.x)/2, mhz=(u.z+tgt.z)/2;
+            spark(mhx,gy(mhx,mhz)+0.55,mhz,3,[1.9,1.9,1.6],1.0,2.2,0.20,0.6);
             if(SND) SND.swing(u.x,u.z);
           } else {
             S.bolts.push({x:u.x,y:gy(u.x,u.z)+0.95,z:u.z,t:tgt,dmg:U.dmg,rot:0,
@@ -2507,7 +2509,7 @@ function stepCombat(dt){
         blockU.hp-=m.dmgB*per; blockU.hit=1;
         var bd=Math.hypot(blockU.x-m.x,blockU.z-m.z)||1;
         blockU.x+=(blockU.x-m.x)/bd*0.10; blockU.z+=(blockU.z-m.z)/bd*0.10;
-        strikeFx(m,blockU.x,PLAT+0.62,blockU.z,m.t==="brute");
+        strikeFx(m,blockU.x,gy(blockU.x,blockU.z)+0.62,blockU.z,m.t==="brute");
         if(SND) SND.swing(m.x,m.z);
       }
       continue;
@@ -2531,7 +2533,7 @@ function stepCombat(dt){
           S.shake=Math.min(0.16,S.shake+0.045);
         }
         debris(m,hhx,hhz,2.35,m.t==="brute"?7:4);
-        strikeFx(m,hhx,PLAT+0.85,hhz,m.t==="brute");
+        strikeFx(m,hhx,gy(hhx,hhz)+0.85,hhz,m.t==="brute");
         if(SND&&mine) SND.hallHit(hhx,hhz);
         // that blow may have ended the round — but this step also runs by day,
         // so the test is "is it over", not "is it night"
@@ -2575,7 +2577,7 @@ function stepCombat(dt){
         if(perB>0){
           damageBuilding(blocker,m.dmgB*perB);
           debris(m,bx,bz,(TYPES[blocker.type].foot*CELL)/2,m.t==="brute"?6:3);
-          strikeFx(m,bx,PLAT+0.6,bz,m.t==="brute");
+          strikeFx(m,bx,gy(bx,bz)+0.6,bz,m.t==="brute");
           if(SND) SND.chew(bx,bz);
           if(S.phase==="won"||S.phase==="lost") return;
         }
@@ -2612,7 +2614,7 @@ function stepCombat(dt){
     }
     if(!best){ c.cd=0.12; continue; }
     c.cd=tyr.fire*(c.fireMul||1);
-    var muzY=PLAT+(c.type==="ballista"?2.6:3.0);
+    var muzY=gy(tx2,tz2)+(c.type==="ballista"?2.6:3.0);
     S.bolts.push({x:tx2,y:muzY,z:tz2,t:best,dmg:tyr.dmg,rot:0,
                   spd:tyr.boltSpeed||BOLT_SPEED, sc:tyr.boltScale||1,
                   splash:tyr.splash||0, splashK:(tyr.splashK===undefined?0.7:tyr.splashK),
@@ -2625,7 +2627,13 @@ function stepCombat(dt){
     var bo=S.bolts[b2];
     if(!bo.t||bo.t.hp<=0){ S.bolts.splice(b2,1); continue; }
     var sp2=bo.spd||BOLT_SPEED;
-    var vx=bo.t.x-bo.x, vy=(PLAT+0.55)-bo.y, vz=bo.t.z-bo.z, L2=Math.hypot(vx,vy,vz);
+    // A bolt flies at the chest of what it is aimed at, wherever that is
+    // standing. Aiming at a fixed height sent every shot to the plateau's chest
+    // height instead, so a shot at something uphill landed in the dirt in front
+    // of it and one downhill passed over its head — and the impact went off
+    // where the arrow was told to be rather than where the body was.
+    var aimY=gy(bo.t.x,bo.t.z)+0.55;
+    var vx=bo.t.x-bo.x, vy=aimY-bo.y, vz=bo.t.z-bo.z, L2=Math.hypot(vx,vy,vz);
     bo.rot=Math.atan2(vz,vx)+Math.PI/2;
     if(L2<sp2*dt){
       var hx2=bo.t.x, hz2=bo.t.z;
@@ -2656,9 +2664,9 @@ function stepCombat(dt){
             se.dx=(se.x-hx2)/sl; se.dz=(se.z-hz2)/sl;
           }
         }
-        spark(hx2,PLAT+0.5,hz2,9,[2.4,1.35,0.5],1.2,4.2,0.42,1.15);
+        spark(hx2,gy(hx2,hz2)+0.5,hz2,9,[2.4,1.35,0.5],1.2,4.2,0.42,1.15);
         S.shake=Math.min(0.18,S.shake+0.05);
-      } else spark(hx2,PLAT+0.6,hz2,3,
+      } else spark(hx2,gy(hx2,hz2)+0.6,hz2,3,
                    bo.friendly?[1.1,2.2,2.3]:[2.3,1.5,0.6],1.0,2.4,0.22,0.65);
       if(SND) SND.impact(!!bo.splash,hx2,hz2);
       S.bolts.splice(b2,1); continue;
@@ -2669,6 +2677,10 @@ function stepCombat(dt){
 
 function update(dt){
   if(!active||!S) return;
+  // A clock that only the look uses. It is deliberately not in the snapshot:
+  // firelight flickering out of step on two machines is not a desync, and
+  // syncing it would put a cosmetic number on the wire every frame.
+  S.tt=(S.tt||0)+dt;
   stepPan(dt);
   // The guest owns nothing: the host decides every position and hit point, and
   // this side only advances the cosmetic parts so the picture stays smooth
@@ -2745,8 +2757,12 @@ function update(dt){
       co.x+=co.vx*dt; co.z+=co.vz*dt; co.y+=co.vy*dt;
       co.tum+=co.spin*dt;
       var fr=Math.exp(-dt*3.0); co.vx*=fr; co.vz*=fr;
-      if(co.y<=PLAT+0.02){                  // landed: stop tumbling, lie flat
-        co.y=PLAT+0.02; co.down=true; co.tum=0;
+      // Where it lands is the ground it fell on. Landing at PLAT left a body
+      // that died uphill lying buried and one that died downhill hovering,
+      // which is the same mistake as drawing it there.
+      var cgy=(co.gnd===undefined?gy(co.x,co.z):co.gnd)+0.02;
+      if(co.y<=cgy){                        // landed: stop tumbling, lie flat
+        co.y=cgy; co.down=true; co.tum=0;
       }
     }
   }
@@ -2839,7 +2855,7 @@ function eliminate(pid){
     var c=S.cells[k];
     if(c.ref||((c.own||0)!==pid)) continue;
     var bx=M.gx2w(c.gx), bz=M.gx2w(c.gz);
-    spark(bx,PLAT+0.9,bz,7,[0.85,0.62,0.42],1.1,3.4,0.6,1.0);
+    spark(bx,gy(bx,bz)+0.9,bz,7,[0.85,0.62,0.42],1.1,3.4,0.6,1.0);
     if(c.garrison) disband(c);
     footCells(c.type,c.gx,c.gz).forEach(function(cc){ delete S.cells[key(cc[0],cc[1])]; });
   }
@@ -2909,6 +2925,29 @@ function rayBox(O,D,lo,hi){
   }
   return tmax<0 ? null : Math.max(tmin,0);
 }
+// Where the cursor's ray meets the ground — the real ground, not a flat plane
+// at the plateau's height.
+//
+// The plane was right for as long as everything happened on the plateau, and
+// wrong by 4.1 units the moment it did not: the camera looks down at 36
+// degrees, so three units of drop between the plane and the actual hillside
+// slides the answer nearly three cells sideways. That is a road laid where you
+// did not point and a building placed in the wrong yard, and it is invisible in
+// the middle of the map where the ground is flat.
+//
+// The plane hit is the first guess; each step after it walks the ray to where
+// it should have crossed. Damped, because on a cliff face the correction can
+// overshoot into ground that is higher still and ring between the two.
+function groundHit(O,f){
+  var t=(PLAT-O[1])/f[1];
+  for(var i=0;i<8;i++){
+    var px=O[0]+f[0]*t, py=O[1]+f[1]*t, pz=O[2]+f[2]*t;
+    var dy=py-gy(px,pz);
+    if(Math.abs(dy)<0.01) break;
+    t += dy/(-f[1]||-1e-6)*0.85;
+  }
+  return t;
+}
 // A building is a solid box, not a hole in the ground. Testing only the ground
 // plane meant clicking a tower's roof picked whatever tile was behind it — from
 // this camera angle that is several cells away, and it selected the wrong thing
@@ -2927,20 +2966,20 @@ function pick(cx,cy){
   // first and every t is a real, comparable distance.
   var back=260;
   O[0]-=C.f[0]*back; O[1]-=C.f[1]*back; O[2]-=C.f[2]*back;
-  var t=(PLAT-O[1])/C.f[1];
+  var t=groundHit(O,C.f);
   var best=t, hitB=null;
   for(var k in S.cells){
     var c=S.cells[k];
     if(c.ref) continue;
     var half=((TYPES[c.type].foot||1)*CELL)/2;
     var bx=M.gx2w(c.gx), bz=M.gx2w(c.gz);
-    var top=PLAT+(BAR_Y[c.type]||2.4)*0.86;
-    var th=rayBox(O,C.f,[bx-half,PLAT,bz-half],[bx+half,top,bz+half]);
+    var base=gy(bx,bz), top=base+(BAR_Y[c.type]||2.4)*0.86;
+    var th=rayBox(O,C.f,[bx-half,base,bz-half],[bx+half,top,bz+half]);
     if(th!==null&&th<best){ best=th; hitB=c; }
   }
   if(hitB) return {x:M.gx2w(hitB.gx), z:M.gx2w(hitB.gz),
                    gx:hitB.gx, gz:hitB.gz, onBuilding:true};
-  var p=[O[0]+C.f[0]*t, PLAT, O[2]+C.f[2]*t];
+  var p=[O[0]+C.f[0]*t, 0, O[2]+C.f[2]*t];
   return {x:p[0], z:p[2], gx:M.w2gx(p[0]), gz:M.w2gx(p[2])};
 }
 
@@ -3526,6 +3565,20 @@ function rangeRing(n,x,z,r,col,tick,lift){
 // a clear cool wash on grass, and the 2.10 this used to carry was three times
 // what the display could show — which is why every ring came out the same
 // flat, blown, identical cyan whatever it was meant to mean.
+// Mist comes up after dusk and burns off after dawn. It is keyed to the hour
+// rather than to the phase because dawn arrives before the fighting stops.
+function mistK(){
+  var p=S.dayP;
+  if(p<0.36||p>1.72) return 0;
+  var up=Math.min(1,(p-0.36)/0.34), dn=Math.min(1,(1.72-p)/0.30);
+  return Math.min(up,dn)*0.85;
+}
+// A stable 0..1 from a lattice point, so a patch of mist is in the same place
+// every frame and no two patches share a drift.
+function hash2(x,z){
+  var v=Math.sin(x*127.1+z*311.7)*43758.5453;
+  return v-Math.floor(v);
+}
 var IND={
   sel   :[0.105,0.330,0.390],   // picked, yours
   range :[0.055,0.145,0.130],   // how far a weapon reaches
@@ -3550,7 +3603,7 @@ function pack(){
   var n={hall:0,tower:0,ballista:0,brazier:0,barracks:0,archery:0,cottage:0,
          wall:0,wpost:0,gate:0,turret:0,salvage:0,
          soldier:0,archer:0,worker:0,scout:0,commander:0,nest:0,
-         corpse:0,bolt:0,arrow:0,spark:0,debris:0,rchip:0,dshade:0,marker:0,tile:0,grid:0,site:0,
+         corpse:0,bolt:0,arrow:0,spark:0,debris:0,rchip:0,dshade:0,mist:0,marker:0,tile:0,grid:0,site:0,
          road:0};
   for(var rk0 in RIGDEF){
     n[rk0+"Body"]=0; n[rk0+"Arm"]=0; n[rk0+"Leg"]=0;
@@ -3710,6 +3763,35 @@ function pack(){
       var cf=Math.min(1,u.carry/Math.max(1,UNITS[u.t].carry));
       var lc=[0.95+0.5*cf,0.78+0.35*cf,0.40];
       n.spark=put(buf.spark,n.spark,u.x,gy(u.x,u.z)+1.35*u.sc,u.z,0,lc,0.85+0.7*cf,lc);
+    }
+  }
+  // ---- mist ---------------------------------------------------------------
+  // Patches on a fixed world lattice, drifting, with the ones near the camera
+  // drawn and the rest ignored. A lattice rather than a spawn list because mist
+  // has to already be there when you pan into it: anything spawned around the
+  // camera pops into existence at the edge of the screen, and on a map this
+  // size keeping a real particle system alive everywhere costs more than the
+  // whole rest of the frame.
+  //
+  // It is additive, so overlapping patches thicken and a gap between them is a
+  // clear patch of ground — which is what makes it read as weather rather than
+  // as a flat wash laid over the picture.
+  var misK=mistK();
+  if(misK>0.002){
+    var MSTEP=11, MR=3;
+    var mcx=Math.round(cam.tx/MSTEP), mcz=Math.round(cam.tz/MSTEP);
+    var mcol=[0.090*misK,0.116*misK,0.140*misK];
+    for(var mi=-MR;mi<=MR;mi++) for(var mj=-MR;mj<=MR;mj++){
+      var lx=(mcx+mi)*MSTEP, lz=(mcz+mj)*MSTEP;
+      var hh1=hash2(lx,lz), hh2=hash2(lx+7.3,lz-3.1);
+      var tt=(S.tt||0);
+      var px2=lx+(hh1-0.5)*MSTEP*0.9+Math.sin(tt*0.031+hh1*6.283)*3.4;
+      var pz2=lz+(hh2-0.5)*MSTEP*0.9+Math.cos(tt*0.026+hh2*6.283)*3.4;
+      // a patch that is thin at its own pace, so the bank breathes
+      var thin=0.62+0.38*Math.sin(tt*0.07+hh1*9.4);
+      n.mist=put(buf.mist,n.mist,px2,gy(px2,pz2)+0.18,pz2,0,
+                 [mcol[0]*thin,mcol[1]*thin,mcol[2]*thin],
+                 6.2+hh2*3.4,[mcol[0]*thin,mcol[1]*thin,mcol[2]*thin]);
     }
   }
   for(i=0;i<S.markers.length;i++){
@@ -3944,6 +4026,14 @@ var LAMP_SPEC={
   archery :[1.75,  6.2, 1.00,0.74,0.40, 0.44],
   cottage :[1.35,  5.6, 1.00,0.74,0.38, 0.46]
 };
+// Firelight is not a light bulb. Two slow waves at unrelated rates, seeded off
+// where the thing stands so no two fires breathe together, and shallow enough
+// to read as a fire rather than as a fault: a brazier swings about a tenth
+// either way, a window half of that.
+function flick(seed,amp){
+  var t=(S.tt||0)+seed*0.37;
+  return 1 + amp*0.10*(Math.sin(t*3.1)*0.62 + Math.sin(t*7.9+seed)*0.38);
+}
 function packLamps(){
   LAMPS.length=0;
   var anyHall=false;
@@ -3951,7 +4041,8 @@ function packLamps(){
     var H=S.players[ph].hall;
     if(!H) continue;
     anyHall=true;
-    LAMPS.push([M.gx2w(H.gx),PLAT+1.60,M.gx2w(H.gz),8.6, 1.00,0.70,0.34, 0.78]);
+    var hxw=M.gx2w(H.gx), hzw=M.gx2w(H.gz);
+    LAMPS.push([hxw,gy(hxw,hzw)+1.60,hzw,8.6, 1.00,0.70,0.34, 0.78*flick(1,0.5)]);
   }
   if(!anyHall) return LAMPS;
   var hx=me().hall?M.gx2w(me().hall.gx):S.players[S.me].cx;
@@ -3970,7 +4061,12 @@ function packLamps(){
   });
   for(var i=0;i<lit.length&&LAMPS.length<12;i++){
     var t=lit[i], sp=LAMP_SPEC[t.type];
-    LAMPS.push([M.gx2w(t.gx),PLAT+sp[0],M.gx2w(t.gz),sp[1], sp[2],sp[3],sp[4], sp[5]]);
+    var tx=M.gx2w(t.gx), tz=M.gx2w(t.gz);
+    // gy(), not PLAT. Every lamp in the game hung at the plateau's height, which
+    // is right only for as long as nothing is ever lit off the plateau — the
+    // documented way to float something half a unit in the air.
+    LAMPS.push([tx,gy(tx,tz)+sp[0],tz,sp[1], sp[2],sp[3],sp[4],
+                sp[5]*flick(t.gx*7+t.gz*13, t.type==="brazier"?1:0.55)]);
   }
   return LAMPS;
 }
@@ -3982,6 +4078,13 @@ var ambT=0, ambOn=false;
 function draw(){
   if(!active||!S) return;
   if(R.setTime) R.setTime(S.dayP);
+  // The wind rises and falls over a couple of minutes rather than blowing at
+  // one strength forever, and it runs off the same cosmetic clock the fires
+  // flicker on — deterministic for a headless run, not on the wire.
+  if(R.setClock){
+    var wt=S.tt||0;
+    R.setClock(wt, 0.62+0.30*(0.5+0.5*Math.sin(wt*0.083))+0.12*Math.sin(wt*0.31));
+  }
   if(R.setLamps) R.setLamps(packLamps());
   if(SND&&SND.listen){
     var CA=camera(true);
@@ -4031,7 +4134,7 @@ function unitAt(cx,cy){
   for(var i=0;i<S.units.length;i++){
     var u=S.units[i];
     if((u.own||0)!==S.me||u.inside) continue;
-    var sp=projPt(C.vp,u.x,PLAT+0.62*u.sc,u.z,rect);
+    var sp=projPt(C.vp,u.x,gy(u.x,u.z)+0.62*u.sc,u.z,rect);
     var d=Math.hypot(sp[0]-cx,sp[1]-cy);
     if(d<bd){ bd=d; best=u; }
   }
@@ -4044,7 +4147,7 @@ function unitsInBox(x0,y0,x1,y1){
   for(var i=0;i<S.units.length;i++){
     var u=S.units[i];
     if((u.own||0)!==S.me||u.inside) continue;
-    var sp=projPt(C.vp,u.x,PLAT+0.62*u.sc,u.z,rect);
+    var sp=projPt(C.vp,u.x,gy(u.x,u.z)+0.62*u.sc,u.z,rect);
     if(sp[0]>=ax&&sp[0]<=bx&&sp[1]>=ay&&sp[1]<=by) out.push(u);
   }
   return out;
@@ -4422,7 +4525,7 @@ return {
       var o=[C.target[0]+C.r[0]*sx[i]*hw+C.u[0]*sy[i]*hh,
              C.target[1]+C.r[1]*sx[i]*hw+C.u[1]*sy[i]*hh,
              C.target[2]+C.r[2]*sx[i]*hw+C.u[2]*sy[i]*hh];
-      var t=(PLAT-o[1])/(Math.abs(C.f[1])<1e-6?1e-6:C.f[1]);
+      var t=groundHit(o,C.f);
       out.push([o[0]+C.f[0]*t, o[2]+C.f[2]*t]);
     }
     return out;

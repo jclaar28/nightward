@@ -531,22 +531,36 @@ function buildStatic(T,props){
     }
   }
   // trees + rocks outside the buildable plateau
+  // A tree's canopy carries a sway weight in the top of its emissive channel;
+  // the trunk carries none. See GLSL_SWAY in d_gl.js — emit uses values 0-2 and
+  // the finish uses the next two bits, so everything from 32 up was free, and
+  // the alternative was a whole extra vertex attribute across a mesh of a
+  // quarter of a million vertices for one number per vertex.
+  var SWAY=32;
   function tree(x,z,s,dead){
     var y=h(x,z)-0.1, hgt=(2.0+rnd()*1.7)*s;
+    M.emitAll=null;
     cyl(M,x,y,z,0.20*s,hgt*0.62,6,jit(PAL.trunk,rnd,0.2));
     if(dead){
       for(var b=0;b<4;b++){
         var ba=rnd()*Math.PI*2;
+        // bare branches move, and less than leaves do
+        M.emitAll=SWAY*(2+b);
         box(M,x+Math.cos(ba)*0.35*s,y+hgt*0.45+b*0.22,z+Math.sin(ba)*0.35*s,
             1.0*s,0.11,0.11,ba,jit(PAL.trunk,rnd,0.2));
       }
+      M.emitAll=null;
       return;
     }
     var lay=2+Math.floor(rnd()*2);
     for(var l=0;l<lay;l++){
       var f=1-l*0.28;
+      // higher layers swing further, which is what makes a tree bend rather
+      // than slide sideways
+      M.emitAll=SWAY*Math.min(7,3+l*2);
       cone(M,x,y+hgt*(0.50+l*0.30),z,(1.35*s)*f,(1.5*s)*f,7,jit(l%2?PAL.leafD:PAL.leaf,rnd,0.18));
     }
+    M.emitAll=null;
   }
   var nearC=T.nearC||function(x,z){ return Math.hypot(x,z); };
   for(var t=0;t<(G.trees|0);t++){
@@ -1510,6 +1524,14 @@ var ASSETS=[
   slots:["A — decal, additive"],
   parts:[
     {id:"chip", name:"Segment", prim:"glow", p:[0,0,0], s:[1.60,0,0.30], emit:true}
+  ]},
+
+{ id:"mistpatch", name:"Mist", group:"Overlays",
+  colA:[0.052,0.070,0.088], colB:[0.052,0.070,0.088], scale:1.0,
+  note:"One patch of ground mist. Dozens of these drift on a lattice around the camera after dark, each one a pool with no rim, added to what is behind it — so where two overlap the haze thickens and where none reach there is none. It lies flat and just above the ground rather than standing up as a volume, which from this camera angle is the difference between a night that has weather in it and a shader nobody can afford.",
+  slots:["A — decal, additive"],
+  parts:[
+    {id:"pool", name:"Pool", prim:"gdisc", p:[0,0,0], s:[1.0], seg:26, emit:true}
   ]},
 
 { id:"shadepatch", name:"Contact Shade", group:"Overlays",

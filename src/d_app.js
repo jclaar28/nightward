@@ -620,8 +620,14 @@ function worldBars(){
     n.hidden=false;
     n.style.left=Math.round(sx)+"px";
     n.style.top=Math.round(sy)+"px";
-    var w=a.w||46;
+    // Scaled by the camera, not fixed in pixels. `a.w` is the width at the
+    // default zoom of 17; zoomed out to 34 a soldier is half the size it was
+    // and a 22px bar over it is a placard. Clamped at both ends so a bar stays
+    // a bar: legible when far out, and not a slab when right in.
+    var k=Math.max(0.60,Math.min(1.25,17/(HFGAME.cam?HFGAME.cam().zoom:17)));
+    var w=Math.round((a.w||46)*k);
     n.style.width=w+"px";
+    n.style.height=Math.max(2,Math.round(3*k))+"px";
     n.style.marginLeft=(-w/2)+"px";
     n.classList.toggle("own",a.k==="own");
     n.classList.toggle("work",a.k==="work");

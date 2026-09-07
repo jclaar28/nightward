@@ -18,6 +18,9 @@ var FS_COMMON=
 "uniform vec4 uLampC[NL];\n"+
 "uniform int uLampN;\n"+
 "uniform vec2 uShadowTexel;\n"+
+// Skylight caught on an edge. rgb is the colour of it, a is how much of it
+// there is at this hour — near nothing at midday, most of it at night.
+"uniform vec4 uRim;\n"+
 // War fog. One 80x80 R8 texture for the whole scene, sampled by world XZ:
 // 0 never seen, ~0.5 seen before, 1 in sight now. Doing it here rather than
 // per instance is what makes the boundary a smooth curve instead of a staircase
@@ -99,18 +102,61 @@ var FS_COMMON=
 "  }\n"+
 "  float rim=pow(1.0-max(dot(N,Vs),0.0),(vM>2.5)?2.2:3.5);\n"+
 "  col += vC*0.9*rim*rimK*(uSun*0.72+uSky*0.55);\n"+
+// The material rim above is the object lighting its own edge, which is no help
+// to a thing that is nearly black: at night an attacker sat 12 levels off the
+// ground behind it against 26 by day, and a rim scaled by its own colour would
+// have left it there. This one adds the sky's colour rather than the object's,
+// so a dark silhouette catches an edge exactly because it is dark. It picks out
+// what it should: the ground faces the camera at a glancing angle and takes
+// almost none of it, while anything standing up is all edge.
+// A sharper falloff than the material rim on purpose. At 3.5 the ground takes
+// a twentieth of it, which is enough to lift the whole field by six levels and
+// give back most of the contrast the edge had just gained; at 6.0 the ground
+// takes a two-hundredth and only a true silhouette catches it.
+"  float srim=pow(1.0-max(dot(N,Vs),0.0),6.0);\n"+
+"  col += uRim.rgb*srim*uRim.a;\n"+
 // the fog level rides in the normal buffer alpha so the ink pass can fade too
 "  oColor=vec4(warApply(col,wf),1.0);\n"+
 "  oNormal=vec4(N*0.5+0.5,wf);\n"+
 "}";
 
-var VS_STATIC="#version 300 es\n"+
+// Wind, in the one place it can be cheap: the vertex shader.
+//
+// The trees are part of the static mesh — one buffer, one draw call, no
+// instances — so there is nothing per tree to animate on the CPU. What there
+// is, is a spare range in the emissive channel: emit uses 0-2 and finish uses
+// the next two bits, so everything above 32 was free. A tree's foliage is baked
+// with a sway weight there, its trunk with none, and the terrain with none.
+//
+// The offset is driven by the vertex's own position, so neighbouring trees are
+// never in step, and it is scaled by that weight, so a canopy moves and the
+// trunk it sits on does not. The shadow pass runs the identical function: a
+// tree that sways while its shadow stands still is worse than no wind at all.
+var GLSL_SWAY=
+"uniform float uTime; uniform float uWind;\n"+
+"vec3 swayAt(vec3 p,float w){\n"+
+"  if(w<0.5||uWind<0.001) return p;\n"+
+// 0.17 of a world unit at the top of the tallest layer, at full wind. The
+// first pass left this at 1.0 and a stand of pines swung a metre each way like
+// kelp — a quarter of every pixel in a forest view changed between two frames
+// a second and a half apart.
+"  float k=w*(1.0/7.0)*uWind*0.17;\n"+
+"  float a=uTime*1.05 + p.x*0.31 + p.z*0.19;\n"+
+"  float b=uTime*0.61 + p.z*0.24 - p.x*0.13;\n"+
+"  p.x += (sin(a)*0.72 + sin(b*1.7)*0.28)*k;\n"+
+"  p.z += (sin(b)*0.68 + sin(a*1.3)*0.32)*k*0.85;\n"+
+"  return p;\n"+
+"}\n";
+
+var VS_STATIC="#version 300 es\n"+GLSL_SWAY+
 "in vec3 aPos; in vec3 aNrm; in vec3 aCol; in float aEmit;\n"+
 "uniform mat4 uVP,uLightVP;\n"+
 "out vec3 vN; out vec3 vC; out vec3 vW; out float vE; out float vM; out vec4 vLP;\n"+
-"void main(){ vN=aNrm; vC=aCol; vW=aPos;\n"+
-"  vE=mod(aEmit,8.0); vM=floor(aEmit/8.0);\n"+
-"  vLP=uLightVP*vec4(aPos,1.0); gl_Position=uVP*vec4(aPos,1.0); }";
+"void main(){\n"+
+"  vec3 wp=swayAt(aPos, floor(aEmit/32.0));\n"+
+"  vN=aNrm; vC=aCol; vW=wp;\n"+
+"  vE=mod(aEmit,8.0); vM=floor(mod(aEmit,32.0)/8.0);\n"+
+"  vLP=uLightVP*vec4(wp,1.0); gl_Position=uVP*vec4(wp,1.0); }";
 
 var VS_INST="#version 300 es\n"+
 "in vec3 aPos; in vec3 aNrm; in vec3 aShade; in float aTint; in float aEmit;\n"+
@@ -131,12 +177,12 @@ var VS_INST="#version 300 es\n"+
 // tint 2 means the vertex already carries its final colour: a part that opted
 // out of the asset's two shared slots
 "  vC=(em>1.5||aTint>1.5)?aShade:mix(iColA.rgb,iColB.rgb,aTint)*aShade;\n"+
-"  vW=wp; vE=em; vM=floor(aEmit/8.0);\n"+
+"  vW=wp; vE=em; vM=floor(mod(aEmit,32.0)/8.0);\n"+
 "  vLP=uLightVP*vec4(wp,1.0); gl_Position=uVP*vec4(wp,1.0); }";
 
-var VS_SHADOW_STATIC="#version 300 es\n"+
-"in vec3 aPos; uniform mat4 uLightVP;\n"+
-"void main(){ gl_Position=uLightVP*vec4(aPos,1.0); }";
+var VS_SHADOW_STATIC="#version 300 es\n"+GLSL_SWAY+
+"in vec3 aPos; in float aEmit; uniform mat4 uLightVP;\n"+
+"void main(){ gl_Position=uLightVP*vec4(swayAt(aPos, floor(aEmit/32.0)),1.0); }";
 
 var VS_SHADOW_INST="#version 300 es\n"+
 "in vec3 aPos; in vec4 iPosRot; in vec4 iColA; in vec4 iColB;\n"+
@@ -161,6 +207,8 @@ var FS_POST="#version 300 es\nprecision highp float;\n"+
 "uniform sampler2D uColor,uNormal,uDepth;\n"+
 "uniform vec2 uTexel; uniform float uOutline; uniform vec3 uFlash;\n"+
 "uniform vec3 uFog,uSkyTop,uSkyBot;\n"+
+// how much of the outline turns pale where the picture is dark
+"uniform float uInk;\n"+
 "out vec4 o;\n"+
 "float lum(vec3 c){ return dot(c,vec3(0.299,0.587,0.114)); }\n"+
 "void main(){\n"+
@@ -169,7 +217,7 @@ var FS_POST="#version 300 es\nprecision highp float;\n"+
 "  vec3 n=texture(uNormal,vUv).rgb*2.0-1.0;\n"+
 "  float sky=step(0.99995,d);\n"+
 "  c=mix(c,mix(uSkyBot,uSkyTop,pow(clamp(vUv.y,0.,1.),0.75)),sky);\n"+
-"  float e=0.0;\n"+
+"  float e=0.0, gap=0.0;\n"+
 "  for(int i=0;i<4;i++){\n"+
 "    vec2 off = i==0?vec2(1.,0.): i==1?vec2(-1.,0.): i==2?vec2(0.,1.):vec2(0.,-1.);\n"+
 "    vec2 uv2=vUv+off*uTexel*1.35;\n"+
@@ -177,13 +225,32 @@ var FS_POST="#version 300 es\nprecision highp float;\n"+
 "    vec3 n2=texture(uNormal,uv2).rgb*2.0-1.0;\n"+
 "    e=max(e, smoothstep(0.00028,0.0016,abs(d-d2)));\n"+
 "    e=max(e, smoothstep(0.42,0.86,1.0-dot(n,n2))*0.85);\n"+
+// How far the depth jumps, on a much coarser scale than the outline uses. The
+// camera is orthographic, so this is linear in world units: the band below
+// starts at about a unit of standing height and saturates near two and a half.
+// It is what separates a thing from a speck — the map is strewn with pebbles
+// and tufts, and lighting every edge indiscriminately turned the night into a
+// wireframe with a bright line around every stone.
+"    gap=max(gap, smoothstep(0.0035,0.0090,abs(d-d2)));\n"+
 "  }\n"+
 // The ink pass would happily draw a crisp outline around a building sitting in
 // unexplored ground: the edge comes from depth and normals, neither of which
 // knows about fog. That is what the alpha written above is for.
 "  float wf=texture(uNormal,vUv).a;\n"+
 "  e*=(1.0-sky)*uOutline*wf;\n"+
-"  c=mix(c,mix(vec3(0.055,0.045,0.055),c*0.16,0.35),clamp(e,0.0,1.0)*0.92);\n"+
+// The outline is drawn in ink by day and in moonlight at night. A dark line
+// around a dark shape on dark ground is not an outline, it is nothing, which is
+// why a night wave was 88 attackers you could pick out ten of. A fresnel rim
+// was tried first and does almost nothing here: these are boxes and cones, so
+// there is no curvature for a rim to sweep across — a face is either edge-on
+// and one pixel wide or it faces you and takes none. The edge the eye actually
+// reads is the one the depth-and-normal pass already finds, so that is the one
+// to light. Only pixels that are themselves dark switch over, so a lamp-lit
+// wall keeps its ink and the horde in the field outside it does not.
+"  float l0=lum(c);\n"+
+"  vec3 inkD=mix(vec3(0.055,0.045,0.055),c*0.16,0.35);\n"+
+"  float ik=uInk*gap*(1.0-smoothstep(0.05,0.26,l0));\n"+
+"  c=mix(c,mix(inkD,vec3(0.50,0.60,0.86),ik),clamp(e,0.0,1.0)*0.92);\n"+
 "  float fogT=smoothstep(0.28,0.80,d)*(1.0-sky);\n"+
 "  c=mix(c,uFog,fogT*0.88);\n"+
 "  c=pow(max(c,0.0),vec3(0.95));\n"+
@@ -256,7 +323,7 @@ function create(canvas){
     attr(pStatic,"aCol",3,S,24); attr(pStatic,"aEmit",1,S,36);
     gl.bindVertexArray(st.vaoS);
     gl.bindBuffer(gl.ARRAY_BUFFER,st.vbo);
-    attr(pShS,"aPos",3,S,0);
+    attr(pShS,"aPos",3,S,0); attr(pShS,"aEmit",1,S,36);
     gl.bindVertexArray(null);
     st.n=mesh.count();
   }
@@ -361,15 +428,20 @@ function create(canvas){
   // together instead of drifting apart.
   var SKY=[
    {p:0.00, az:108, el:54, sun:[1.36,1.28,1.14], sky:[0.360,0.420,0.530], bnc:[0.225,0.222,0.220],
-    fog:[0.400,0.430,0.470], top:[0.255,0.335,0.455], bot:[0.560,0.575,0.585], em:0.30},
+    fog:[0.400,0.430,0.470], top:[0.255,0.335,0.455], bot:[0.560,0.575,0.585], em:0.30,
+    rim:[0.62,0.68,0.82], rk:0.10, ink:0.00},
    {p:0.50, az:122, el:15, sun:[1.42,1.02,0.66], sky:[0.330,0.352,0.430], bnc:[0.200,0.180,0.180],
-    fog:[0.360,0.300,0.290], top:[0.150,0.180,0.265], bot:[0.520,0.395,0.320], em:0.85},
+    fog:[0.360,0.300,0.290], top:[0.150,0.180,0.265], bot:[0.520,0.395,0.320], em:0.85,
+    rim:[0.92,0.62,0.42], rk:0.85, ink:0.42},
    {p:1.00, az:152, el:40, sun:[0.470,0.560,0.760], sky:[0.205,0.252,0.372], bnc:[0.112,0.124,0.158],
-    fog:[0.105,0.128,0.192], top:[0.032,0.044,0.078], bot:[0.086,0.100,0.152], em:1.45},
+    fog:[0.105,0.128,0.192], top:[0.032,0.044,0.078], bot:[0.086,0.100,0.152], em:1.45,
+    rim:[0.46,0.60,0.92], rk:1.15, ink:0.80},
    {p:1.50, az:62,  el:13, sun:[1.14,0.86,0.70], sky:[0.262,0.292,0.400], bnc:[0.132,0.126,0.140],
-    fog:[0.330,0.322,0.332], top:[0.150,0.170,0.250], bot:[0.470,0.392,0.352], em:0.90},
+    fog:[0.330,0.322,0.332], top:[0.150,0.170,0.250], bot:[0.470,0.392,0.352], em:0.90,
+    rim:[0.86,0.66,0.50], rk:0.80, ink:0.38},
    {p:2.00, az:108, el:54, sun:[1.36,1.28,1.14], sky:[0.360,0.420,0.530], bnc:[0.225,0.222,0.220],
-    fog:[0.400,0.430,0.470], top:[0.255,0.335,0.455], bot:[0.560,0.575,0.585], em:0.30}
+    fog:[0.400,0.430,0.470], top:[0.255,0.335,0.455], bot:[0.560,0.575,0.585], em:0.30,
+    rim:[0.62,0.68,0.82], rk:0.10, ink:0.00}
   ];
   // Lamp pools: unshadowed point lights so the settlement stays legible
   // after dark. Scaled by uEmit, so they fade out in daylight for free.
@@ -389,10 +461,16 @@ function create(canvas){
   }
 
   function lerp3(a,b,t){ return [a[0]+(b[0]-a[0])*t, a[1]+(b[1]-a[1])*t, a[2]+(b[2]-a[2])*t]; }
-  var SKYNOW={sun:[1,1,1], sky:[0,0,0], bnc:[0,0,0], fog:[0,0,0], top:[0,0,0], bot:[0,0,0], em:1};
+  var SKYNOW={sun:[1,1,1], sky:[0,0,0], bnc:[0,0,0], fog:[0,0,0], top:[0,0,0], bot:[0,0,0],
+              rim:[0,0,0], rk:0, ink:0, em:1};
   var SM_HALF=34;                       // light frustum half-extent, world units
   var SM_WORLD=(SM_HALF*2)/SM;         // world units per shadow texel
   var lightDir, lightVP, dayPhase=0.5;
+  // One clock for everything that moves without the simulation moving it. It
+  // comes in from the game rather than from Date.now() so a headless run of a
+  // known number of steps draws the same frame every time.
+  var clockT=0, windK=1.0;
+  function setClock(t,w){ clockT=t||0; if(w!==undefined) windK=w; }
 
   function setTime(p){
     p=p%2; if(p<0) p+=2;
@@ -407,6 +485,9 @@ function create(canvas){
     SKYNOW.fog=lerp3(a.fog,b.fog,t);
     SKYNOW.top=lerp3(a.top,b.top,t);
     SKYNOW.bot=lerp3(a.bot,b.bot,t);
+    SKYNOW.rim=lerp3(a.rim,b.rim,t);
+    SKYNOW.rk =a.rk+(b.rk-a.rk)*t;
+    SKYNOW.ink=a.ink+(b.ink-a.ink)*t;
     SKYNOW.em =a.em+(b.em-a.em)*t;
     var az=(a.az+(b.az-a.az)*t)*Math.PI/180, el=(a.el+(b.el-a.el)*t)*Math.PI/180;
     lightDir=M.nz([Math.cos(el)*Math.cos(az),Math.sin(el),Math.cos(el)*Math.sin(az)]);
@@ -434,6 +515,7 @@ function create(canvas){
     gl.clear(gl.DEPTH_BUFFER_BIT);
     gl.useProgram(pShS);
     gl.uniformMatrix4fv(u(pShS,"uLightVP"),false,lightVP);
+    gl.uniform1f(u(pShS,"uTime"),clockT); gl.uniform1f(u(pShS,"uWind"),windK);
     gl.bindVertexArray(st.vaoS);
     gl.drawArrays(gl.TRIANGLES,0,st.n);
     gl.useProgram(pShI);
@@ -463,6 +545,7 @@ function create(canvas){
       gl.uniform3fv(u(p,"uSky"),SKYNOW.sky);
       gl.uniform3fv(u(p,"uBounce"),SKYNOW.bnc);
       gl.uniform1f(u(p,"uEmit"),SKYNOW.em);
+      gl.uniform4f(u(p,"uRim"),SKYNOW.rim[0],SKYNOW.rim[1],SKYNOW.rim[2],SKYNOW.rk);
       bindLamps(p);
       gl.uniform2f(u(p,"uShadowTexel"),1/SM,1/SM);
       gl.uniform1f(u(p,"uSMWorld"),SM_WORLD);
@@ -475,6 +558,7 @@ function create(canvas){
       gl.activeTexture(gl.TEXTURE0);
     }
     gl.useProgram(pStatic); common(pStatic);
+    gl.uniform1f(u(pStatic,"uTime"),clockT); gl.uniform1f(u(pStatic,"uWind"),windK);
     gl.bindVertexArray(st.vao);
     gl.drawArrays(gl.TRIANGLES,0,st.n);
 
@@ -550,6 +634,7 @@ function create(canvas){
     gl.uniform1i(u(pPost,"uDepth"),2);
     gl.uniform2f(u(pPost,"uTexel"),1/W,1/H);
     gl.uniform1f(u(pPost,"uOutline"),OPT.outline);
+    gl.uniform1f(u(pPost,"uInk"),SKYNOW.ink);
     gl.uniform3f(u(pPost,"uFlash"),flash?flash[0]:0,flash?flash[1]:0,flash?flash[2]:0);
     gl.uniform3fv(u(pPost,"uFog"),SKYNOW.fog);
     gl.uniform3fv(u(pPost,"uSkyTop"),SKYNOW.top);
@@ -610,7 +695,8 @@ function create(canvas){
     gl.bindTexture(gl.TEXTURE_2D,null);
   }
   return {gl:gl, setStatic:setStatic, makeBatch:makeBatch, rebuildBatch:rebuildBatch, setInstances:setInstances, pickAt:pickAt,
-          render:render, setOptions:setOptions, setTime:setTime, setLamps:setLamps, setFog:setFog,
+          render:render, setOptions:setOptions, setTime:setTime, setClock:setClock,
+          setLamps:setLamps, setFog:setFog,
           time:function(){return dayPhase;}, size:function(){return [W,H];}};
 }
 

@@ -82,12 +82,16 @@ const wiring = await page.evaluate(() => {
            inOpaque: ['rchip', 'dshade', 'marker', 'grid']
                        .filter(k => (window.__nwLIST || []).indexOf(B[k]) >= 0) };
 });
-check('every decal batch reaches the blended pass', wiring.blends.length === 4,
+check('the decal batches reach the blended pass', wiring.blends.length >= 4,
       `${wiring.blends.length} decal batches: ${wiring.blends.join(', ')}`);
-check('...and the contact shade is the one that subtracts',
+// Composition, not a count: the first version asserted exactly four and the
+// mist made it five, which is a check failing for the reason a check should
+// never fail — somebody added a thing it was not told about.
+check('...and exactly one of them subtracts rather than adds',
       wiring.blends.filter(b => b === 'mul').length === 1 &&
-      wiring.blends.filter(b => b === 'add').length === 3,
-      `${wiring.blends.join(', ')} — add brightens, mul takes light away`);
+      wiring.blends.filter(b => b === 'add').length === wiring.blends.length - 1,
+      `${wiring.blends.join(', ')} — add brightens, mul takes light away, and the ` +
+      `contact shade is the only thing that can be made by taking light away`);
 
 // ---- a ring is an even line, not a string of beads --------------------------
 // Every chip fades to nothing at both ends so consecutive chips cross-fade, and
